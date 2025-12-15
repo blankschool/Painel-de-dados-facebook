@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithFacebook = async () => {
     const clientId = '1728352261135208';
-    const redirectUri = 'https://xftrrfomvmvllnwjroxp.supabase.co/auth/v1/callback';
+    const redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
     const scopes = [
       'instagram_business_basic',
       'instagram_business_manage_messages',

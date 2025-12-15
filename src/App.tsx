@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import Mentions from "./pages/Mentions";
 import Benchmarks from "./pages/Benchmarks";
 import NotFound from "./pages/NotFound";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route element={<DashboardLayout />}>
                 <Route path="/" element={<Index />} />
                 <Route path="/posts" element={<Posts />} />
