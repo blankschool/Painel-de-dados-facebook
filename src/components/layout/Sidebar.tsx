@@ -118,13 +118,25 @@ export function Sidebar() {
         ) : (
           <div className="mb-3 rounded-xl border border-border bg-secondary/50 p-3">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-full border border-border bg-background" />
+              {connectedAccounts[0]?.profile_picture_url ? (
+                <img 
+                  src={connectedAccounts[0].profile_picture_url} 
+                  alt="Profile" 
+                  className="h-8 w-8 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full border border-border bg-background flex items-center justify-center">
+                  <Instagram className="h-4 w-4 text-muted-foreground" />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="truncate text-sm font-medium">
-                  {isDemoMode ? 'Demo User' : user?.email || 'Usuário'}
+                  {connectedAccounts[0]?.account_username 
+                    ? `@${connectedAccounts[0].account_username}` 
+                    : connectedAccounts[0]?.account_name || user?.email || 'Usuário'}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {isDemoMode ? 'Modo demonstração' : 'Conta conectada'}
+                  {connectedAccounts[0]?.provider === 'facebook' ? 'Facebook' : 'Instagram'}
                 </p>
               </div>
             </div>
