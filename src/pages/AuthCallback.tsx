@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState('Processando autenticação...');
+  const { refreshConnectedAccounts } = useAuth();
+  const [status, setStatus] = useState('Processing authentication...');
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -14,13 +16,13 @@ export default function AuthCallback() {
       const error = urlParams.get('error');
 
       if (error) {
-        setStatus('Erro na autenticação: ' + error);
+        setStatus('Authentication error: ' + error);
         setTimeout(() => navigate('/auth?error=unknown'), 2000);
         return;
       }
 
       if (!code) {
-        setStatus('Código de autorização não encontrado');
+        setStatus('Authorization code not found');
         setTimeout(() => navigate('/auth?error=unknown'), 2000);
         return;
       }
@@ -29,19 +31,17 @@ export default function AuthCallback() {
       const storedState = localStorage.getItem('oauth_state');
       if (!stateParam || stateParam !== storedState) {
         console.error('State mismatch:', { stateParam, storedState });
-        setStatus('Sessão de autenticação inválida');
+        setStatus('Invalid authentication session');
         localStorage.removeItem('oauth_state');
         setTimeout(() => navigate('/auth?error=invalid_state'), 2000);
         return;
       }
 
-      // Parse state to get login method and redirect
+      // Parse state to get login method
       let loginMethod = 'instagram';
-      let redirectTo = '/';
       try {
         const stateData = JSON.parse(atob(stateParam));
         loginMethod = stateData.login_method || 'instagram';
-        redirectTo = stateData.redirect_to || '/';
       } catch (e) {
         console.warn('Could not parse state data');
       }
@@ -52,17 +52,15 @@ export default function AuthCallback() {
       // Check if user is logged in
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setStatus('Por favor, faça login primeiro');
-        // Store the code temporarily to retry after login
+        setStatus('Please sign in first');
         localStorage.setItem('pending_oauth_code', code);
         localStorage.setItem('pending_oauth_method', loginMethod);
-        localStorage.setItem('auth_redirect_to', redirectTo);
         setTimeout(() => navigate('/auth?error=no_session'), 2000);
         return;
       }
 
       try {
-        setStatus('Trocando código por token...');
+        setStatus('Exchanging code for token...');
         
         const { data, error: fnError } = await supabase.functions.invoke('instagram-oauth', {
           body: { 
@@ -75,25 +73,29 @@ export default function AuthCallback() {
         if (fnError) throw fnError;
 
         if (data?.success) {
-          setStatus('Conta conectada com sucesso! Redirecionando...');
+          setStatus('Account connected successfully! Redirecting...');
           // Clear any old localStorage tokens
           localStorage.removeItem('instagram_access_token');
           localStorage.removeItem('instagram_user_id');
-          localStorage.removeItem('demoMode');
+          localStorage.removeItem('auth_redirect_to');
           
-          setTimeout(() => navigate(redirectTo), 1000);
+          // Refresh connected accounts in context
+          await refreshConnectedAccounts();
+          
+          // Always redirect to /profile after successful connection
+          setTimeout(() => navigate('/profile'), 1000);
         } else {
-          throw new Error(data?.error || 'Token não recebido');
+          throw new Error(data?.error || 'Token not received');
         }
       } catch (err: any) {
         console.error('OAuth error:', err);
-        setStatus('Erro ao processar autenticação: ' + err.message);
+        setStatus('Error processing authentication: ' + err.message);
         setTimeout(() => navigate('/auth?error=token_exchange_failed'), 3000);
       }
     };
 
     handleCallback();
-  }, [navigate]);
+  }, [navigate, refreshConnectedAccounts]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">

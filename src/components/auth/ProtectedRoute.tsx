@@ -3,15 +3,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requireConnectedAccount?: boolean;
 }
 
-export function ProtectedRoute({ children, requireConnectedAccount = true }: ProtectedRouteProps) {
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading, connectedAccounts, loadingAccounts } = useAuth();
   const location = useLocation();
-
-  // Check for demo mode
-  const isDemoMode = localStorage.getItem('demoMode') === 'true';
 
   // Still loading auth state
   if (loading || loadingAccounts) {
@@ -22,11 +18,6 @@ export function ProtectedRoute({ children, requireConnectedAccount = true }: Pro
     );
   }
 
-  // Demo mode bypass
-  if (isDemoMode) {
-    return <>{children}</>;
-  }
-
   // No user session - redirect to login
   if (!user) {
     // Store the intended destination
@@ -34,9 +25,8 @@ export function ProtectedRoute({ children, requireConnectedAccount = true }: Pro
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // User logged in but no connected account
-  if (requireConnectedAccount && connectedAccounts.length === 0) {
-    // Store the intended destination
+  // User logged in but no connected account - redirect to /auth (will show connect step)
+  if (connectedAccounts.length === 0) {
     localStorage.setItem('auth_redirect_to', location.pathname);
     return <Navigate to="/auth" replace />;
   }

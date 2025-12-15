@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 const dayLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const Audience = () => {
-  const { profile, demographics, onlineFollowers, loading, error, isDemoMode, refreshData } = useInstagram();
+  const { profile, demographics, onlineFollowers, loading, error, refreshData } = useInstagram();
 
   // Process gender data from demographics
   const genderData = useMemo(() => {
@@ -233,11 +233,6 @@ const Audience = () => {
           <p className="mt-1.5 text-sm text-muted-foreground">
             Visão geral de crescimento, demografia e distribuição geográfica.
           </p>
-          {isDemoMode && (
-            <span className="mt-2 inline-block rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-              Modo Demonstração
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-3">
           <Button onClick={refreshData} variant="ghost" size="sm" className="gap-2" disabled={loading}>

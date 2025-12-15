@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Auth = () => {
-  const { user, loading, connectedAccounts, connectWithInstagram, connectWithFacebook, signInWithEmail, signUpWithEmail } = useAuth();
+  const { user, loading, connectedAccounts, loadingAccounts, connectWithInstagram, connectWithFacebook, signInWithEmail, signUpWithEmail } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -26,13 +26,13 @@ const Auth = () => {
     const error = searchParams.get('error');
     if (error) {
       const errorMessages: Record<string, string> = {
-        'invalid_state': 'Sessão de autenticação expirada. Por favor, tente novamente.',
-        'token_exchange_failed': 'Falha ao conectar sua conta. Por favor, tente novamente.',
-        'no_session': 'Por favor, faça login antes de conectar uma conta.',
-        'unknown': 'Ocorreu um erro. Por favor, tente novamente.',
+        'invalid_state': 'Authentication session expired. Please try again.',
+        'token_exchange_failed': 'Failed to connect your account. Please try again.',
+        'no_session': 'Please sign in before connecting an account.',
+        'unknown': 'An error occurred. Please try again.',
       };
       toast({
-        title: 'Erro de autenticação',
+        title: 'Authentication Error',
         description: errorMessages[error] || errorMessages['unknown'],
         variant: 'destructive',
       });
@@ -41,12 +41,12 @@ const Auth = () => {
 
   // Redirect authenticated users with connected accounts to dashboard
   useEffect(() => {
-    if (user && !loading && connectedAccounts.length > 0) {
-      const redirectTo = localStorage.getItem('auth_redirect_to') || '/';
+    if (user && !loading && !loadingAccounts && connectedAccounts.length > 0) {
+      const redirectTo = localStorage.getItem('auth_redirect_to') || '/profile';
       localStorage.removeItem('auth_redirect_to');
       navigate(redirectTo);
     }
-  }, [user, loading, connectedAccounts, navigate]);
+  }, [user, loading, loadingAccounts, connectedAccounts, navigate]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,25 +57,25 @@ const Auth = () => {
         const { error } = await signInWithEmail(email, password);
         if (error) throw error;
         toast({
-          title: 'Login realizado',
-          description: 'Você está conectado!',
+          title: 'Welcome back',
+          description: 'You are now signed in.',
         });
       } else {
         const { error } = await signUpWithEmail(email, password, fullName);
         if (error) throw error;
         toast({
-          title: 'Conta criada',
-          description: 'Verifique seu email para confirmar o cadastro.',
+          title: 'Account created',
+          description: 'Please check your email to confirm your account.',
         });
       }
     } catch (error: any) {
       const errorMessage = error.message === 'Invalid login credentials'
-        ? 'Email ou senha incorretos.'
+        ? 'Invalid email or password.'
         : error.message === 'User already registered'
-          ? 'Este email já está cadastrado.'
+          ? 'This email is already registered.'
           : error.message;
       toast({
-        title: 'Erro',
+        title: 'Error',
         description: errorMessage,
         variant: 'destructive',
       });
@@ -90,8 +90,8 @@ const Auth = () => {
       await connectWithInstagram();
     } catch (error) {
       toast({
-        title: 'Erro',
-        description: 'Ocorreu um erro ao conectar com Instagram.',
+        title: 'Error',
+        description: 'Failed to connect with Instagram.',
         variant: 'destructive',
       });
       setIsSigningIn(false);
@@ -104,20 +104,15 @@ const Auth = () => {
       await connectWithFacebook();
     } catch (error) {
       toast({
-        title: 'Erro',
-        description: 'Ocorreu um erro ao conectar com Facebook.',
+        title: 'Error',
+        description: 'Failed to connect with Facebook.',
         variant: 'destructive',
       });
       setIsSigningIn(false);
     }
   };
 
-  const handleDemoMode = () => {
-    localStorage.setItem('demoMode', 'true');
-    navigate('/');
-  };
-
-  if (loading) {
+  if (loading || loadingAccounts) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -125,7 +120,7 @@ const Auth = () => {
     );
   }
 
-  // User is logged in but needs to connect an account
+  // User is logged in but needs to connect an account (Step 2)
   const needsAccountConnection = user && connectedAccounts.length === 0;
 
   return (
@@ -137,19 +132,21 @@ const Auth = () => {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-background">
               <Instagram className="h-8 w-8 text-foreground" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Painel de Dados</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {needsAccountConnection ? 'Connect your account' : 'Access your dashboard'}
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {needsAccountConnection 
-                ? 'Conecte sua conta Instagram ou Facebook para continuar'
-                : 'Análise completa do seu perfil Instagram'}
+                ? 'Choose how you want to connect. This lets you analyze and save Instagram accounts under your profile.'
+                : 'Sign in with email to save profiles and track your analysis history.'}
             </p>
           </div>
 
           {needsAccountConnection ? (
-            // Show only Meta connection options
+            // Step 2: Connect Instagram or Facebook
             <div className="space-y-4">
-              <p className="text-center text-sm text-muted-foreground mb-4">
-                Olá, {user.email}! Conecte uma conta para acessar o painel.
+              <p className="text-center text-sm text-muted-foreground mb-6">
+                Signed in as <span className="font-medium text-foreground">{user.email}</span>
               </p>
               
               {/* Instagram Button */}
@@ -163,7 +160,7 @@ const Auth = () => {
                 ) : (
                   <Instagram className="h-5 w-5" />
                 )}
-                Conectar Instagram
+                Connect Instagram
               </Button>
 
               {/* Facebook Button */}
@@ -177,68 +174,26 @@ const Auth = () => {
                 ) : (
                   <Facebook className="h-5 w-5" />
                 )}
-                Conectar Facebook
+                Connect Facebook
               </Button>
             </div>
           ) : (
-            // Show full login options
+            // Step 1: Email login/signup only
             <div className="space-y-6">
-              {/* Meta OAuth Buttons */}
-              <div className="space-y-3">
-                {/* Instagram Button */}
-                <Button
-                  onClick={handleInstagramConnect}
-                  disabled={isSigningIn}
-                  className="w-full gap-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 py-6 text-sm font-semibold text-white transition-all hover:from-purple-700 hover:to-pink-600 hover:shadow-hover"
-                >
-                  {isSigningIn ? (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <Instagram className="h-5 w-5" />
-                  )}
-                  Continuar com Instagram
-                </Button>
-
-                {/* Facebook Button */}
-                <Button
-                  onClick={handleFacebookConnect}
-                  disabled={isSigningIn}
-                  className="w-full gap-3 rounded-xl bg-[#1877F2] py-6 text-sm font-semibold text-white transition-all hover:bg-[#166FE5] hover:shadow-hover"
-                >
-                  {isSigningIn ? (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <Facebook className="h-5 w-5" />
-                  )}
-                  Continuar com Facebook
-                </Button>
-              </div>
-
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">ou</span>
-                </div>
-              </div>
-
-              {/* Email Auth */}
               <Tabs value={authTab} onValueChange={(v) => setAuthTab(v as 'login' | 'signup')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="login">Entrar</TabsTrigger>
-                  <TabsTrigger value="signup">Criar conta</TabsTrigger>
+                  <TabsTrigger value="login">Sign in</TabsTrigger>
+                  <TabsTrigger value="signup">Create account</TabsTrigger>
                 </TabsList>
                 
                 <form onSubmit={handleEmailAuth} className="space-y-4">
                   <TabsContent value="signup" className="mt-0">
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Nome completo</Label>
+                      <Label htmlFor="fullName">Full name</Label>
                       <Input
                         id="fullName"
                         type="text"
-                        placeholder="Seu nome"
+                        placeholder="Your name"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         className="rounded-xl"
@@ -251,7 +206,7 @@ const Auth = () => {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="seu@email.com"
+                      placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -260,7 +215,7 @@ const Auth = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
+                    <Label htmlFor="password">Password</Label>
                     <div className="relative">
                       <Input
                         id="password"
@@ -285,40 +240,23 @@ const Auth = () => {
                   <Button
                     type="submit"
                     disabled={isSigningIn}
-                    variant="outline"
                     className="w-full gap-2 rounded-xl py-6 text-sm font-medium"
                   >
                     {isSigningIn ? (
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                     ) : (
                       <Mail className="h-5 w-5" />
                     )}
-                    {authTab === 'login' ? 'Entrar com Email' : 'Criar conta'}
+                    {authTab === 'login' ? 'Sign in' : 'Create account'}
                   </Button>
                 </form>
               </Tabs>
-
-              {/* Demo Mode Button */}
-              <Button
-                variant="ghost"
-                onClick={handleDemoMode}
-                className="w-full gap-2 rounded-xl py-6 text-sm font-medium text-muted-foreground"
-              >
-                Ver demonstração
-              </Button>
             </div>
           )}
 
-          {/* Info */}
-          <div className="mt-6 rounded-xl border border-border bg-secondary/50 p-4">
-            <p className="text-center text-xs text-muted-foreground">
-              Ao continuar, você autoriza o acesso às informações do seu perfil Instagram.
-            </p>
-          </div>
-
           {/* Footer */}
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Seus dados estão protegidos e seguros.
+            Your data is stored securely. You can disconnect at any time.
           </p>
         </div>
       </div>
