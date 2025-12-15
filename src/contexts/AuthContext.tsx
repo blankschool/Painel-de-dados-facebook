@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithFacebook = async () => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = 'https://insta-glow-up-39.lovable.app/';
     await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
