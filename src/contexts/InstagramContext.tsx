@@ -95,11 +95,14 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isDemoMode = localStorage.getItem('demoMode') === 'true' && !user;
+  // Check for Instagram token from localStorage (direct Instagram OAuth)
+  const instagramToken = localStorage.getItem('instagram_access_token');
+  const instagramUserId = localStorage.getItem('instagram_user_id');
+  const isAuthenticated = !!(instagramToken && instagramUserId) || !!session?.provider_token;
+  
+  const isDemoMode = localStorage.getItem('demoMode') === 'true' && !user && !isAuthenticated;
 
   const loadAccountData = useCallback(async (account: InstagramAccount) => {
-    if (!session?.provider_token) return;
-    
     setLoading(true);
     setError(null);
     
@@ -120,7 +123,7 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [api, session]);
+  }, [api]);
 
   const selectAccount = useCallback((account: InstagramAccount) => {
     setSelectedAccount(account);
@@ -133,38 +136,74 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedAccount, loadAccountData]);
 
-  // Load Instagram accounts when user logs in
+  // Load Instagram accounts when user logs in or has localStorage token
   useEffect(() => {
     const loadAccounts = async () => {
-      if (!user || !session?.provider_token) {
-        if (isDemoMode) {
-          // Set demo data
-          setProfile(demoProfile);
-          setMedia(demoMedia);
-          setDemographics(demoDemographics);
-          setOnlineFollowers(demoOnlineFollowers);
+      // Check for direct Instagram OAuth (localStorage token)
+      if (instagramToken && instagramUserId) {
+        setLoading(true);
+        try {
+          // For direct Instagram OAuth, get profile directly
+          const profileData = await api.getUserProfile(instagramUserId);
+          if (profileData) {
+            setProfile(profileData);
+            // Create a synthetic account for compatibility
+            const syntheticAccount: InstagramAccount = {
+              pageId: instagramUserId,
+              pageName: profileData.username || 'Instagram Account',
+              instagram: profileData,
+            };
+            setAccounts([syntheticAccount]);
+            setSelectedAccount(syntheticAccount);
+            
+            // Load additional data
+            const [mediaData, demographicsData, onlineData] = await Promise.all([
+              api.getMedia(instagramUserId),
+              api.getAudienceDemographics(instagramUserId),
+              api.getOnlineFollowers(instagramUserId),
+            ]);
+            setMedia(mediaData);
+            setDemographics(demographicsData);
+            setOnlineFollowers(onlineData);
+          }
+        } catch (err: any) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
         }
         return;
       }
 
-      setLoading(true);
-      try {
-        const accountsList = await api.getInstagramAccounts();
-        setAccounts(accountsList);
-        
-        // Auto-select first account if available
-        if (accountsList.length > 0) {
-          selectAccount(accountsList[0]);
+      // Check for Facebook OAuth (Supabase session)
+      if (user && session?.provider_token) {
+        setLoading(true);
+        try {
+          const accountsList = await api.getInstagramAccounts();
+          setAccounts(accountsList);
+          
+          // Auto-select first account if available
+          if (accountsList.length > 0) {
+            selectAccount(accountsList[0]);
+          }
+        } catch (err: any) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
         }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        return;
+      }
+
+      // Demo mode fallback
+      if (isDemoMode) {
+        setProfile(demoProfile);
+        setMedia(demoMedia);
+        setDemographics(demoDemographics);
+        setOnlineFollowers(demoOnlineFollowers);
       }
     };
 
     loadAccounts();
-  }, [user, session, isDemoMode, api, selectAccount]);
+  }, [user, session, isDemoMode, api, selectAccount, instagramToken, instagramUserId]);
 
   return (
     <InstagramContext.Provider value={{

@@ -53,6 +53,11 @@ export function useInstagramApi() {
   const [error, setError] = useState<string | null>(null);
 
   const getAccessToken = useCallback(() => {
+    // First try localStorage (direct Instagram OAuth)
+    const storedToken = localStorage.getItem('instagram_access_token');
+    if (storedToken) return storedToken;
+    
+    // Fallback to Supabase session (Facebook OAuth)
     return session?.provider_token || null;
   }, [session]);
 
