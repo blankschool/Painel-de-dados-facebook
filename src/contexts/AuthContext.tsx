@@ -129,18 +129,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const clientId = '698718192521096';
     const redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
     const scopes = [
-      'instagram_business_basic',
-      'instagram_business_manage_messages',
-      'instagram_business_manage_comments',
-      'instagram_business_content_publish',
-      'instagram_business_manage_insights',
+      'instagram_basic',
+      'instagram_manage_messages',
+      'instagram_manage_comments',
+      'instagram_content_publish',
+      'instagram_manage_insights',
       'pages_show_list',
       'pages_read_engagement'
     ].join(',');
     
     const state = generateOAuthState('facebook', sessionStorage.getItem('auth_redirect_to') || '/profile');
     
-    const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
+    const facebookAuthUrl = `https://www.facebook.com/v24.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
     
     window.location.href = facebookAuthUrl;
   };
