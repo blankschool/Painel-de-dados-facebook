@@ -70,8 +70,6 @@ serve(async (req) => {
       throw new Error('Invalid provider parameter');
     }
 
-    const clientId = Deno.env.get('INSTAGRAM_APP_ID');
-    const clientSecret = Deno.env.get('INSTAGRAM_APP_SECRET');
     const redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
 
     let accessToken: string;
@@ -79,9 +77,12 @@ serve(async (req) => {
     let expiresIn: number;
 
     if (provider === 'facebook') {
-      // Facebook OAuth flow
+      // Facebook OAuth flow - use Facebook credentials
+      const facebookClientId = Deno.env.get('FACEBOOK_APP_ID');
+      const facebookClientSecret = Deno.env.get('FACEBOOK_APP_SECRET');
+      
       const tokenResponse = await fetch(
-        `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${clientSecret}&code=${code}`
+        `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${facebookClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${facebookClientSecret}&code=${code}`
       );
 
       const tokenData = await tokenResponse.json();
@@ -92,7 +93,7 @@ serve(async (req) => {
 
       // Get long-lived token for Facebook
       const longLivedResponse = await fetch(
-        `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${tokenData.access_token}`
+        `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${facebookClientId}&client_secret=${facebookClientSecret}&fb_exchange_token=${tokenData.access_token}`
       );
 
       const longLivedData = await longLivedResponse.json();
@@ -106,14 +107,14 @@ serve(async (req) => {
 
       // Get Instagram business account ID via Facebook Pages
       const pagesResponse = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`
+        `https://graph.facebook.com/v24.0/me/accounts?access_token=${accessToken}`
       );
       const pagesData = await pagesResponse.json();
       
       if (pagesData.data && pagesData.data.length > 0) {
         const page = pagesData.data[0];
         const igResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`
+          `https://graph.facebook.com/v24.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`
         );
         const igData = await igResponse.json();
         
@@ -127,15 +128,17 @@ serve(async (req) => {
       }
 
     } else {
-      // Instagram Direct OAuth flow
+      // Instagram Direct OAuth flow - use Instagram credentials
+      const instagramClientId = Deno.env.get('INSTAGRAM_APP_ID');
+      const instagramClientSecret = Deno.env.get('INSTAGRAM_APP_SECRET');
       const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: clientId!,
-          client_secret: clientSecret!,
+          client_id: instagramClientId!,
+          client_secret: instagramClientSecret!,
           grant_type: 'authorization_code',
           redirect_uri: redirectUri,
           code: code,
@@ -153,7 +156,7 @@ serve(async (req) => {
 
       // Exchange short-lived token for long-lived token
       const longLivedResponse = await fetch(
-        `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${shortLivedToken}`
+        `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${instagramClientSecret}&access_token=${shortLivedToken}`
       );
 
       const longLivedData = await longLivedResponse.json();
