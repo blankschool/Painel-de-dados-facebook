@@ -1,14 +1,15 @@
 import { HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface MetricCardProps {
+export interface MetricCardProps {
   label: string;
   value: string;
-  delta?: string;
+  delta?: string | { value: string; positive: boolean };
   deltaType?: 'good' | 'bad' | 'neutral';
   tooltip?: string;
   tag?: string;
   sparkline?: React.ReactNode;
+  icon?: React.ReactNode;
 }
 
 export function MetricCard({
@@ -19,11 +20,19 @@ export function MetricCard({
   tooltip,
   tag,
   sparkline,
+  icon,
 }: MetricCardProps) {
+  // Handle delta as string or object
+  const deltaValue = typeof delta === 'object' ? delta.value : delta;
+  const computedDeltaType = typeof delta === 'object' 
+    ? (delta.positive ? 'good' : 'bad') 
+    : deltaType;
+
   return (
     <article className="metric-card animate-slide-up">
       <div className="metric-label">
         <span className="flex items-center gap-2">
+          {icon && <span className="text-muted-foreground">{icon}</span>}
           <span>{label}</span>
           {tooltip && (
             <Tooltip>
@@ -41,10 +50,10 @@ export function MetricCard({
         {tag && <span className="tag">{tag}</span>}
       </div>
       <div className="metric-value">{value}</div>
-      {delta && (
+      {deltaValue && (
         <div className="metric-delta">
-          <span className={`tag ${deltaType === 'good' ? 'tag-good' : deltaType === 'bad' ? 'tag-bad' : ''}`}>
-            {delta}
+          <span className={`tag ${computedDeltaType === 'good' ? 'tag-good' : computedDeltaType === 'bad' ? 'tag-bad' : ''}`}>
+            {deltaValue}
           </span>
           <span>vs período anterior</span>
         </div>
