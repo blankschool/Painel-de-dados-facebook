@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, FileJson, FileText, FileSpreadsheet, File, Loader2 } from 'lucide-react';
+import { Download, FileJson, FileText, FileSpreadsheet, File, Loader2, FileType } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAccount } from '@/contexts/AccountContext';
 import { toast } from 'sonner';
 
-type ExportFormat = 'json' | 'csv' | 'ndjson' | 'markdown' | 'txt';
+type ExportFormat = 'json' | 'csv' | 'ndjson' | 'markdown' | 'txt' | 'pdf';
 
 const formatOptions: { value: ExportFormat; label: string; icon: typeof FileJson; description: string }[] = [
   { value: 'json', label: 'JSON', icon: FileJson, description: 'For developers/AI' },
@@ -21,6 +21,7 @@ const formatOptions: { value: ExportFormat; label: string; icon: typeof FileJson
   { value: 'ndjson', label: 'NDJSON', icon: FileText, description: 'For fine-tuning' },
   { value: 'markdown', label: 'Markdown Report', icon: File, description: 'Formatted report' },
   { value: 'txt', label: 'AI Prompt Ready', icon: FileText, description: 'Ready for AI analysis' },
+  { value: 'pdf', label: 'PDF Report', icon: FileType, description: 'Printable document' },
 ];
 
 export function ExportDropdown() {
@@ -67,6 +68,23 @@ export function ExportDropdown() {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         });
+      } else if (format === 'pdf') {
+        // PDF is base64 encoded
+        const byteCharacters = atob(data.data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       } else {
         // Single file download
         const blob = new Blob([data.data], { type: data.contentType });

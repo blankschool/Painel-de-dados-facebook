@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsPDF } from 'https://esm.sh/jspdf@2.5.1';
 
 /**
  * Export Insights Edge Function
@@ -11,6 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
  * - NDJSON (newline-delimited JSON for streaming/fine-tuning)
  * - Markdown (formatted report with tables)
  * - TXT (prompt-ready text for AI analysis)
+ * - PDF (formatted report document)
  */
 
 const allowedOrigins = [
@@ -315,6 +317,88 @@ serve(async (req) => {
         responseData = txt;
         contentType = 'text/plain';
         filename = `instagram_${username}_${exportDate}.txt`;
+        break;
+
+      case 'pdf':
+        const pdfTotalLikes = posts.reduce((sum: number, p: any) => sum + (p.like_count || 0), 0);
+        const pdfTotalComments = posts.reduce((sum: number, p: any) => sum + (p.comments_count || 0), 0);
+        const pdfAvgEngagement = posts.length > 0 
+          ? ((pdfTotalLikes + pdfTotalComments) / posts.length).toFixed(1)
+          : '0';
+
+        const doc = new jsPDF();
+        let yPos = 20;
+        const lineHeight = 7;
+        const pageHeight = 280;
+
+        // Title
+        doc.setFontSize(18);
+        doc.text(`Instagram Analytics Report`, 20, yPos);
+        yPos += 10;
+        
+        doc.setFontSize(11);
+        doc.text(`@${username} - ${exportDate}`, 20, yPos);
+        yPos += 15;
+
+        // Profile Metrics
+        doc.setFontSize(14);
+        doc.text('Profile Metrics', 20, yPos);
+        yPos += 8;
+        
+        doc.setFontSize(10);
+        Object.entries(profileMetrics).slice(0, 12).forEach(([k, v]) => {
+          if (yPos > pageHeight) { doc.addPage(); yPos = 20; }
+          doc.text(`${k.replace(/_/g, ' ')}: ${(v as number).toLocaleString()}`, 25, yPos);
+          yPos += lineHeight;
+        });
+        yPos += 5;
+
+        // Posts Summary
+        if (yPos > pageHeight - 40) { doc.addPage(); yPos = 20; }
+        doc.setFontSize(14);
+        doc.text('Posts Summary', 20, yPos);
+        yPos += 8;
+        
+        doc.setFontSize(10);
+        doc.text(`Total Posts: ${posts.length}`, 25, yPos); yPos += lineHeight;
+        doc.text(`Total Likes: ${pdfTotalLikes.toLocaleString()}`, 25, yPos); yPos += lineHeight;
+        doc.text(`Total Comments: ${pdfTotalComments.toLocaleString()}`, 25, yPos); yPos += lineHeight;
+        doc.text(`Avg Engagement: ${pdfAvgEngagement}`, 25, yPos); yPos += 10;
+
+        // Top 10 Posts
+        doc.setFontSize(14);
+        doc.text('Top 10 Posts by Engagement', 20, yPos);
+        yPos += 8;
+        
+        doc.setFontSize(9);
+        const pdfTopPosts = [...posts]
+          .sort((a, b) => ((b.like_count || 0) + (b.comments_count || 0)) - ((a.like_count || 0) + (a.comments_count || 0)))
+          .slice(0, 10);
+        pdfTopPosts.forEach((p: any, i: number) => {
+          if (yPos > pageHeight) { doc.addPage(); yPos = 20; }
+          doc.text(`${i + 1}. [${p.media_type}] ${p.like_count || 0} likes, ${p.comments_count || 0} comments`, 25, yPos);
+          yPos += lineHeight;
+        });
+
+        // Stories if available
+        if (storiesData.length > 0) {
+          yPos += 5;
+          if (yPos > pageHeight - 30) { doc.addPage(); yPos = 20; }
+          doc.setFontSize(14);
+          doc.text('Stories (Last 24h)', 20, yPos);
+          yPos += 8;
+          
+          doc.setFontSize(10);
+          doc.text(`Active Stories: ${storiesAggregate.total_stories || 0}`, 25, yPos); yPos += lineHeight;
+          doc.text(`Total Reach: ${(storiesAggregate.total_reach || 0).toLocaleString()}`, 25, yPos); yPos += lineHeight;
+          doc.text(`Completion Rate: ${storiesAggregate.avg_completion_rate || 0}%`, 25, yPos); yPos += lineHeight;
+        }
+
+        // Convert to base64
+        const pdfOutput = doc.output('datauristring').split(',')[1];
+        responseData = pdfOutput;
+        contentType = 'application/pdf';
+        filename = `instagram_${username}_${exportDate}.pdf`;
         break;
 
       default:
