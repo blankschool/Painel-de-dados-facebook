@@ -1,20 +1,21 @@
-import { useEffect } from 'react';
-import { useInsights } from '@/hooks/useInsights';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
-import { DataAlerts } from '@/components/dashboard/DataAlerts';
 import { 
   Users, 
   Grid3X3, 
   Heart, 
+  MessageCircle, 
+  TrendingUp,
   Eye,
-  MousePointerClick,
   UserPlus,
-  Loader2,
-  RefreshCw
+  UserMinus,
+  BarChart3,
+  Loader2
 } from 'lucide-react';
 import {
+  LineChart,
+  Line,
   AreaChart,
   Area,
   BarChart,
@@ -28,18 +29,11 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { Button } from '@/components/ui/button';
 
 const Overview = () => {
-  const { profile, media } = useInstagram();
-  const { data, loading, error, fetchInsights } = useInsights();
+  const { profile, media, loading } = useInstagram();
 
-  // Fetch insights on mount
-  useEffect(() => {
-    fetchInsights();
-  }, [fetchInsights]);
-
-  if (loading && !data) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -47,63 +41,35 @@ const Overview = () => {
     );
   }
 
-  // Extract profile insights from data
-  const profileInsights = data?.profile_insights?.data || [];
-  const getMetricValue = (name: string) => {
-    const metric = profileInsights.find((m: any) => m.name === name);
-    return metric?.values?.[0]?.value || 0;
-  };
-
-  const reach = getMetricValue('reach');
-  const views = getMetricValue('views');
-  const accountsEngaged = getMetricValue('accounts_engaged');
-  const totalInteractions = getMetricValue('total_interactions');
-  const likes = getMetricValue('likes');
-  const comments = getMetricValue('comments');
-  const shares = getMetricValue('shares');
-  const saves = getMetricValue('saves');
-  const profileLinksTaps = getMetricValue('profile_links_taps');
-  const followsUnfollows = getMetricValue('follows_and_unfollows');
-
-  // Calculate engagement metrics from media as fallback
+  // Calculate engagement metrics from media
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count || 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count || 0), 0);
+  const avgEngagement = media.length > 0 
+    ? ((totalLikes + totalComments) / media.length / (profile?.followers_count || 1) * 100).toFixed(2)
+    : '0';
 
-  // Mock data for follower growth chart (will be enhanced with historical snapshots later)
+  // Mock data for charts (will be replaced with real API data)
   const followerGrowthData = [
-    { date: 'Seg', followers: profile?.followers_count || 0 },
-    { date: 'Ter', followers: profile?.followers_count || 0 },
-    { date: 'Qua', followers: profile?.followers_count || 0 },
-    { date: 'Qui', followers: profile?.followers_count || 0 },
-    { date: 'Sex', followers: profile?.followers_count || 0 },
-    { date: 'Sáb', followers: profile?.followers_count || 0 },
-    { date: 'Dom', followers: profile?.followers_count || 0 },
+    { date: 'Seg', followers: 1000, gained: 50, lost: 10 },
+    { date: 'Ter', followers: 1040, gained: 60, lost: 20 },
+    { date: 'Qua', followers: 1080, gained: 55, lost: 15 },
+    { date: 'Qui', followers: 1120, gained: 70, lost: 30 },
+    { date: 'Sex', followers: 1160, gained: 80, lost: 40 },
+    { date: 'Sáb', followers: 1200, gained: 65, lost: 25 },
+    { date: 'Dom', followers: 1240, gained: 75, lost: 35 },
   ];
 
   const engagementData = [
-    { name: 'Curtidas', value: likes || totalLikes, color: 'hsl(var(--primary))' },
-    { name: 'Comentários', value: comments || totalComments, color: 'hsl(var(--muted-foreground))' },
-    { name: 'Compartilhamentos', value: shares, color: 'hsl(var(--secondary-foreground))' },
-    { name: 'Salvamentos', value: saves, color: 'hsl(var(--accent-foreground))' },
-  ].filter(item => item.value > 0);
+    { name: 'Curtidas', value: totalLikes, color: 'hsl(var(--primary))' },
+    { name: 'Comentários', value: totalComments, color: 'hsl(var(--muted-foreground))' },
+  ];
 
-  const recentPostsPerformance = (data?.posts || media).slice(0, 7).map((item: any, index: number) => ({
+  const recentPostsPerformance = media.slice(0, 7).map((item, index) => ({
     post: `Post ${index + 1}`,
     likes: item.like_count || 0,
     comments: item.comments_count || 0,
-    reach: item.insights?.reach || 0,
+    engagement: ((item.like_count || 0) + (item.comments_count || 0)),
   }));
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toLocaleString();
-  };
-
-  // Check if we need to show warnings
-  const hasEmptyPostInsights = (data?.posts || []).some((p: any) => !p.insights || Object.keys(p.insights).length === 0);
-  const hasNoStories = data?.stories?.length === 0;
-  const hasNoDemographics = !data?.demographics || data?.demographics?.error;
 
   return (
     <div className="space-y-6">
@@ -113,81 +79,33 @@ const Overview = () => {
           <h1 className="text-2xl font-bold tracking-tight">Visão Geral</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Resumo das principais métricas e performance do perfil.
-            {data?.snapshot_date && (
-              <span className="ml-2 text-xs">Atualizado: {new Date(data.snapshot_date).toLocaleDateString('pt-BR')}</span>
-            )}
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => fetchInsights()}
-          disabled={loading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Atualizar dados
-        </Button>
       </section>
 
-      {/* Data Alerts */}
-      <DataAlerts 
-        messages={data?.messages}
-        showPostsWarning={hasEmptyPostInsights}
-        showStoriesWarning={hasNoStories}
-        showDemographicsWarning={hasNoDemographics}
-      />
-
-      {/* Main KPIs - Profile Insights */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          label="Alcance"
-          value={formatNumber(reach)}
-          icon={<Eye className="w-4 h-4" />}
-          tooltip="Número de contas únicas que viram seu conteúdo"
-        />
-        <MetricCard
-          label="Visualizações"
-          value={formatNumber(views)}
-          icon={<Eye className="w-4 h-4" />}
-          tooltip="Total de visualizações do seu conteúdo"
-        />
-        <MetricCard
-          label="Contas Engajadas"
-          value={formatNumber(accountsEngaged)}
-          icon={<Users className="w-4 h-4" />}
-          tooltip="Contas únicas que interagiram com seu conteúdo"
-        />
-        <MetricCard
-          label="Total Interações"
-          value={formatNumber(totalInteractions)}
-          icon={<Heart className="w-4 h-4" />}
-          tooltip="Soma de todas as interações (curtidas, comentários, saves, shares)"
-        />
-      </div>
-
-      {/* Secondary KPIs */}
+      {/* Main KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label="Seguidores"
           value={profile?.followers_count?.toLocaleString() || '0'}
           icon={<Users className="w-4 h-4" />}
+          delta={{ value: '+2.4%', positive: true }}
+        />
+        <MetricCard
+          label="Seguindo"
+          value={profile?.follows_count?.toLocaleString() || '0'}
+          icon={<UserPlus className="w-4 h-4" />}
         />
         <MetricCard
           label="Posts"
-          value={data?.total_posts?.toLocaleString() || profile?.media_count?.toLocaleString() || '0'}
+          value={profile?.media_count?.toLocaleString() || '0'}
           icon={<Grid3X3 className="w-4 h-4" />}
         />
         <MetricCard
-          label="Cliques no Link"
-          value={formatNumber(profileLinksTaps)}
-          icon={<MousePointerClick className="w-4 h-4" />}
-          tooltip="Cliques no link da bio"
-        />
-        <MetricCard
-          label="Novos Seguidores"
-          value={formatNumber(followsUnfollows)}
-          icon={<UserPlus className="w-4 h-4" />}
-          tooltip="Diferença entre novos seguidores e unfollows"
+          label="Engajamento"
+          value={`${avgEngagement}%`}
+          icon={<Heart className="w-4 h-4" />}
+          delta={{ value: '+0.5%', positive: true }}
         />
       </div>
 
@@ -254,12 +172,12 @@ const Overview = () => {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-2">
+          <div className="flex justify-center gap-6 mt-2">
             {engagementData.map((entry) => (
               <div key={entry.name} className="flex items-center gap-2 text-sm">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
                 <span className="text-muted-foreground">{entry.name}</span>
-                <span className="font-medium">{formatNumber(entry.value)}</span>
+                <span className="font-medium">{entry.value.toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -291,7 +209,7 @@ const Overview = () => {
       {/* Recent Posts Preview */}
       <ChartCard title="Posts Recentes" subtitle="Últimos posts publicados">
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-          {(data?.posts || media).slice(0, 6).map((item: any) => (
+          {media.slice(0, 6).map((item) => (
             <a 
               key={item.id}
               href={item.permalink}
@@ -299,9 +217,9 @@ const Overview = () => {
               rel="noopener noreferrer"
               className="aspect-square rounded-lg overflow-hidden bg-secondary hover:opacity-80 transition-opacity"
             >
-              {(item.media_url || item.thumbnail_url) ? (
+              {item.media_url ? (
                 <img 
-                  src={item.thumbnail_url || item.media_url} 
+                  src={item.media_url} 
                   alt={item.caption?.slice(0, 50) || 'Post'} 
                   className="w-full h-full object-cover"
                 />
