@@ -31,65 +31,83 @@ const Demographics = () => {
     );
   }
 
-  // Process demographics data or use mock data
-  const ageData = demographics.age ? Object.entries(demographics.age).map(([range, value]) => ({
-    range,
-    value: value as number,
-  })) : [
-    { range: '13-17', value: 5 },
-    { range: '18-24', value: 28 },
-    { range: '25-34', value: 35 },
-    { range: '35-44', value: 18 },
-    { range: '45-54', value: 9 },
-    { range: '55-64', value: 4 },
-    { range: '65+', value: 1 },
-  ];
+  // Process age data from audience_gender_age
+  const ageData = demographics.audience_gender_age 
+    ? (() => {
+        const ageGroups: Record<string, number> = {};
+        Object.entries(demographics.audience_gender_age).forEach(([key, value]) => {
+          const age = key.split('.')[1]; // e.g., "M.25-34" -> "25-34"
+          if (age) {
+            ageGroups[age] = (ageGroups[age] || 0) + (value as number);
+          }
+        });
+        return Object.entries(ageGroups).map(([range, value]) => ({ range, value }));
+      })()
+    : [
+        { range: '13-17', value: 5 },
+        { range: '18-24', value: 28 },
+        { range: '25-34', value: 35 },
+        { range: '35-44', value: 18 },
+        { range: '45-54', value: 9 },
+        { range: '55-64', value: 4 },
+        { range: '65+', value: 1 },
+      ];
 
-  const genderData = demographics.gender ? Object.entries(demographics.gender).map(([gender, value]) => ({
-    name: gender === 'M' ? 'Masculino' : gender === 'F' ? 'Feminino' : 'Outro',
-    value: value as number,
-    color: gender === 'M' ? 'hsl(var(--primary))' : gender === 'F' ? 'hsl(217, 91%, 60%)' : 'hsl(var(--muted-foreground))',
-  })) : [
-    { name: 'Masculino', value: 45, color: 'hsl(var(--primary))' },
-    { name: 'Feminino', value: 52, color: 'hsl(217, 91%, 60%)' },
-    { name: 'Outro', value: 3, color: 'hsl(var(--muted-foreground))' },
-  ];
+  // Process gender data from audience_gender_age
+  const genderData = demographics.audience_gender_age 
+    ? (() => {
+        const genders: Record<string, number> = { M: 0, F: 0 };
+        Object.entries(demographics.audience_gender_age).forEach(([key, value]) => {
+          const gender = key.split('.')[0]; // e.g., "M.25-34" -> "M"
+          if (gender === 'M' || gender === 'F') {
+            genders[gender] += value as number;
+          }
+        });
+        const total = genders.M + genders.F || 1;
+        return [
+          { name: 'Masculino', value: Math.round((genders.M / total) * 100), color: 'hsl(var(--primary))' },
+          { name: 'Feminino', value: Math.round((genders.F / total) * 100), color: 'hsl(217, 91%, 60%)' },
+        ];
+      })()
+    : [
+        { name: 'Masculino', value: 45, color: 'hsl(var(--primary))' },
+        { name: 'Feminino', value: 52, color: 'hsl(217, 91%, 60%)' },
+        { name: 'Outro', value: 3, color: 'hsl(var(--muted-foreground))' },
+      ];
 
-  const countryData = demographics.country ? Object.entries(demographics.country)
-    .sort((a, b) => (b[1] as number) - (a[1] as number))
-    .slice(0, 10)
-    .map(([country, value]) => ({
-      country,
-      value: value as number,
-    })) : [
-    { country: 'Brasil', value: 78 },
-    { country: 'Portugal', value: 8 },
-    { country: 'Estados Unidos', value: 5 },
-    { country: 'Angola', value: 3 },
-    { country: 'Moçambique', value: 2 },
-    { country: 'Espanha', value: 1.5 },
-    { country: 'França', value: 1 },
-    { country: 'Outros', value: 1.5 },
-  ];
+  const countryData = demographics.audience_country 
+    ? Object.entries(demographics.audience_country)
+        .sort((a, b) => (b[1] as number) - (a[1] as number))
+        .slice(0, 10)
+        .map(([country, value]) => ({ country, value: value as number }))
+    : [
+        { country: 'Brasil', value: 78 },
+        { country: 'Portugal', value: 8 },
+        { country: 'Estados Unidos', value: 5 },
+        { country: 'Angola', value: 3 },
+        { country: 'Moçambique', value: 2 },
+        { country: 'Espanha', value: 1.5 },
+        { country: 'França', value: 1 },
+        { country: 'Outros', value: 1.5 },
+      ];
 
-  const cityData = demographics.city ? Object.entries(demographics.city)
-    .sort((a, b) => (b[1] as number) - (a[1] as number))
-    .slice(0, 10)
-    .map(([city, value]) => ({
-      city,
-      value: value as number,
-    })) : [
-    { city: 'São Paulo', value: 25 },
-    { city: 'Rio de Janeiro', value: 15 },
-    { city: 'Belo Horizonte', value: 8 },
-    { city: 'Brasília', value: 6 },
-    { city: 'Salvador', value: 5 },
-    { city: 'Curitiba', value: 4.5 },
-    { city: 'Fortaleza', value: 4 },
-    { city: 'Recife', value: 3.5 },
-    { city: 'Porto Alegre', value: 3 },
-    { city: 'Lisboa', value: 2.5 },
-  ];
+  const cityData = demographics.audience_city 
+    ? Object.entries(demographics.audience_city)
+        .sort((a, b) => (b[1] as number) - (a[1] as number))
+        .slice(0, 10)
+        .map(([city, value]) => ({ city, value: value as number }))
+    : [
+        { city: 'São Paulo', value: 25 },
+        { city: 'Rio de Janeiro', value: 15 },
+        { city: 'Belo Horizonte', value: 8 },
+        { city: 'Brasília', value: 6 },
+        { city: 'Salvador', value: 5 },
+        { city: 'Curitiba', value: 4.5 },
+        { city: 'Fortaleza', value: 4 },
+        { city: 'Recife', value: 3.5 },
+        { city: 'Porto Alegre', value: 3 },
+        { city: 'Lisboa', value: 2.5 },
+      ];
 
   return (
     <div className="space-y-6">
