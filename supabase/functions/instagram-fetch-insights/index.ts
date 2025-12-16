@@ -181,11 +181,16 @@ serve(async (req) => {
     }
 
     // ============================================
-    // Step 4: Fetch Demographics (with metric_type=total_value)
+    // Step 4: Fetch Demographics (with timeframe for reached/engaged)
     // ============================================
     console.log('[instagram-fetch-insights] Fetching demographics...');
+    
+    // Calculate date range (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const todayDate = new Date().toISOString().split('T')[0];
+    
     const demoMetrics = 'follower_demographics,engaged_audience_demographics,reached_audience_demographics';
-    const demoUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=${demoMetrics}&period=lifetime&metric_type=total_value&access_token=${accessToken}`;
+    const demoUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=${demoMetrics}&period=lifetime&timeframe=last_30_days&metric_type=total_value&since=${thirtyDaysAgo}&until=${todayDate}&access_token=${accessToken}`;
     const demoRes = await fetchWithRetry(demoUrl);
     const demographics = await demoRes.json();
 
