@@ -41,7 +41,7 @@ const POSTS_PER_PAGE = 25;
 const Posts = () => {
   const { connectedAccounts } = useAuth();
   const { selectedAccount } = useAccount();
-  const { loading, error, data, fetchInsights, resetData, selectedAccountId } = useInsights();
+  const { loading, error, data, unfilteredData, fetchInsights, resetData, selectedAccountId } = useInsights();
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'engagement' | 'likes' | 'comments' | 'saves' | 'reach'>('engagement');
   const [displayCount, setDisplayCount] = useState(POSTS_PER_PAGE);
@@ -114,7 +114,9 @@ const Posts = () => {
     );
   }
 
-  const posts = data?.posts || [];
+  const filteredPosts = data?.posts || [];
+  const allPosts = unfilteredData?.posts || filteredPosts;
+  const posts = allPosts;
   
   // Aggregate metrics
   const totalLikes = posts.reduce((sum: number, p: any) => sum + (p.like_count || 0), 0);
@@ -187,7 +189,7 @@ const Posts = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Posts</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Análise detalhada de performance: {posts.length} posts carregados via API.
+            Análise detalhada de performance: {filteredPosts.length.toLocaleString()} no período • {posts.length.toLocaleString()} no total.
           </p>
         </div>
         <div className="flex items-center gap-3">

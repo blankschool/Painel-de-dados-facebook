@@ -165,6 +165,7 @@ export function useInsights() {
     loading,
     error,
     data,
+    unfilteredData: rawData,
     fetchInsights,
     getStoredSnapshot,
     resetData,
