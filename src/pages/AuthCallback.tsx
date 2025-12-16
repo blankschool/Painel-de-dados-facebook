@@ -76,14 +76,18 @@ export default function AuthCallback() {
       try {
         setStatus('Exchanging code for token...');
         
-        const { data, error: fnError } = await supabase.functions.invoke('instagram-oauth', {
-          body: { 
-            code,
-            provider: loginMethod
-          }
+        // Use dedicated edge function based on provider
+        const functionName = loginMethod === 'facebook' ? 'facebook-oauth' : 'instagram-oauth';
+        console.log(`[AuthCallback] Calling ${functionName} for provider: ${loginMethod}`);
+        
+        const { data, error: fnError } = await supabase.functions.invoke(functionName, {
+          body: loginMethod === 'facebook' ? { code } : { code, provider: loginMethod }
         });
 
-        if (fnError) throw fnError;
+        if (fnError) {
+          console.error(`[AuthCallback] ${functionName} error:`, fnError);
+          throw fnError;
+        }
 
         if (data?.success) {
           setStatus('Account connected successfully! Redirecting...');

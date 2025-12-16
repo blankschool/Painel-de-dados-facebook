@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.get-instagram-token]
 verify_jwt = true
+
+[functions.facebook-oauth]
+verify_jwt = true
