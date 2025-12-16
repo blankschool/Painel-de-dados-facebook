@@ -187,14 +187,25 @@ serve(async (req) => {
         if (!mediaId) {
           throw new Error('mediaId is required for this action');
         }
-        const insightMetrics = metrics || 'impressions,reach,engagement,saved,shares';
+        // v24.0 valid metrics: reach, saved, views, total_interactions (for video)
+        // DEPRECATED: impressions, engagement, clips_replays_count
+        const insightMetrics = metrics || 'reach,saved,views,total_interactions';
         response = await fetch(
           `${baseUrl}/${mediaId}/insights?metric=${insightMetrics}&access_token=${accessToken}`
         );
         data = await response.json();
 
         if (data.error) {
-          throw new Error(data.error.message);
+          // If metrics fail, try with minimal set (reach, saved work for images)
+          const fallbackResponse = await fetch(
+            `${baseUrl}/${mediaId}/insights?metric=reach,saved&access_token=${accessToken}`
+          );
+          const fallbackData = await fallbackResponse.json();
+          if (!fallbackData.error) {
+            data = fallbackData;
+          } else {
+            throw new Error(data.error.message);
+          }
         }
 
         const insights: Record<string, number> = {};
@@ -212,10 +223,13 @@ serve(async (req) => {
           throw new Error('userId is required for this action');
         }
         const insightPeriod = period || 'day';
-        const insightMetrics = metrics || 'impressions,reach,profile_views,website_clicks,follower_count';
+        // v24.0 valid metrics: reach, views, accounts_engaged, total_interactions, 
+        // likes, comments, shares, saves, replies, profile_links_taps, follows_and_unfollows, follower_count
+        // DEPRECATED: impressions (use views), profile_views, website_clicks
+        const insightMetrics = metrics || 'reach,views,accounts_engaged,total_interactions,likes,comments,shares,saves,replies,profile_links_taps,follows_and_unfollows,follower_count';
         
         response = await fetch(
-          `${baseUrl}/${userId}/insights?metric=${insightMetrics}&period=${insightPeriod}&access_token=${accessToken}`
+          `${baseUrl}/${userId}/insights?metric=${insightMetrics}&period=${insightPeriod}&metric_type=total_value&access_token=${accessToken}`
         );
         data = await response.json();
 
@@ -241,18 +255,29 @@ serve(async (req) => {
         if (!userId) {
           throw new Error('userId is required for this action');
         }
+        // v24.0: Use new metric names with timeframe parameter
+        // follower_demographics, engaged_audience_demographics, reached_audience_demographics
+        // Timeframe required: last_14_days, last_30_days, last_90_days
         response = await fetch(
-          `${baseUrl}/${userId}/insights?metric=audience_city,audience_country,audience_gender_age,audience_locale&period=lifetime&access_token=${accessToken}`
+          `${baseUrl}/${userId}/insights?metric=follower_demographics,engaged_audience_demographics,reached_audience_demographics&period=lifetime&timeframe=last_30_days&metric_type=total_value&access_token=${accessToken}`
         );
         data = await response.json();
 
         if (data.error) {
-          throw new Error(data.error.message);
+          // Demographics may fail for accounts with <100 followers
+          console.log('Demographics error:', data.error.message);
+          return new Response(JSON.stringify({ 
+            demographics: {},
+            error: data.error.message,
+            help: 'Demographics require 100+ followers and may take 48h to appear.'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
         const demographics: Record<string, any> = {};
         data.data?.forEach((item: any) => {
-          demographics[item.name] = item.values?.[0]?.value || {};
+          demographics[item.name] = item.total_value || item.values?.[0]?.value || {};
         });
 
         return new Response(JSON.stringify({ demographics }), {

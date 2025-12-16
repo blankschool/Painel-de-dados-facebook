@@ -181,19 +181,22 @@ serve(async (req) => {
     }
 
     // ============================================
-    // Step 4: Fetch Demographics (with metric_type=total_value)
+    // Step 4: Fetch Demographics (with timeframe parameter - REQUIRED for v24.0)
     // ============================================
     console.log('[instagram-fetch-insights] Fetching demographics...');
+    
+    // Demographics require timeframe parameter in v24.0
+    // Valid timeframes: last_14_days, last_30_days, last_90_days, this_month, this_week, prev_month
     const demoMetrics = 'follower_demographics,engaged_audience_demographics,reached_audience_demographics';
-    const demoUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=${demoMetrics}&period=lifetime&metric_type=total_value&access_token=${accessToken}`;
+    const demoUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=${demoMetrics}&period=lifetime&timeframe=last_30_days&metric_type=total_value&access_token=${accessToken}`;
     const demoRes = await fetchWithRetry(demoUrl);
     const demographics = await demoRes.json();
 
     if (demographics.error) {
       console.error('[instagram-fetch-insights] Demographics error:', demographics.error.message);
-      // Note: Demographics require 100+ followers
+      // Note: Demographics require 100+ followers and may take 48h to appear
     } else {
-      console.log('[instagram-fetch-insights] Demographics fetched');
+      console.log('[instagram-fetch-insights] Demographics fetched successfully');
     }
 
     // ============================================
@@ -225,15 +228,32 @@ serve(async (req) => {
 
     // ============================================
     // Step 6: Fetch insights for each post (parallel batches)
+    // IMPORTANT: CAROUSEL_ALBUM does not support individual insights (API limitation)
     // ============================================
     console.log('[instagram-fetch-insights] Fetching post insights...');
     
-    // Different metrics for different media types
-    const imageMetrics = 'reach,views,engagement,saved,shares';
-    const videoMetrics = 'reach,views,engagement,saved,shares,ig_reels_avg_watch_time,clips_replays_count,ig_reels_video_view_total_time';
+    // Valid metrics for v24.0 (engagement is DEPRECATED, clips_replays_count is DEPRECATED)
+    // For IMAGE/CAROUSEL_ALBUM: only reach, saved are reliable
+    // For VIDEO/REELS: reach, saved, views, total_interactions
+    // Note: CAROUSEL_ALBUM insights are NOT available per Instagram API docs
+    const imageMetrics = 'reach,saved';
+    const videoMetrics = 'reach,saved,views,total_interactions';
     
     const postsWithInsights = await Promise.all(allPosts.map(async (post: any) => {
       try {
+        // CAROUSEL_ALBUM does not support insights - skip API call
+        if (post.media_type === 'CAROUSEL_ALBUM') {
+          return { 
+            ...post, 
+            insights: { 
+              _note: 'CAROUSEL_ALBUM insights not available via API',
+              // Use like_count and comments_count as engagement proxies
+              likes: post.like_count || 0,
+              comments: post.comments_count || 0,
+            } 
+          };
+        }
+        
         const isVideo = post.media_type === 'VIDEO' || post.media_type === 'REELS';
         const metrics = isVideo ? videoMetrics : imageMetrics;
         
@@ -242,17 +262,34 @@ serve(async (req) => {
         const piData = await piRes.json();
 
         if (piData.error) {
-          return { ...post, insights: {} };
+          console.log(`[instagram-fetch-insights] Post ${post.id} insights error:`, piData.error.message);
+          return { 
+            ...post, 
+            insights: {
+              likes: post.like_count || 0,
+              comments: post.comments_count || 0,
+            } 
+          };
         }
 
         const insights = piData.data?.reduce((acc: any, m: any) => {
           acc[m.name] = m.values?.[0]?.value || 0;
           return acc;
         }, {}) || {};
+        
+        // Add like/comment counts as additional metrics
+        insights.likes = post.like_count || 0;
+        insights.comments = post.comments_count || 0;
 
         return { ...post, insights };
       } catch {
-        return { ...post, insights: {} };
+        return { 
+          ...post, 
+          insights: {
+            likes: post.like_count || 0,
+            comments: post.comments_count || 0,
+          } 
+        };
       }
     }));
 
