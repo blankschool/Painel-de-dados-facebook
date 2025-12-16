@@ -111,17 +111,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const connectWithInstagram = async () => {
     const clientId = '1728352261135208';
     const redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
+    // Updated scopes for 2025 - instagram_business_* are the new standard
     const scopes = [
       'instagram_business_basic',
       'instagram_business_manage_messages',
       'instagram_business_manage_comments',
       'instagram_business_content_publish',
-      'instagram_business_manage_insights'
+      'instagram_business_manage_insights',
+      'user_profile',
+      'user_media'
     ].join(',');
     
     const state = generateOAuthState('instagram', sessionStorage.getItem('auth_redirect_to') || '/profile');
     
-    const instagramAuthUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
+    // Use api.instagram.com for direct Instagram OAuth (not www.instagram.com)
+    const instagramAuthUrl = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;
     
     window.location.href = instagramAuthUrl;
   };

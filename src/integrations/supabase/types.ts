@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_snapshots: {
+        Row: {
+          created_at: string | null
+          date: string
+          demographics: Json | null
+          id: string
+          instagram_user_id: string
+          posts: Json | null
+          profile_insights: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          demographics?: Json | null
+          id?: string
+          instagram_user_id: string
+          posts?: Json | null
+          profile_insights?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          demographics?: Json | null
+          id?: string
+          instagram_user_id?: string
+          posts?: Json | null
+          profile_insights?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       connected_accounts: {
         Row: {
           access_token: string
