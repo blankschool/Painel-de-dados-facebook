@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccount } from '@/contexts/AccountContext';
 import {
   Home,
   BarChart3,
@@ -18,6 +19,8 @@ import {
   Facebook,
   X,
   ChevronDown,
+  Plus,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -79,9 +82,11 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut, connectedAccounts, connectWithInstagram, connectWithFacebook, disconnectAccount } = useAuth();
+  const { selectedAccount, selectAccount } = useAccount();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     navGroups.reduce((acc, group) => ({ ...acc, [group.title]: group.defaultOpen ?? true }), {})
   );
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const hasConnectedAccount = connectedAccounts && connectedAccounts.length > 0;
 
@@ -106,6 +111,134 @@ export function Sidebar() {
           <span className="text-xs text-muted-foreground">Painel de Dados</span>
         </span>
       </Link>
+
+      {/* Account Switcher */}
+      {hasConnectedAccount && (
+        <div className="mt-4 relative">
+          <button
+            onClick={() => setShowAccountMenu(!showAccountMenu)}
+            className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-secondary/50 p-3 hover:bg-secondary transition-colors"
+          >
+            {selectedAccount?.profile_picture_url ? (
+              <img 
+                src={selectedAccount.profile_picture_url} 
+                alt="Profile" 
+                className="h-8 w-8 rounded-full border border-border object-cover"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full border border-border bg-background flex items-center justify-center">
+                <Instagram className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0 text-left">
+              <p className="truncate text-sm font-medium">
+                {selectedAccount?.account_username 
+                  ? `@${selectedAccount.account_username}` 
+                  : selectedAccount?.account_name 
+                    || 'Selecionar conta'
+                }
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {connectedAccounts.length} conta{connectedAccounts.length > 1 ? 's' : ''} conectada{connectedAccounts.length > 1 ? 's' : ''}
+              </p>
+            </div>
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showAccountMenu && "rotate-180")} />
+          </button>
+
+          {/* Account Dropdown */}
+          {showAccountMenu && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border border-border bg-background shadow-lg overflow-hidden">
+              <div className="p-1 max-h-[300px] overflow-y-auto">
+                {connectedAccounts.map((account) => (
+                  <button
+                    key={account.id}
+                    onClick={() => {
+                      selectAccount(account);
+                      setShowAccountMenu(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 rounded-lg p-2.5 hover:bg-secondary transition-colors",
+                      selectedAccount?.id === account.id && "bg-secondary"
+                    )}
+                  >
+                    {account.profile_picture_url ? (
+                      <img 
+                        src={account.profile_picture_url} 
+                        alt="Profile" 
+                        className="h-8 w-8 rounded-full border border-border object-cover"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full border border-border bg-secondary flex items-center justify-center">
+                        {account.provider === 'facebook' ? (
+                          <Facebook className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Instagram className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="truncate text-sm font-medium">
+                        {account.account_username 
+                          ? `@${account.account_username}` 
+                          : account.account_name 
+                            || 'Instagram'
+                        }
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        via {account.provider === 'facebook' ? 'Facebook' : 'Instagram'}
+                      </p>
+                    </div>
+                    {selectedAccount?.id === account.id && (
+                      <Check className="h-4 w-4 text-foreground" />
+                    )}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const { error } = await disconnectAccount(account.id);
+                        if (error) {
+                          toast.error('Erro ao desconectar');
+                        } else {
+                          toast.success('Conta desconectada');
+                        }
+                      }}
+                      className="p-1 rounded-md hover:bg-background text-muted-foreground hover:text-destructive transition-colors"
+                      title="Desconectar"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </button>
+                ))}
+              </div>
+              
+              {/* Add Account Options */}
+              <div className="border-t border-border p-2 space-y-1">
+                <button
+                  onClick={() => {
+                    setShowAccountMenu(false);
+                    connectWithInstagram();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg p-2 text-sm hover:bg-secondary transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <Instagram className="h-4 w-4" />
+                  Adicionar Instagram
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAccountMenu(false);
+                    connectWithFacebook();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg p-2 text-sm hover:bg-secondary transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <Facebook className="h-4 w-4" />
+                  Adicionar via Facebook
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="mt-4 flex flex-col gap-1 flex-1">
@@ -147,7 +280,7 @@ export function Sidebar() {
 
       {/* User section */}
       <div className="mt-auto pt-4 border-t border-border">
-        {!hasConnectedAccount ? (
+        {!hasConnectedAccount && (
           <div className="mb-3 space-y-2">
             <p className="text-xs text-muted-foreground text-center mb-3">Conecte sua conta</p>
             <Button 
@@ -167,48 +300,6 @@ export function Sidebar() {
               <Facebook className="h-4 w-4" />
               Conectar Facebook
             </Button>
-          </div>
-        ) : (
-          <div className="mb-3 rounded-xl border border-border bg-secondary/50 p-3">
-            <div className="flex items-center gap-2.5">
-              {connectedAccounts[0]?.profile_picture_url ? (
-                <img 
-                  src={connectedAccounts[0].profile_picture_url} 
-                  alt="Profile" 
-                  className="h-8 w-8 rounded-full border border-border object-cover"
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-full border border-border bg-background flex items-center justify-center">
-                  <Instagram className="h-4 w-4 text-muted-foreground" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {connectedAccounts[0]?.account_username 
-                    ? `@${connectedAccounts[0].account_username}` 
-                    : connectedAccounts[0]?.account_name 
-                      || (connectedAccounts[0]?.provider === 'facebook' ? 'Instagram Business' : 'Instagram')
-                  }
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  via {connectedAccounts[0]?.provider === 'facebook' ? 'Facebook' : 'Instagram'}
-                </p>
-              </div>
-              <button
-                onClick={async () => {
-                  const { error } = await disconnectAccount(connectedAccounts[0].id);
-                  if (error) {
-                    toast.error('Erro ao desconectar');
-                  } else {
-                    toast.success('Conta desconectada');
-                  }
-                }}
-                className="p-1 rounded-md hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
-                title="Desconectar conta"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
           </div>
         )}
         <button

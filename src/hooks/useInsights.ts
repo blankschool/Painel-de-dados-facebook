@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAccount } from '@/contexts/AccountContext';
 
 export interface InsightsData {
   profile_insights: any;
@@ -27,10 +28,13 @@ export function useInsights() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InsightsData | null>(null);
+  const { selectedAccountId } = useAccount();
 
   const fetchInsights = useCallback(async (accountId?: string) => {
     setLoading(true);
     setError(null);
+    
+    const targetAccountId = accountId || selectedAccountId;
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -39,7 +43,7 @@ export function useInsights() {
       }
 
       const { data: result, error: fnError } = await supabase.functions.invoke('instagram-fetch-insights', {
-        body: accountId ? { accountId } : {},
+        body: targetAccountId ? { accountId: targetAccountId } : {},
       });
 
       if (fnError) {
@@ -59,7 +63,7 @@ export function useInsights() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedAccountId]);
 
   const getStoredSnapshot = useCallback(async (accountId: string, date?: string) => {
     try {
@@ -87,11 +91,19 @@ export function useInsights() {
     }
   }, []);
 
+  // Reset data when account changes
+  const resetData = useCallback(() => {
+    setData(null);
+    setError(null);
+  }, []);
+
   return {
     loading,
     error,
     data,
     fetchInsights,
     getStoredSnapshot,
+    resetData,
+    selectedAccountId,
   };
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useInsights } from '@/hooks/useInsights';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccount } from '@/contexts/AccountContext';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { Button } from '@/components/ui/button';
@@ -30,16 +31,19 @@ import {
 
 const Stories = () => {
   const { connectedAccounts } = useAuth();
-  const { loading, error, data, fetchInsights } = useInsights();
+  const { selectedAccount } = useAccount();
+  const { loading, error, data, fetchInsights, resetData, selectedAccountId } = useInsights();
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const hasAccount = connectedAccounts && connectedAccounts.length > 0;
 
+  // Refetch when account changes
   useEffect(() => {
-    if (hasAccount && !data) {
+    if (hasAccount && selectedAccountId) {
+      resetData();
       handleRefresh();
     }
-  }, [hasAccount]);
+  }, [selectedAccountId]);
 
   const handleRefresh = async () => {
     const result = await fetchInsights();
