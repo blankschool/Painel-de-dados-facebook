@@ -202,15 +202,15 @@ serve(async (req) => {
     }
 
     // ============================================
-    // Step 5: Fetch ALL posts (full pagination)
+    // Step 5: Fetch recent posts (up to 200)
     // ============================================
     console.log('[instagram-fetch-insights] Fetching media...');
     const mediaFields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
     let allPosts: any[] = [];
-    let mediaUrl: string | null = `https://graph.facebook.com/v24.0/${igUserId}/media?fields=${mediaFields}&limit=100&access_token=${accessToken}`;
+    let mediaUrl: string | null = `https://graph.facebook.com/v24.0/${igUserId}/media?fields=${mediaFields}&limit=50&access_token=${accessToken}`;
     
-    // Pagination to get ALL posts
-    while (mediaUrl) {
+    // Pagination to get up to 200 posts
+    for (let i = 0; i < 4 && mediaUrl; i++) {
       const mediaRes = await fetchWithRetry(mediaUrl);
       const mediaJson = await mediaRes.json();
       
@@ -221,8 +221,11 @@ serve(async (req) => {
       
       allPosts = [...allPosts, ...(mediaJson.data || [])];
       mediaUrl = mediaJson.paging?.next || null;
+      
+      if (allPosts.length >= 200) break;
     }
     
+    allPosts = allPosts.slice(0, 200);
     console.log('[instagram-fetch-insights] Posts fetched:', allPosts.length);
 
     // ============================================

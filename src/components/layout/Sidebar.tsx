@@ -2,10 +2,18 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccount } from '@/contexts/AccountContext';
 import {
+  Home,
   BarChart3,
+  TrendingUp,
+  Activity,
   Grid3X3,
+  Layers,
   Users,
+  Clock,
+  Play,
   User,
+  Server,
+  Code,
   Instagram,
   LogOut,
   Facebook,
@@ -28,21 +36,44 @@ interface NavItem {
 interface NavGroup {
   title: string;
   items: NavItem[];
+  defaultOpen?: boolean;
 }
 
 const navGroups: NavGroup[] = [
   {
     title: 'Principal',
+    defaultOpen: true,
     items: [
-      { label: 'Visão Geral', href: '/', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
-      { label: 'Conteúdo', href: '/content', icon: <Grid3X3 className="h-[18px] w-[18px]" /> },
-      { label: 'Audiência', href: '/audience', icon: <Users className="h-[18px] w-[18px]" /> },
+      { label: 'Minhas Contas', href: '/', icon: <Home className="h-[18px] w-[18px]" /> },
+      { label: 'Visão Geral', href: '/overview', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
     ],
   },
   {
-    title: 'Conta',
+    title: 'Análises',
+    defaultOpen: true,
+    items: [
+      { label: 'Crescimento', href: '/growth', icon: <TrendingUp className="h-[18px] w-[18px]" /> },
+      { label: 'Performance', href: '/performance', icon: <Activity className="h-[18px] w-[18px]" /> },
+      { label: 'Posts', href: '/posts', icon: <Grid3X3 className="h-[18px] w-[18px]" /> },
+      { label: 'Stories', href: '/stories', icon: <Layers className="h-[18px] w-[18px]" /> },
+      { label: 'Reels', href: '/reels', icon: <Play className="h-[18px] w-[18px]" /> },
+    ],
+  },
+  {
+    title: 'Audiência',
+    defaultOpen: true,
+    items: [
+      { label: 'Demografia', href: '/demographics', icon: <Users className="h-[18px] w-[18px]" /> },
+      { label: 'Online', href: '/online', icon: <Clock className="h-[18px] w-[18px]" /> },
+    ],
+  },
+  {
+    title: 'Configurações',
+    defaultOpen: false,
     items: [
       { label: 'Perfil', href: '/profile', icon: <User className="h-[18px] w-[18px]" /> },
+      { label: 'Status API', href: '/api-status', icon: <Server className="h-[18px] w-[18px]" /> },
+      { label: 'Desenvolvedor', href: '/developer', icon: <Code className="h-[18px] w-[18px]" /> },
     ],
   },
 ];
@@ -52,6 +83,9 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { user, signOut, connectedAccounts, connectWithInstagram, connectWithFacebook, disconnectAccount } = useAuth();
   const { selectedAccount, selectAccount } = useAccount();
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    navGroups.reduce((acc, group) => ({ ...acc, [group.title]: group.defaultOpen ?? true }), {})
+  );
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const hasConnectedAccount = connectedAccounts && connectedAccounts.length > 0;
@@ -61,8 +95,12 @@ export function Sidebar() {
     navigate('/auth');
   };
 
+  const toggleGroup = (title: string) => {
+    setExpandedGroups(prev => ({ ...prev, [title]: !prev[title] }));
+  };
+
   return (
-    <aside className="sticky top-0 flex h-screen w-[240px] flex-col border-r border-border bg-background p-4 overflow-y-auto">
+    <aside className="sticky top-0 flex h-screen w-[272px] flex-col border-r border-border bg-background p-4 overflow-y-auto">
       {/* Brand */}
       <Link to="/" className="flex items-center gap-2.5 rounded-xl p-2.5 transition-colors hover:bg-secondary">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary">
@@ -101,7 +139,7 @@ export function Sidebar() {
                 }
               </p>
               <p className="truncate text-xs text-muted-foreground">
-                {connectedAccounts.length} conta{connectedAccounts.length > 1 ? 's' : ''}
+                {connectedAccounts.length} conta{connectedAccounts.length > 1 ? 's' : ''} conectada{connectedAccounts.length > 1 ? 's' : ''}
               </p>
             </div>
             <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showAccountMenu && "rotate-180")} />
@@ -203,30 +241,39 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="mt-6 flex flex-col gap-1 flex-1">
+      <nav className="mt-4 flex flex-col gap-1 flex-1">
         {navGroups.map((group) => (
-          <div key={group.title} className="mb-4">
-            <p className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+          <div key={group.title} className="mb-2">
+            <button
+              onClick={() => toggleGroup(group.title)}
+              className="flex w-full items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+            >
               {group.title}
-            </p>
-            <div className="flex flex-col gap-0.5 mt-1">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  aria-current={location.pathname === item.href ? 'page' : undefined}
-                  className={cn(
-                    'nav-link',
-                    location.pathname === item.href && 'border-border bg-secondary text-foreground'
-                  )}
-                >
-                  <span className={cn('nav-icon', location.pathname === item.href && 'text-foreground')}>
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </Link>
-              ))}
-            </div>
+              <ChevronDown className={cn(
+                "h-3 w-3 transition-transform",
+                expandedGroups[group.title] ? "" : "-rotate-90"
+              )} />
+            </button>
+            {expandedGroups[group.title] && (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {group.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    aria-current={location.pathname === item.href ? 'page' : undefined}
+                    className={cn(
+                      'nav-link',
+                      location.pathname === item.href && 'border-border bg-secondary text-foreground'
+                    )}
+                  >
+                    <span className={cn('nav-icon', location.pathname === item.href && 'text-foreground')}>
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </nav>

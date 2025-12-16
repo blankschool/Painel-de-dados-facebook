@@ -1,29 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useInstagramApi, InstagramProfile, InstagramAccount, InstagramMedia, AudienceDemographics } from '@/hooks/useInstagramApi';
 import { supabase } from '@/integrations/supabase/client';
-
-// Simplified types - main data fetching is now done via useInsights
-export interface InstagramProfile {
-  id: string;
-  username?: string;
-  name?: string;
-  profile_picture_url?: string;
-  followers_count?: number;
-  follows_count?: number;
-  media_count?: number;
-  biography?: string;
-}
-
-export interface InstagramAccount {
-  pageId: string;
-  pageName: string;
-  instagram: InstagramProfile;
-}
 
 interface InstagramContextType {
   accounts: InstagramAccount[];
   selectedAccount: InstagramAccount | null;
   profile: InstagramProfile | null;
+  media: InstagramMedia[];
+  demographics: AudienceDemographics;
+  onlineFollowers: Record<string, number>;
   loading: boolean;
   error: string | null;
   selectAccount: (account: InstagramAccount) => void;
@@ -34,10 +20,14 @@ const InstagramContext = createContext<InstagramContextType | undefined>(undefin
 
 export function InstagramProvider({ children }: { children: React.ReactNode }) {
   const { user, connectedAccounts } = useAuth();
+  const api = useInstagramApi();
   
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<InstagramAccount | null>(null);
   const [profile, setProfile] = useState<InstagramProfile | null>(null);
+  const [media, setMedia] = useState<InstagramMedia[]>([]);
+  const [demographics, setDemographics] = useState<AudienceDemographics>({});
+  const [onlineFollowers, setOnlineFollowers] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -49,14 +39,23 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     
     try {
-      // Profile data comes from the account info
-      setProfile(account.instagram);
+      const [profileData, mediaData, demographicsData, onlineData] = await Promise.all([
+        api.getUserProfile(account.instagram.id),
+        api.getMedia(account.instagram.id),
+        api.getAudienceDemographics(account.instagram.id),
+        api.getOnlineFollowers(account.instagram.id),
+      ]);
+
+      if (profileData) setProfile(profileData);
+      setMedia(mediaData);
+      setDemographics(demographicsData);
+      setOnlineFollowers(onlineData);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   const selectAccount = useCallback((account: InstagramAccount) => {
     setSelectedAccount(account);
@@ -76,6 +75,9 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
       setAccounts([]);
       setSelectedAccount(null);
       setProfile(null);
+      setMedia([]);
+      setDemographics({});
+      setOnlineFollowers({});
       loadedUserIdRef.current = null;
       return;
     }
@@ -105,28 +107,47 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
           sessionStorage.setItem('instagram_access_token', tokenData.access_token);
           sessionStorage.setItem('instagram_user_id', tokenData.instagram_user_id);
 
-          // Use data from connected_accounts as the profile source
-          const account = connectedAccounts[0];
-          const profileData: InstagramProfile = {
-            id: account.provider_account_id,
-            username: account.account_username || undefined,
-            name: account.account_name || undefined,
-            profile_picture_url: account.profile_picture_url || undefined,
-          };
+          // Get profile directly
+          let profileData = await api.getUserProfile(tokenData.instagram_user_id);
           
-          setProfile(profileData);
+          // If API profile fetch fails, use data from connected_accounts as fallback
+          if (!profileData && connectedAccounts[0]) {
+            const account = connectedAccounts[0];
+            profileData = {
+              id: account.provider_account_id,
+              username: account.account_username || undefined,
+              name: account.account_name || undefined,
+              profile_picture_url: account.profile_picture_url || undefined,
+            };
+          }
           
-          // Create a synthetic account for compatibility
-          const syntheticAccount: InstagramAccount = {
-            pageId: tokenData.instagram_user_id,
-            pageName: profileData.username || account.account_name || 'Instagram Account',
-            instagram: profileData,
-          };
-          setAccounts([syntheticAccount]);
-          setSelectedAccount(syntheticAccount);
-          
-          // Mark as loaded for this user
-          loadedUserIdRef.current = user.id;
+          if (profileData) {
+            setProfile(profileData);
+            
+            // Create a synthetic account for compatibility
+            const syntheticAccount: InstagramAccount = {
+              pageId: tokenData.instagram_user_id,
+              pageName: profileData.username || connectedAccounts[0]?.account_name || 'Instagram Account',
+              instagram: profileData,
+            };
+            setAccounts([syntheticAccount]);
+            setSelectedAccount(syntheticAccount);
+            
+            // Load additional data
+            const [mediaData, demographicsData, onlineData] = await Promise.all([
+              api.getMedia(tokenData.instagram_user_id),
+              api.getAudienceDemographics(tokenData.instagram_user_id),
+              api.getOnlineFollowers(tokenData.instagram_user_id),
+            ]);
+            setMedia(mediaData);
+            setDemographics(demographicsData);
+            setOnlineFollowers(onlineData);
+            
+            // Mark as loaded for this user
+            loadedUserIdRef.current = user.id;
+          } else {
+            setError('Could not load profile data');
+          }
         }
       } catch (err: any) {
         console.error('Error loading accounts:', err);
@@ -137,13 +158,16 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
     };
 
     loadAccounts();
-  }, [user?.id, connectedAccounts.length]);
+  }, [user?.id, connectedAccounts.length, api]);
 
   return (
     <InstagramContext.Provider value={{
       accounts,
       selectedAccount,
       profile,
+      media,
+      demographics,
+      onlineFollowers,
       loading,
       error,
       selectAccount,
