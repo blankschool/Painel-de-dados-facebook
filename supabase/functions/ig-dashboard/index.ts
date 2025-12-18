@@ -163,14 +163,14 @@ async function fetchMediaInsights(
   
   let metrics: string;
   if (isReel) {
-    // REELS-specific metrics (plays = views, shares available)
-    metrics = "plays,reach,saved,shares,total_interactions";
+    // REELS-specific metrics (views, shares available)
+    metrics = "views,reach,saves,shares,total_interactions";
   } else if (mediaType === "VIDEO") {
-    // Feed VIDEO metrics (video_views = views)
-    metrics = "reach,saved,video_views";
+    // Feed VIDEO metrics
+    metrics = "views,reach,saves";
   } else {
     // IMAGE metrics
-    metrics = "reach,saved";
+    metrics = "reach,saves";
   }
   
   try {
@@ -188,13 +188,6 @@ async function fetchMediaInsights(
       if (typeof name === "string" && typeof lastValue === "number") {
         out[name] = lastValue;
       }
-    }
-    
-    // Normalize views: plays (reels) or video_views (feed videos) -> views
-    if (out.plays) {
-      out.views = out.plays;
-    } else if (out.video_views) {
-      out.views = out.video_views;
     }
     
     return out;
