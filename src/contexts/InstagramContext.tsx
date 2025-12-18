@@ -2,10 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagramApi, InstagramProfile, InstagramAccount, InstagramMedia, AudienceDemographics } from '@/hooks/useInstagramApi';
 import { supabase } from '@/integrations/supabase/client';
-<<<<<<< HEAD
-=======
 import { requireSupabaseJwt } from '@/integrations/supabase/jwt';
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
 interface InstagramContextType {
   accounts: InstagramAccount[];
@@ -91,18 +88,13 @@ export function InstagramProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const loadAccounts = async () => {
+      const loadAccounts = async () => {
       setLoading(true);
       try {
-<<<<<<< HEAD
-        // Get the access token from database via edge function
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-instagram-token', {
-=======
         const jwt = await requireSupabaseJwt();
         // Get the access token from database via edge function
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-instagram-token', {
           headers: { Authorization: `Bearer ${jwt}` },
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
           body: {}
         });
 

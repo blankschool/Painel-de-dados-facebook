@@ -7,25 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-<<<<<<< HEAD
-
-const Auth = () => {
-  const { user, loading, connectedAccounts, loadingAccounts, connectWithFacebook, signInWithEmail, signUpWithEmail } = useAuth();
-=======
 import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
   const { user, loading, connectedAccounts, loadingAccounts, connectWithFacebook, signInWithEmail, signUpWithEmail, refreshConnectedAccounts } = useAuth();
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
-<<<<<<< HEAD
-=======
   const [isSeedingDev, setIsSeedingDev] = useState(false);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
   
   // Email form state
   const [email, setEmail] = useState('');
@@ -121,8 +112,6 @@ const Auth = () => {
 
   // User is logged in but needs to connect an account (Step 2)
   const needsAccountConnection = user && connectedAccounts.length === 0;
-<<<<<<< HEAD
-=======
   const shouldShowDevSeed = import.meta.env.DEV && (import.meta.env.VITE_DEV_SEED_TEST_ACCOUNT as string | undefined) === 'true';
 
   const handleDevSeed = async () => {
@@ -147,7 +136,6 @@ const Auth = () => {
       setIsSeedingDev(false);
     }
   };
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background-secondary">
@@ -174,8 +162,6 @@ const Auth = () => {
               <p className="text-center text-sm text-muted-foreground mb-6">
                 Signed in as <span className="font-medium text-foreground">{user.email}</span>
               </p>
-<<<<<<< HEAD
-=======
 
               {shouldShowDevSeed && (
                 <div className="rounded-xl border border-border bg-background p-4">
@@ -193,7 +179,6 @@ const Auth = () => {
                   </Button>
                 </div>
               )}
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
               
               {/* Facebook Login Button - connects Instagram via Facebook */}
               <Button

@@ -71,8 +71,6 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-<<<<<<< HEAD
-=======
 
 ## Supabase Edge Functions (backend)
 
@@ -102,4 +100,3 @@ For local development, you can auto-login a test user (email/password) and optio
 `VITE_DEV_SEED_TEST_ACCOUNT=true`
 
 3) Run the app: `npm run dev`
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)

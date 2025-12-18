@@ -139,11 +139,7 @@ const ApiStatus = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-<<<<<<< HEAD
-    await fetchInsights();
-=======
     await fetchInsights(undefined, { forceRefresh: true, preferCache: false });
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     setRefreshing(false);
     toast.success('Status atualizado com dados da API');
   };

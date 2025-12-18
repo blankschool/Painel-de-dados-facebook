@@ -57,13 +57,8 @@ const Posts = () => {
     }
   }, [selectedAccountId]);
 
-<<<<<<< HEAD
-  const handleRefresh = async () => {
-    const result = await fetchInsights();
-=======
   const handleRefresh = async (forceRefresh = false) => {
     const result = await fetchInsights(undefined, forceRefresh ? { forceRefresh: true, preferCache: false } : {});
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     if (result) {
       setLastUpdated(new Date().toLocaleString('pt-BR'));
     }
@@ -204,11 +199,7 @@ const Posts = () => {
               <strong className="font-semibold">{lastUpdated}</strong>
             </div>
           )}
-<<<<<<< HEAD
-          <Button onClick={handleRefresh} disabled={loading} variant="outline" size="sm" className="gap-2">
-=======
           <Button onClick={() => handleRefresh(true)} disabled={loading} variant="outline" size="sm" className="gap-2">
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>

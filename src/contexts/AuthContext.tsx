@@ -34,15 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
-<<<<<<< HEAD
-=======
   const devAutoLoginRanRef = React.useRef(false);
   const devSeedRanRef = React.useRef(false);
   const devInsightsSecret = import.meta.env.VITE_DEV_INSIGHTS_SECRET as string | undefined;
   const devIgUserId = import.meta.env.VITE_DEV_IG_USER_ID as string | undefined;
   const devIgUsername = import.meta.env.VITE_DEV_IG_USERNAME as string | undefined;
   const isDevNoAuth = import.meta.env.DEV && !!devInsightsSecret;
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
   const fetchConnectedAccounts = async (userId: string) => {
     setLoadingAccounts(true);
@@ -72,8 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-<<<<<<< HEAD
-=======
     // DEV only: when using the no-auth dev insights endpoint, bypass Supabase auth and
     // synthesize a connected account for UI routing/selection.
     if (isDevNoAuth) {
@@ -95,7 +90,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -126,9 +120,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-<<<<<<< HEAD
-  }, []);
-=======
   }, [isDevNoAuth, devIgUserId, devIgUsername]);
 
   // DEV convenience: auto-login a test user and seed a fixed account (from Supabase secrets).
@@ -200,7 +191,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, [user, session, loading, loadingAccounts, connectedAccounts.length]);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
   const generateOAuthState = (redirectTo: string = '/profile') => {
     const state = btoa(JSON.stringify({

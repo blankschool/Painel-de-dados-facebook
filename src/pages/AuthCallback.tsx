@@ -80,10 +80,7 @@ export default function AuthCallback() {
         console.log('[AuthCallback] Calling facebook-oauth');
         
         const { data, error: fnError } = await supabase.functions.invoke('facebook-oauth', {
-<<<<<<< HEAD
-=======
           headers: { Authorization: `Bearer ${session.access_token}` },
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
           body: { code }
         });
 

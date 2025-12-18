@@ -5,12 +5,9 @@ import { ChartCard } from '@/components/dashboard/ChartCard';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-<<<<<<< HEAD
-=======
 import { supabase } from '@/integrations/supabase/client';
 import { requireSupabaseJwt } from '@/integrations/supabase/jwt';
 import { copyTextToClipboard } from '@/utils/clipboard';
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 import { 
   RefreshCw,
   AlertTriangle,
@@ -35,10 +32,6 @@ interface LogEntry {
   duration?: number;
 }
 
-<<<<<<< HEAD
-const DeveloperMode = () => {
-  const { connectedAccounts } = useAuth();
-=======
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
@@ -78,16 +71,12 @@ const getSupabaseFunctionErrorDetails = (error: unknown): string | null => {
 
 const DeveloperMode = () => {
   const { connectedAccounts, refreshConnectedAccounts } = useAuth();
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
   const { profile, media, refreshData, loading } = useInstagram();
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [forceRefreshing, setForceRefreshing] = useState(false);
-<<<<<<< HEAD
-=======
   const [seedingTestAccount, setSeedingTestAccount] = useState(false);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
   // Add log entry
   const addLog = (type: LogEntry['type'], message: string, endpoint?: string, duration?: number) => {
@@ -149,8 +138,6 @@ const DeveloperMode = () => {
     toast.success('Logs limpos');
   };
 
-<<<<<<< HEAD
-=======
   const copyJwtToClipboard = async () => {
     try {
       const jwt = await requireSupabaseJwt();
@@ -197,7 +184,6 @@ const DeveloperMode = () => {
     }
   };
 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
   // Data integrity check
   const integrityChecks = [
     {
@@ -374,8 +360,6 @@ const DeveloperMode = () => {
       {/* Quick Actions */}
       <ChartCard title="Ações Rápidas" subtitle="Operações de debug">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-<<<<<<< HEAD
-=======
           <Button
             variant="outline"
             className="justify-start gap-2"
@@ -393,7 +377,6 @@ const DeveloperMode = () => {
             <Play className={`w-4 h-4 ${seedingTestAccount ? 'animate-pulse' : ''}`} />
             Seed Test Account
           </Button>
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
           <Button variant="outline" className="justify-start gap-2" onClick={() => {
             sessionStorage.removeItem('instagram_access_token');
             addLog('warning', 'Token removido da sessão');
@@ -433,8 +416,4 @@ const DeveloperMode = () => {
   );
 };
 
-<<<<<<< HEAD
 export default DeveloperMode;
-=======
-export default DeveloperMode;
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)

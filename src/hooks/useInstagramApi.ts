@@ -1,9 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-<<<<<<< HEAD
-=======
 import { requireSupabaseJwt } from '@/integrations/supabase/jwt';
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
 export interface InstagramProfile {
   id: string;
@@ -66,13 +63,9 @@ export function useInstagramApi() {
       throw new Error('No access token available. Please sign in again.');
     }
 
-<<<<<<< HEAD
-    const { data, error } = await supabase.functions.invoke('instagram-api', {
-=======
     const jwt = await requireSupabaseJwt();
     const { data, error } = await supabase.functions.invoke('instagram-api', {
       headers: { Authorization: `Bearer ${jwt}` },
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       body: { action, accessToken, ...params },
     });
 

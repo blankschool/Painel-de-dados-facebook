@@ -12,20 +12,14 @@ verify_jwt = true
 [functions.instagram-fetch-insights]
 verify_jwt = true
 
-<<<<<<< HEAD
-=======
 [functions.instagram-fetch-insights-dev]
 verify_jwt = false
 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 [functions.facebook-instagram-insights]
 verify_jwt = true
 
 [functions.export-insights]
 verify_jwt = true
-<<<<<<< HEAD
-=======
 
 [functions.seed-test-account]
 verify_jwt = true
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)

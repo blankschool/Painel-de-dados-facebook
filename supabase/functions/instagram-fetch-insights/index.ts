@@ -35,16 +35,6 @@ const allowedOrigins = [
   'http://localhost:8080',
 ];
 
-<<<<<<< HEAD
-const getCorsHeaders = (origin: string | null) => {
-  const isAllowed = origin && allowedOrigins.includes(origin);
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-};
-
-=======
 const isDevOrigin = (origin: string) => {
   try {
     const url = new URL(origin);
@@ -96,7 +86,6 @@ const isValidIsoDate = (value: unknown): value is string => {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 };
 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 // Retry helper with exponential backoff
 async function fetchWithRetry(url: string, maxRetries = 5): Promise<Response> {
   for (let i = 0; i < maxRetries; i++) {
@@ -123,8 +112,6 @@ async function fetchWithRetry(url: string, maxRetries = 5): Promise<Response> {
   throw new Error('Max retries exceeded');
 }
 
-<<<<<<< HEAD
-=======
 const graphJsonOrThrow = async (res: Response) => {
   const data = await res.json();
   if (!res.ok) {
@@ -187,7 +174,6 @@ const buildResponseFromSnapshot = (snapshot: SnapshotRow, maxPostsResponse: numb
   };
 };
 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -197,12 +183,8 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
-<<<<<<< HEAD
-  console.log('[instagram-fetch-insights] Request started');
-=======
   const requestId = crypto.randomUUID();
   console.log(`[instagram-fetch-insights][${requestId}] Request started`);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
   try {
     // Step 1: Verify JWT
@@ -219,15 +201,6 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
     if (authError || !user) throw new Error('Unauthorized');
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] User authenticated:', user.id);
-
-    // Parse request body for specific account
-    let targetAccountId: string | null = null;
-    try {
-      const body = await req.json();
-      targetAccountId = body.accountId || null;
-=======
     console.log(`[instagram-fetch-insights][${requestId}] User authenticated:`, user.id);
 
     // Parse request body for specific account
@@ -245,13 +218,10 @@ serve(async (req) => {
       preferCache = body.preferCache === undefined ? true : Boolean(body.preferCache);
       maxPostsResponse = clampInt(body.maxPosts, 1, 500, 150);
       cacheTtlMinutes = clampInt(body.cacheTtlMinutes, 0, 24 * 60, 60);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     } catch {
       // No body provided, use first available account
     }
 
-<<<<<<< HEAD
-=======
     if (requestedDate && !isValidIsoDate(requestedDate)) {
       return new Response(JSON.stringify({ success: false, error: 'Invalid date (expected YYYY-MM-DD)' }), {
         status: 400,
@@ -259,7 +229,6 @@ serve(async (req) => {
       });
     }
 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     // Step 2: Get connected account
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
@@ -301,10 +270,6 @@ serve(async (req) => {
     const igUserId = account.provider_account_id;
     const accessToken = account.access_token;
     const provider = account.provider;
-<<<<<<< HEAD
-    const username = account.account_username || igUserId;
-    console.log('[instagram-fetch-insights] Using account:', igUserId, 'provider:', provider);
-=======
     const username = account.account_username || null;
     console.log(`[instagram-fetch-insights][${requestId}] Using account:`, igUserId, 'provider:', provider);
 
@@ -340,21 +305,13 @@ serve(async (req) => {
         }
       }
     }
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
     // ============================================
     // Step 3: Fetch Profile Insights (v24.0 metrics)
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Fetching profile insights...');
-    
-    // Use "views" instead of deprecated "impressions"
-    const profileMetrics = [
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Fetching profile insights...`);
     
     const profileMetricsPrimary = [
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       'reach',
       'views',
       'accounts_engaged',
@@ -365,19 +322,6 @@ serve(async (req) => {
       'saves',
       'replies',
       'profile_links_taps',
-<<<<<<< HEAD
-      'follows_and_unfollows'
-    ].join(',');
-
-    const insightsUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=${profileMetrics}&period=day&metric_type=total_value&access_token=${accessToken}`;
-    const insightsRes = await fetchWithRetry(insightsUrl);
-    const profileInsights = await insightsRes.json();
-
-    if (profileInsights.error) {
-      console.error('[instagram-fetch-insights] Profile insights error:', profileInsights.error.message);
-    } else {
-      console.log('[instagram-fetch-insights] Profile insights fetched:', profileInsights.data?.length || 0, 'metrics');
-=======
       'follows_and_unfollows',
       'follower_count',
     ].join(',');
@@ -399,7 +343,6 @@ serve(async (req) => {
     } catch (e) {
       console.error(`[instagram-fetch-insights][${requestId}] Profile insights error:`, e instanceof Error ? e.message : e);
       profileInsights = { error: { message: e instanceof Error ? e.message : 'Profile insights failed' } };
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     }
 
     // ============================================
@@ -407,20 +350,6 @@ serve(async (req) => {
     // Per API documentation: follower_demographics, engaged_audience_demographics
     // MUST be specified with parameter metric_type=total_value
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Fetching demographics...');
-    
-    const demoMetrics = 'follower_demographics,engaged_audience_demographics';
-    const demoUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=${demoMetrics}&period=lifetime&metric_type=total_value&breakdown=age,gender,country,city&access_token=${accessToken}`;
-    const demoRes = await fetchWithRetry(demoUrl);
-    const demographics = await demoRes.json();
-
-    if (demographics.error) {
-      console.error('[instagram-fetch-insights] Demographics error:', JSON.stringify(demographics.error));
-      // Note: Demographics require 100+ followers and may take 48h to appear
-    } else {
-      console.log('[instagram-fetch-insights] Demographics fetched:', JSON.stringify(demographics.data?.length || 0), 'metrics');
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Fetching demographics...`);
     
     let demographics: any;
@@ -438,17 +367,12 @@ serve(async (req) => {
 
     if (demographics.error) {
       console.error(`[instagram-fetch-insights][${requestId}] Demographics error:`, JSON.stringify(demographics.error));
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     }
 
     // ============================================
     // Step 5: Fetch all available posts (full pagination)
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Fetching media (all available)...');
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Fetching media (all available)...`);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     const mediaFields = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
     let allPosts: any[] = [];
     let mediaUrl: string | null = `https://graph.facebook.com/v24.0/${igUserId}/media?fields=${mediaFields}&limit=100&access_token=${accessToken}`;
@@ -460,48 +384,22 @@ serve(async (req) => {
       const mediaJson = await mediaRes.json();
       
       if (mediaJson.error) {
-<<<<<<< HEAD
-        console.error('[instagram-fetch-insights] Media fetch error:', mediaJson.error.message);
-=======
         console.error(`[instagram-fetch-insights][${requestId}] Media fetch error:`, mediaJson.error.message);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
         break;
       }
       
       allPosts = [...allPosts, ...(mediaJson.data || [])];
       mediaUrl = mediaJson.paging?.next || null;
       
-<<<<<<< HEAD
-      console.log(`[instagram-fetch-insights] Page ${i + 1}: fetched ${mediaJson.data?.length || 0} posts (total: ${allPosts.length})`);
-    }
-    
-    console.log('[instagram-fetch-insights] Total posts fetched:', allPosts.length);
-=======
       console.log(`[instagram-fetch-insights][${requestId}] Page ${i + 1}: fetched ${mediaJson.data?.length || 0} posts (total: ${allPosts.length})`);
     }
     
     console.log(`[instagram-fetch-insights][${requestId}] Total posts fetched:`, allPosts.length);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
     // ============================================
     // Step 6: Fetch insights for each post (parallel batches)
     // IMPORTANT: CAROUSEL_ALBUM does not support individual insights (API limitation)
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Fetching post insights...');
-    
-    // Valid metrics for v24.0 - different metrics for different media types
-    // IMAGE: impressions, reach, saved, video_views NOT available
-    // VIDEO/REELS: impressions, reach, saved, video_views, plays, total_interactions
-    // CAROUSEL_ALBUM: NO insights available via API (use like_count/comments_count)
-    // Note: "views" replaces "impressions" in some contexts but not for post-level
-    const imageMetrics = 'impressions,reach,saved';
-    const videoMetrics = 'impressions,reach,saved,plays,total_interactions';
-    
-    // Log first post to debug
-    if (allPosts.length > 0) {
-      console.log('[instagram-fetch-insights] First post type:', allPosts[0].media_type, 'id:', allPosts[0].id);
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Fetching post insights...`);
     
     // Metrics vary by media type and by account/app permissions. Use fallbacks because
@@ -514,7 +412,6 @@ serve(async (req) => {
     // Log first post to debug
     if (allPosts.length > 0) {
       console.log(`[instagram-fetch-insights][${requestId}] First post type:`, allPosts[0].media_type, 'id:', allPosts[0].id);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     }
     
     const postsWithInsights = await Promise.all(allPosts.map(async (post: any, index: number) => {
@@ -532,17 +429,6 @@ serve(async (req) => {
         }
         
         const isVideo = post.media_type === 'VIDEO' || post.media_type === 'REELS';
-<<<<<<< HEAD
-        const metrics = isVideo ? videoMetrics : imageMetrics;
-        
-        const piUrl = `https://graph.facebook.com/v24.0/${post.id}/insights?metric=${metrics}&access_token=${accessToken}`;
-        const piRes = await fetch(piUrl);
-        const piData = await piRes.json();
-
-        // Log first few posts for debugging
-        if (index < 3) {
-          console.log(`[instagram-fetch-insights] Post ${index} (${post.media_type}) insights response:`, 
-=======
         const metricsPrimary = isVideo ? videoMetricsPrimary : imageMetricsPrimary;
         const metricsFallback = isVideo ? videoMetricsFallback : imageMetricsFallback;
 
@@ -559,7 +445,6 @@ serve(async (req) => {
         // Log first few posts for debugging
         if (index < 3) {
           console.log(`[instagram-fetch-insights][${requestId}] Post ${index} (${post.media_type}) insights response:`, 
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
             piData.error ? piData.error.message : `${piData.data?.length || 0} metrics`);
         }
 
@@ -569,10 +454,7 @@ serve(async (req) => {
             insights: {
               likes: post.like_count || 0,
               comments: post.comments_count || 0,
-<<<<<<< HEAD
-=======
               engagement: (post.like_count || 0) + (post.comments_count || 0),
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
               _error: piData.error.message,
             } 
           };
@@ -586,10 +468,7 @@ serve(async (req) => {
         // Add like/comment counts as additional metrics
         insights.likes = post.like_count || 0;
         insights.comments = post.comments_count || 0;
-<<<<<<< HEAD
-=======
         insights.engagement = insights.total_interactions || (insights.likes + insights.comments + (insights.saved || 0) + (insights.shares || 0));
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
         return { ...post, insights };
       } catch (err: any) {
@@ -598,10 +477,7 @@ serve(async (req) => {
           insights: {
             likes: post.like_count || 0,
             comments: post.comments_count || 0,
-<<<<<<< HEAD
-=======
             engagement: (post.like_count || 0) + (post.comments_count || 0),
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
             _error: err.message,
           } 
         };
@@ -611,11 +487,7 @@ serve(async (req) => {
     // ============================================
     // Step 7: Fetch Stories (last 24 hours)
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Fetching stories...');
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Fetching stories...`);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     let storiesData: any[] = [];
     let storiesAggregate = {
       total_stories: 0,
@@ -630,30 +502,17 @@ serve(async (req) => {
 
     try {
       const storiesUrl = `https://graph.facebook.com/v24.0/${igUserId}/stories?fields=id,media_type,media_url,thumbnail_url,timestamp,permalink&access_token=${accessToken}`;
-<<<<<<< HEAD
-      const storiesRes = await fetchWithRetry(storiesUrl);
-      const storiesJson = await storiesRes.json();
-
-      if (!storiesJson.error && storiesJson.data?.length > 0) {
-        console.log('[instagram-fetch-insights] Active stories found:', storiesJson.data.length);
-=======
       const storiesJson = await fetchGraphJson(storiesUrl);
 
       if (!storiesJson.error && storiesJson.data?.length > 0) {
         console.log(`[instagram-fetch-insights][${requestId}] Active stories found:`, storiesJson.data.length);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
         
         // Fetch insights for each story
         storiesData = await Promise.all(storiesJson.data.map(async (story: any) => {
           try {
             const storyMetrics = 'impressions,reach,replies,taps_forward,taps_back,exits';
             const siUrl = `https://graph.facebook.com/v24.0/${story.id}/insights?metric=${storyMetrics}&access_token=${accessToken}`;
-<<<<<<< HEAD
-            const siRes = await fetch(siUrl);
-            const siData = await siRes.json();
-=======
             const siData = await fetchGraphJson(siUrl);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
             if (siData.error) {
               return { ...story, insights: {} };
@@ -694,75 +553,43 @@ serve(async (req) => {
           );
         }
       } else {
-<<<<<<< HEAD
-        console.log('[instagram-fetch-insights] No active stories or error:', storiesJson.error?.message);
-      }
-    } catch (err) {
-      console.error('[instagram-fetch-insights] Stories fetch error:', err);
-=======
         console.log(`[instagram-fetch-insights][${requestId}] No active stories or error:`, storiesJson.error?.message);
       }
     } catch (err) {
       console.error(`[instagram-fetch-insights][${requestId}] Stories fetch error:`, err);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     }
 
     // ============================================
     // Step 8: Fetch Online Followers
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Fetching online followers...');
-    let onlineFollowers = null;
-    try {
-      const onlineUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=online_followers&period=lifetime&access_token=${accessToken}`;
-      const onlineRes = await fetchWithRetry(onlineUrl);
-      const onlineJson = await onlineRes.json();
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Fetching online followers...`);
     let onlineFollowers = null;
     try {
       const onlineUrl = `https://graph.facebook.com/v24.0/${igUserId}/insights?metric=online_followers&period=lifetime&access_token=${accessToken}`;
       const onlineJson = await fetchGraphJson(onlineUrl);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       
       if (!onlineJson.error && onlineJson.data?.[0]?.values?.[0]?.value) {
         onlineFollowers = onlineJson.data[0].values[0].value;
       }
     } catch (err) {
-<<<<<<< HEAD
-      console.error('[instagram-fetch-insights] Online followers error:', err);
-=======
       console.error(`[instagram-fetch-insights][${requestId}] Online followers error:`, err);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     }
 
     // ============================================
     // Step 9: Save snapshot to database
     // ============================================
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Saving snapshot...');
-    const today = new Date().toISOString().split('T')[0];
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Saving snapshot...`);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     
     // Build snapshot data matching table schema
     const snapshotData = {
       user_id: user.id,
       instagram_user_id: igUserId,
-<<<<<<< HEAD
-      date: today,
-=======
       date: snapshotDate,
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       profile_insights: profileInsights.error ? null : {
         data: profileInsights.data,
         online_followers: onlineFollowers,
         username: username,
-<<<<<<< HEAD
-=======
         provider: provider,
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       },
       demographics: demographics.error ? null : demographics,
       posts: postsWithInsights,
@@ -779,11 +606,7 @@ serve(async (req) => {
       .select('id')
       .eq('user_id', user.id)
       .eq('instagram_user_id', igUserId)
-<<<<<<< HEAD
-      .eq('date', today)
-=======
       .eq('date', snapshotDate)
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       .maybeSingle();
 
     if (existingSnapshot) {
@@ -793,15 +616,9 @@ serve(async (req) => {
         .eq('id', existingSnapshot.id);
       
       if (updateError) {
-<<<<<<< HEAD
-        console.error('[instagram-fetch-insights] Snapshot update error:', updateError);
-      } else {
-        console.log('[instagram-fetch-insights] Snapshot updated for date:', today);
-=======
         console.error(`[instagram-fetch-insights][${requestId}] Snapshot update error:`, updateError);
       } else {
         console.log(`[instagram-fetch-insights][${requestId}] Snapshot updated for date:`, snapshotDate);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       }
     } else {
       const { error: insertError } = await supabase
@@ -809,22 +626,13 @@ serve(async (req) => {
         .insert(snapshotData);
       
       if (insertError) {
-<<<<<<< HEAD
-        console.error('[instagram-fetch-insights] Snapshot insert error:', insertError);
-      } else {
-        console.log('[instagram-fetch-insights] Snapshot inserted for date:', today);
-=======
         console.error(`[instagram-fetch-insights][${requestId}] Snapshot insert error:`, insertError);
       } else {
         console.log(`[instagram-fetch-insights][${requestId}] Snapshot inserted for date:`, snapshotDate);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       }
     }
 
     const duration = Date.now() - startTime;
-<<<<<<< HEAD
-    console.log('[instagram-fetch-insights] Complete! Duration:', duration, 'ms');
-=======
     console.log(`[instagram-fetch-insights][${requestId}] Complete! Duration:`, duration, 'ms');
 
     const postInsightErrorCount = postsWithInsights.reduce((count: number, p: any) => {
@@ -837,33 +645,16 @@ serve(async (req) => {
       storiesData.length === 0 ? 'No active stories in the last 24 hours.' : null,
       postInsightErrorCount > 0 ? `Post insights failed for ${postInsightErrorCount} posts (see logs with request_id).` : null,
     ].filter(Boolean);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
     return new Response(JSON.stringify({
       success: true,
       profile_insights: profileInsights.error ? null : profileInsights,
       demographics: demographics.error ? null : demographics,
-<<<<<<< HEAD
-      posts: postsWithInsights.slice(0, 50), // Limit response size
-=======
       posts: postsWithInsights.slice(0, maxPostsResponse),
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
       total_posts: postsWithInsights.length,
       stories: storiesData,
       stories_aggregate: storiesAggregate,
       online_followers: onlineFollowers,
-<<<<<<< HEAD
-      snapshot_date: today,
-      duration_ms: duration,
-      provider: provider,
-      username: username,
-      messages: [
-        demographics.error ? 'Demographics require 100+ followers and may take up to 48h to appear.' : null,
-        storiesData.length === 0 ? 'No active stories in the last 24 hours.' : null,
-      ].filter(Boolean),
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-=======
       snapshot_date: snapshotDate,
       duration_ms: duration,
       provider: provider,
@@ -872,34 +663,22 @@ serve(async (req) => {
       messages,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Request-Id': requestId },
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     });
 
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     const duration = Date.now() - startTime;
-<<<<<<< HEAD
-    console.error('[instagram-fetch-insights] Error after', duration, 'ms:', msg);
-=======
     console.error(`[instagram-fetch-insights][${requestId}] Error after`, duration, 'ms:', msg);
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     
     return new Response(JSON.stringify({ 
       error: msg, 
       success: false,
       duration_ms: duration,
-<<<<<<< HEAD
-      help: 'Data may take up to 48h to be available. Ensure your account is Business or Creator type.'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-=======
       request_id: requestId,
       help: 'Data may take up to 48h to be available. Ensure your account is Business or Creator type.'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Request-Id': requestId },
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
     });
   }
 });

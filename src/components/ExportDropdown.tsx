@@ -12,10 +12,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAccount } from '@/contexts/AccountContext';
 import { toast } from 'sonner';
-<<<<<<< HEAD
-=======
 import { requireSupabaseJwt } from '@/integrations/supabase/jwt';
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
 
 type ExportFormat = 'json' | 'csv' | 'ndjson' | 'markdown' | 'txt' | 'pdf';
 
@@ -44,13 +41,9 @@ export function ExportDropdown() {
     toast.info('Exporting...');
 
     try {
-<<<<<<< HEAD
-      const { data, error } = await supabase.functions.invoke('export-insights', {
-=======
       const jwt = await requireSupabaseJwt();
       const { data, error } = await supabase.functions.invoke('export-insights', {
         headers: { Authorization: `Bearer ${jwt}` },
->>>>>>> 6f17527 (Fix insights pagination/cache; add dev seeding and CORS)
         body: { format, accountId: selectedAccountId },
       });
 
