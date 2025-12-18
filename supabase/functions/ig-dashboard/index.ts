@@ -331,69 +331,100 @@ serve(async (req) => {
       );
     }
 
-    // Demographics - using follower_demographics metric with breakdowns
+    // Demographics - fetch each breakdown separately to handle partial failures
     let demographics: Record<string, unknown> = {};
-    try {
-      const demoJson = await graphGet(`/${businessId}/insights`, accessToken, {
-        metric: "follower_demographics",
-        period: "lifetime",
-        metric_type: "total_value",
-        breakdown: "age,gender,country,city",
-      });
-      
-      // Process the response to extract demographic data
-      const demoData = (demoJson as { data?: unknown[] }).data;
-      if (Array.isArray(demoData)) {
-        for (const metric of demoData) {
-          const metricObj = metric as { name?: string; total_value?: { breakdowns?: unknown[] } };
-          if (metricObj.total_value?.breakdowns) {
-            const breakdowns = metricObj.total_value.breakdowns as Array<{
+    const breakdownTypes = ["age", "gender", "country", "city"];
+    
+    for (const breakdownType of breakdownTypes) {
+      try {
+        console.log(`[ig-dashboard] Fetching demographics breakdown: ${breakdownType}`);
+        const demoJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: "follower_demographics",
+          period: "lifetime",
+          metric_type: "total_value",
+          breakdown: breakdownType,
+          timeframe: "this_month",
+        });
+        
+        const demoData = (demoJson as { data?: unknown[] }).data;
+        if (Array.isArray(demoData) && demoData.length > 0) {
+          const metric = demoData[0] as { total_value?: { breakdowns?: unknown[] } };
+          if (metric.total_value?.breakdowns) {
+            const breakdowns = metric.total_value.breakdowns as Array<{
               dimension_keys?: string[];
               results?: Array<{ dimension_values?: string[]; value?: number }>;
             }>;
             
             for (const breakdown of breakdowns) {
-              const dimensionKeys = breakdown.dimension_keys || [];
               const results = breakdown.results || [];
+              const values: Record<string, number> = {};
               
-              // Build demographic objects based on dimension keys
-              if (dimensionKeys.includes("age") && dimensionKeys.includes("gender")) {
-                const ageGender: Record<string, number> = {};
-                for (const result of results) {
-                  const key = result.dimension_values?.join(".") || "";
-                  if (key && result.value) {
-                    ageGender[key] = result.value;
-                  }
+              for (const result of results) {
+                const key = result.dimension_values?.join(".") || result.dimension_values?.[0] || "";
+                if (key && result.value) {
+                  values[key] = result.value;
                 }
-                demographics.audience_gender_age = ageGender;
-              } else if (dimensionKeys.includes("country")) {
-                const countries: Record<string, number> = {};
-                for (const result of results) {
-                  const key = result.dimension_values?.[0] || "";
-                  if (key && result.value) {
-                    countries[key] = result.value;
-                  }
-                }
-                demographics.audience_country = countries;
-              } else if (dimensionKeys.includes("city")) {
-                const cities: Record<string, number> = {};
-                for (const result of results) {
-                  const key = result.dimension_values?.[0] || "";
-                  if (key && result.value) {
-                    cities[key] = result.value;
-                  }
-                }
-                demographics.audience_city = cities;
+              }
+              
+              if (Object.keys(values).length > 0) {
+                demographics[`audience_${breakdownType}`] = values;
+                console.log(`[ig-dashboard] Demographics ${breakdownType} fetched: ${Object.keys(values).length} entries`);
               }
             }
           }
         }
+      } catch (err) {
+        console.log(`[ig-dashboard] Demographics ${breakdownType} fetch failed:`, err);
       }
-      console.log(`[ig-dashboard] Demographics fetched:`, Object.keys(demographics));
-    } catch (err) {
-      console.log(`[ig-dashboard] Demographics fetch failed:`, err);
-      demographics = {};
     }
+    
+    // Fallback: try engaged_audience_demographics if follower_demographics failed
+    if (Object.keys(demographics).length === 0) {
+      console.log(`[ig-dashboard] Trying fallback: engaged_audience_demographics`);
+      for (const breakdownType of breakdownTypes) {
+        try {
+          const demoJson = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: "engaged_audience_demographics",
+            period: "lifetime",
+            metric_type: "total_value",
+            breakdown: breakdownType,
+            timeframe: "this_month",
+          });
+          
+          const demoData = (demoJson as { data?: unknown[] }).data;
+          if (Array.isArray(demoData) && demoData.length > 0) {
+            const metric = demoData[0] as { total_value?: { breakdowns?: unknown[] } };
+            if (metric.total_value?.breakdowns) {
+              const breakdowns = metric.total_value.breakdowns as Array<{
+                dimension_keys?: string[];
+                results?: Array<{ dimension_values?: string[]; value?: number }>;
+              }>;
+              
+              for (const breakdown of breakdowns) {
+                const results = breakdown.results || [];
+                const values: Record<string, number> = {};
+                
+                for (const result of results) {
+                  const key = result.dimension_values?.join(".") || result.dimension_values?.[0] || "";
+                  if (key && result.value) {
+                    values[key] = result.value;
+                  }
+                }
+                
+                if (Object.keys(values).length > 0) {
+                  demographics[`audience_${breakdownType}`] = values;
+                  console.log(`[ig-dashboard] Engaged demographics ${breakdownType} fetched: ${Object.keys(values).length} entries`);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.log(`[ig-dashboard] Engaged demographics ${breakdownType} fetch failed:`, err);
+        }
+      }
+    }
+    
+    console.log(`[ig-dashboard] Demographics final result:`, Object.keys(demographics));
 
     // Online followers
     let onlineFollowers: Record<string, number> = {};
