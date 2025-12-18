@@ -15,6 +15,7 @@ const isLovableOrigin = (origin: string) => {
     return (
       url.hostname === "lovable.dev" ||
       url.hostname.endsWith(".lovable.dev") ||
+      url.hostname.endsWith(".lovable.app") ||
       url.hostname.endsWith(".lovableproject.com")
     );
   } catch {
