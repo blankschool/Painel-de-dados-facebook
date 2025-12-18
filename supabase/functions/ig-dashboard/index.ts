@@ -12,7 +12,11 @@ const isLovableOrigin = (origin: string) => {
   try {
     const url = new URL(origin);
     if (url.protocol !== "https:") return false;
-    return url.hostname === "lovable.dev" || url.hostname.endsWith(".lovable.dev");
+    return (
+      url.hostname === "lovable.dev" ||
+      url.hostname.endsWith(".lovable.dev") ||
+      url.hostname.endsWith(".lovableproject.com")
+    );
   } catch {
     return false;
   }
