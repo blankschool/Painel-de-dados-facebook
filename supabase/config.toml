@@ -1,28 +1,7 @@
 project_id = "phbwmfjrgadzybqpjnoi"
 
-[functions.export-insights]
-verify_jwt = false
-
-[functions.facebook-instagram-insights]
-verify_jwt = false
-
-[functions.facebook-oauth]
-verify_jwt = false
-
-[functions.get-instagram-token]
-verify_jwt = false
-
 [functions.ig-dashboard]
 verify_jwt = false
 
-[functions.instagram-api]
-verify_jwt = false
-
-[functions.instagram-fetch-insights-dev]
-verify_jwt = false
-
-[functions.instagram-fetch-insights]
-verify_jwt = false
-
-[functions.seed-test-account]
+[functions.facebook-oauth]
 verify_jwt = false
