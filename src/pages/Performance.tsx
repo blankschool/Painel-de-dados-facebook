@@ -1,10 +1,8 @@
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
-import { Heart, MessageCircle, Activity, Loader2 } from 'lucide-react';
+import { Heart, MessageCircle, Activity, Loader2, Image, Video, Layers } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -12,13 +10,23 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
+
+const MEDIA_TYPE_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--muted-foreground))',
+  'hsl(var(--secondary-foreground))',
+];
+
+const MEDIA_TYPE_LABELS: Record<string, string> = {
+  IMAGE: 'Fotos',
+  VIDEO: 'Vídeos',
+  REELS: 'Reels',
+  CAROUSEL_ALBUM: 'Carrosséis',
+};
 
 const Performance = () => {
   const { data, loading } = useDashboardData();
@@ -42,13 +50,20 @@ const Performance = () => {
     ? (((totalLikes + totalComments) / media.length / profile.followers_count) * 100).toFixed(2)
     : '0';
 
-  // IMPORTANT: no mock data. Only render charts when real metrics exist in the API response.
-  const performanceOverTime: Array<{ date: string; impressions: number; reach: number; engagement: number }> =
-    Array.isArray((data as any)?.performance_over_time) ? (data as any).performance_over_time : [];
+  // Media type distribution from API or calculated
+  const mediaTypeDistribution = (data as any)?.media_type_distribution || {};
+  const mediaTypeData = Object.entries(mediaTypeDistribution)
+    .map(([type, count]) => ({
+      name: MEDIA_TYPE_LABELS[type] || type,
+      value: count as number,
+      type,
+    }))
+    .filter(item => item.value > 0)
+    .sort((a, b) => b.value - a.value);
 
-  const radarData: Array<{ metric: string; value: number; fullMark: number }> =
-    Array.isArray((data as any)?.performance_radar) ? (data as any).performance_radar : [];
+  const totalMedia = mediaTypeData.reduce((sum, item) => sum + item.value, 0);
 
+  // Interaction breakdown
   const interactionBreakdown = [
     { type: 'Curtidas', value: totalLikes },
     { type: 'Comentários', value: totalComments },
@@ -60,6 +75,21 @@ const Performance = () => {
     percentage: Math.round((i.value / interactionTotal) * 100),
   }));
 
+  // Performance by media type
+  const performanceByType = Object.keys(mediaTypeDistribution).map(type => {
+    const typeMedia = media.filter(m => m.media_type === type);
+    const typeLikes = typeMedia.reduce((sum, m) => sum + (m.like_count || 0), 0);
+    const typeComments = typeMedia.reduce((sum, m) => sum + (m.comments_count || 0), 0);
+    const avgEngagement = typeMedia.length > 0 ? Math.round((typeLikes + typeComments) / typeMedia.length) : 0;
+    return {
+      name: MEDIA_TYPE_LABELS[type] || type,
+      posts: typeMedia.length,
+      avgLikes: typeMedia.length > 0 ? Math.round(typeLikes / typeMedia.length) : 0,
+      avgComments: typeMedia.length > 0 ? Math.round(typeComments / typeMedia.length) : 0,
+      avgEngagement,
+    };
+  }).filter(item => item.posts > 0).sort((a, b) => b.avgEngagement - a.avgEngagement);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -67,7 +97,7 @@ const Performance = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Performance</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Métricas de desempenho e alcance do perfil no período.
+            Métricas de desempenho calculadas a partir de {media.length.toLocaleString()} posts.
           </p>
         </div>
       </section>
@@ -96,112 +126,138 @@ const Performance = () => {
         />
       </div>
 
-      {/* Performance Over Time */}
-      <ChartCard title="Performance ao Longo do Tempo" subtitle="Impressões, Alcance e Engajamento">
-        <div className="h-[300px]">
-          {performanceOverTime.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Sem dados de série temporal (impressões/alcance) disponíveis para este período.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={performanceOverTime}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="impressions"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Impressões"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="reach"
-                  stroke="hsl(var(--muted-foreground))"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Alcance"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="engagement"
-                  stroke="hsl(var(--muted-foreground))"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Engajamento"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </ChartCard>
-
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Radar Chart */}
-        <ChartCard title="Análise de Performance" subtitle="Comparativo de métricas">
+        {/* Media Type Distribution - Pie Chart */}
+        <ChartCard title="Distribuição por Tipo de Mídia" subtitle={`Total: ${totalMedia.toLocaleString()} posts`}>
           <div className="h-[300px]">
-            {radarData.length === 0 ? (
+            {mediaTypeData.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Sem dados suficientes para análise comparativa.
+                Sem dados de distribuição disponíveis.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <PolarRadiusAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <Radar
-                    name="Performance"
+                <PieChart>
+                  <Pie
+                    data={mediaTypeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
                     dataKey="value"
-                    stroke="hsl(var(--primary))"
-                    fill="hsl(var(--primary))"
-                    fillOpacity={0.3}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {mediaTypeData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={MEDIA_TYPE_COLORS[index % MEDIA_TYPE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => [value.toLocaleString(), 'Posts']}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
                   />
-                </RadarChart>
+                </PieChart>
               </ResponsiveContainer>
             )}
           </div>
         </ChartCard>
 
         {/* Interaction Breakdown */}
-          <ChartCard title="Tipos de Interação" subtitle="Distribuição por tipo">
-            <div className="space-y-4 p-2">
-              {interactionBreakdownWithPct.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">
-                  Sem interações no período.
-                </div>
-              ) : (
-                interactionBreakdownWithPct.map((item) => (
-                  <div key={item.type} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{item.type}</span>
-                      <span className="text-muted-foreground">
-                        {item.value.toLocaleString()} ({item.percentage}%)
-                      </span>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-bar-fill" style={{ width: `${item.percentage}%` }} />
-                    </div>
+        <ChartCard title="Tipos de Interação" subtitle="Distribuição por tipo">
+          <div className="space-y-4 p-2">
+            {interactionBreakdownWithPct.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                Sem interações no período.
+              </div>
+            ) : (
+              interactionBreakdownWithPct.map((item) => (
+                <div key={item.type} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{item.type}</span>
+                    <span className="text-muted-foreground">
+                      {item.value.toLocaleString()} ({item.percentage}%)
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
-          </ChartCard>
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill" style={{ width: `${item.percentage}%` }} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ChartCard>
       </div>
 
-      {/* Performance Summary */}
-      <ChartCard title="Resumo de Performance" subtitle="Métricas detalhadas do período">
+      {/* Performance by Media Type - Bar Chart */}
+      <ChartCard title="Engajamento Médio por Tipo" subtitle="Comparativo de performance entre formatos">
+        <div className="h-[300px]">
+          {performanceByType.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Sem dados suficientes para comparação.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={performanceByType} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis type="number" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" width={100} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number, name: string) => [value.toLocaleString(), name === 'avgEngagement' ? 'Engajamento Médio' : name]}
+                />
+                <Bar dataKey="avgEngagement" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Engajamento Médio" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </ChartCard>
+
+      {/* Performance Summary Table */}
+      <ChartCard title="Resumo de Performance por Tipo" subtitle="Métricas detalhadas">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Posts</th>
+                <th>Média Curtidas</th>
+                <th>Média Comentários</th>
+                <th>Engajamento Médio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {performanceByType.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center text-muted-foreground py-8">
+                    Sem dados disponíveis.
+                  </td>
+                </tr>
+              ) : (
+                performanceByType.map((item) => (
+                  <tr key={item.name}>
+                    <td className="font-medium">{item.name}</td>
+                    <td>{item.posts.toLocaleString()}</td>
+                    <td>{item.avgLikes.toLocaleString()}</td>
+                    <td>{item.avgComments.toLocaleString()}</td>
+                    <td>{item.avgEngagement.toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+
+      {/* General Performance Summary */}
+      <ChartCard title="Resumo Geral" subtitle="Métricas totais de todos os posts">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
@@ -210,7 +266,6 @@ const Performance = () => {
                 <th>Total</th>
                 <th>Média/Post</th>
                 <th>Melhor</th>
-                <th>Variação</th>
               </tr>
             </thead>
             <tbody>
@@ -219,20 +274,17 @@ const Performance = () => {
                 <td>{totalLikes.toLocaleString()}</td>
                 <td>{avgLikes.toLocaleString()}</td>
                 <td>{Math.max(0, ...media.map((m) => m.like_count || 0)).toLocaleString()}</td>
-                <td>-</td>
               </tr>
               <tr>
                 <td className="font-medium">Comentários</td>
                 <td>{totalComments.toLocaleString()}</td>
                 <td>{avgComments.toLocaleString()}</td>
                 <td>{Math.max(0, ...media.map((m) => m.comments_count || 0)).toLocaleString()}</td>
-                <td>-</td>
               </tr>
               <tr>
                 <td className="font-medium">Engajamento</td>
                 <td>{(totalLikes + totalComments).toLocaleString()}</td>
                 <td>{(avgLikes + avgComments).toLocaleString()}</td>
-                <td>-</td>
                 <td>-</td>
               </tr>
             </tbody>
