@@ -1,16 +1,13 @@
 import { useMemo } from 'react';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
-import { Sparkline } from '@/components/dashboard/Sparkline';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { 
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-const dayLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const Audience = () => {
   const { data, loading, error, refresh } = useDashboardData();
@@ -19,15 +16,12 @@ const Audience = () => {
   const demographics = (data?.demographics || {}) as Record<string, Record<string, number>>;
   const onlineFollowers = (data?.online_followers || {}) as Record<string, number>;
 
-  // Process gender data from demographics
+  const hasDemographics = demographics.audience_gender_age || demographics.audience_country || demographics.audience_city;
+  const hasOnlineData = Object.keys(onlineFollowers).length > 0;
+
+  // Process gender data from demographics - only if real data exists
   const genderData = useMemo(() => {
-    if (!demographics.audience_gender_age) {
-      return [
-        { name: 'Feminino', value: 61, fill: 'hsl(var(--foreground) / 0.7)' },
-        { name: 'Masculino', value: 38, fill: 'hsl(var(--foreground) / 0.35)' },
-        { name: 'Outro', value: 1, fill: 'hsl(var(--foreground) / 0.15)' },
-      ];
-    }
+    if (!demographics.audience_gender_age) return [];
 
     let female = 0;
     let male = 0;
@@ -40,6 +34,8 @@ const Audience = () => {
       if (key.startsWith('M.')) male += numValue;
     });
 
+    if (total === 0) return [];
+
     const other = total - female - male;
     const femalePercent = Math.round((female / total) * 100) || 0;
     const malePercent = Math.round((male / total) * 100) || 0;
@@ -49,21 +45,12 @@ const Audience = () => {
       { name: 'Feminino', value: femalePercent, fill: 'hsl(var(--foreground) / 0.7)' },
       { name: 'Masculino', value: malePercent, fill: 'hsl(var(--foreground) / 0.35)' },
       { name: 'Outro', value: otherPercent, fill: 'hsl(var(--foreground) / 0.15)' },
-    ];
+    ].filter(item => item.value > 0);
   }, [demographics]);
 
-  // Process age data from demographics
+  // Process age data from demographics - only if real data exists
   const ageData = useMemo(() => {
-    if (!demographics.audience_gender_age) {
-      return [
-        { range: '13-17', value: 5 },
-        { range: '18-24', value: 28 },
-        { range: '25-34', value: 42 },
-        { range: '35-44', value: 18 },
-        { range: '45-54', value: 5 },
-        { range: '55+', value: 2 },
-      ];
-    }
+    if (!demographics.audience_gender_age) return [];
 
     const ageGroups: Record<string, number> = {
       '13-17': 0,
@@ -86,30 +73,24 @@ const Audience = () => {
       }
     });
 
+    if (total === 0) return [];
+
     // Combine 55+ ranges
     ageGroups['55+'] = ageGroups['55-64'] + ageGroups['65+'];
     delete ageGroups['55-64'];
     delete ageGroups['65+'];
 
     return Object.entries(ageGroups)
-      .filter(([_, value]) => value > 0 || !demographics.audience_gender_age)
+      .filter(([_, value]) => value > 0)
       .map(([range, value]) => ({
         range,
         value: Math.round((value / total) * 100) || 0,
       }));
   }, [demographics]);
 
-  // Process country data
+  // Process country data - only if real data exists
   const topCountries = useMemo(() => {
-    if (!demographics.audience_country) {
-      return [
-        { country: 'Brasil', share: 82, followers: '147.6k' },
-        { country: 'Portugal', share: 8, followers: '14.4k' },
-        { country: 'Estados Unidos', share: 5, followers: '9.0k' },
-        { country: 'Argentina', share: 3, followers: '5.4k' },
-        { country: 'México', share: 2, followers: '3.6k' },
-      ];
-    }
+    if (!demographics.audience_country) return [];
 
     const countryNames: Record<string, string> = {
       'BR': 'Brasil',
@@ -124,6 +105,8 @@ const Audience = () => {
 
     const countryData = demographics.audience_country as Record<string, number>;
     const total = Object.values(countryData).reduce((a: number, b: number) => a + b, 0);
+    
+    if (total === 0) return [];
 
     return Object.entries(countryData)
       .sort(([, a], [, b]) => (b as number) - (a as number))
@@ -135,20 +118,14 @@ const Audience = () => {
       }));
   }, [demographics]);
 
-  // Process city data
+  // Process city data - only if real data exists
   const topCities = useMemo(() => {
-    if (!demographics.audience_city) {
-      return [
-        { city: 'São Paulo', share: 54, followers: '41.3k' },
-        { city: 'Rio de Janeiro', share: 36, followers: '27.1k' },
-        { city: 'Belo Horizonte', share: 22, followers: '16.9k' },
-        { city: 'Porto Alegre', share: 18, followers: '13.6k' },
-        { city: 'Lisboa', share: 12, followers: '9.4k' },
-      ];
-    }
+    if (!demographics.audience_city) return [];
 
     const cityData = demographics.audience_city as Record<string, number>;
     const total = Object.values(cityData).reduce((a: number, b: number) => a + b, 0);
+    
+    if (total === 0) return [];
 
     return Object.entries(cityData)
       .sort(([, a], [, b]) => (b as number) - (a as number))
@@ -160,54 +137,6 @@ const Audience = () => {
       }));
   }, [demographics]);
 
-  // Process online followers heatmap data
-  const heatmapData = useMemo(() => {
-    if (Object.keys(onlineFollowers).length === 0) {
-      return [
-        { time: '09:00', days: [2, 2, 3, 2, 3, 1, 2] },
-        { time: '12:00', days: [3, 3, 4, 3, 4, 2, 3] },
-        { time: '15:00', days: [2, 3, 4, 3, 4, 2, 3] },
-        { time: '18:00', days: [4, 4, 5, 4, 5, 3, 4] },
-        { time: '21:00', days: [3, 3, 4, 3, 4, 3, 3] },
-      ];
-    }
-
-    // Group by time slots (3-hour windows)
-    const timeSlots = ['09:00', '12:00', '15:00', '18:00', '21:00'];
-    const maxValue = Math.max(...Object.values(onlineFollowers).map(v => v as number));
-
-    return timeSlots.map((time) => {
-      const hour = parseInt(time.split(':')[0]);
-      const days = Array(7).fill(0).map((_, dayIndex) => {
-        // Simulate day variation (actual API doesn't provide per-day data)
-        const hourValue = (onlineFollowers[hour.toString()] as number) || 0;
-        const normalized = Math.ceil((hourValue / maxValue) * 5);
-        // Add some variation per day
-        const variation = Math.max(1, Math.min(5, normalized + (dayIndex % 2 === 0 ? 0 : -1)));
-        return variation;
-      });
-      return { time, days };
-    });
-  }, [onlineFollowers]);
-
-  // Mock followers trend data (would need historical data from API)
-  const followersData = useMemo(() => {
-    const currentFollowers = profile?.followers_count || 179959;
-    return [
-      { month: 'Set', value: Math.round(currentFollowers * 0.96) },
-      { month: 'Out', value: Math.round(currentFollowers * 0.97) },
-      { month: 'Nov', value: Math.round(currentFollowers * 0.99) },
-      { month: 'Dez', value: currentFollowers },
-    ];
-  }, [profile]);
-
-  const gainLossData = [
-    { month: 'Set', gained: 6200, lost: 4100 },
-    { month: 'Out', gained: 5800, lost: 3800 },
-    { month: 'Nov', gained: 6500, lost: 4200 },
-    { month: 'Dez', gained: 5600, lost: 3900 },
-  ];
-
   const formatNumber = (num: number) => {
     return num.toLocaleString('pt-BR');
   };
@@ -215,19 +144,7 @@ const Audience = () => {
   if (loading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex h-[50vh] flex-col items-center justify-center gap-4">
-        <p className="text-destructive">Erro ao carregar dados: {error}</p>
-        <Button onClick={() => refresh()} variant="outline" className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Tentar novamente
-        </Button>
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -247,320 +164,199 @@ const Audience = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          <div className="chip">
-            <span className="text-muted-foreground">Atualizado</span>
-            <strong className="font-semibold">{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })} • {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
-          </div>
         </div>
       </section>
 
-      {/* Metrics Grid */}
-      <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4" style={{ animationDelay: '0.1s' }}>
+      {/* Metrics Grid - Real data only */}
+      <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label="Followers"
-          value={formatNumber(profile?.followers_count || 0)}
-          delta="+4,05%"
-          deltaType="good"
-          tooltip="Total de seguidores no momento (geralmente acumulado/lifetime)."
+          value={profile?.followers_count ? formatNumber(profile.followers_count) : '--'}
+          tooltip="Total de seguidores no momento."
           tag="All time"
-          sparkline={<Sparkline trend="up" />}
         />
         <MetricCard
           label="Following"
-          value={formatNumber(profile?.follows_count || 0)}
-          delta=""
-          deltaType="neutral"
+          value={profile?.follows_count ? formatNumber(profile.follows_count) : '--'}
           tooltip="Número de contas que você segue."
           tag="All time"
-          sparkline={<Sparkline trend="neutral" />}
         />
         <MetricCard
           label="Posts"
-          value={formatNumber(profile?.media_count || 0)}
-          delta="publicações"
-          deltaType="neutral"
+          value={profile?.media_count ? formatNumber(profile.media_count) : '--'}
           tooltip="Total de publicações no perfil."
           tag="All time"
-          sparkline={<Sparkline trend="up" />}
         />
         <MetricCard
           label="Engagement Rate"
-          value="4.2%"
-          delta="estimado"
-          deltaType="good"
-          tooltip="Taxa de engajamento estimada baseada em curtidas e comentários."
-          tag="Média"
-          sparkline={<Sparkline trend="up" />}
+          value="--"
+          tooltip="Taxa de engajamento requer dados históricos."
+          tag="Indisponível"
         />
       </section>
 
-      {/* Charts Row 1 */}
-      <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-5" style={{ animationDelay: '0.2s' }}>
-        <div className="lg:col-span-3">
-          <ChartCard
-            title="Followers"
-            subtitle="Número de followers no período selecionado."
-            tooltip="Evolução do total de seguidores ao longo do tempo no período selecionado."
-            legend={
-              <>
-                <span><span className="legend-dot bg-foreground/70" />Followers</span>
-                <span><span className="legend-dot bg-foreground/35" />Tendência</span>
-              </>
-            }
-          >
-            <div className="h-60 rounded-xl border border-border bg-background p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={followersData}>
-                  <defs>
-                    <linearGradient id="colorFollowers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.15}/>
-                      <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '12px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: number) => [value.toLocaleString(), 'Followers']}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="hsl(var(--foreground) / 0.7)"
-                    strokeWidth={3}
-                    fill="url(#colorFollowers)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
+      {/* No demographics data message */}
+      {!hasDemographics && (
+        <div className="chart-card p-8 flex flex-col items-center justify-center min-h-[250px]">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Dados demográficos indisponíveis</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            Os dados demográficos requerem uma conta Business/Creator com pelo menos 100 seguidores 
+            e permissões adequadas no Instagram Graph API.
+          </p>
+          {error && (
+            <p className="text-sm text-destructive mt-4">{error}</p>
+          )}
         </div>
-        <div className="lg:col-span-2">
-          <ChartCard
-            title="Gained & Lost"
-            subtitle="Comparativo de ganho e perda no período."
-            tooltip="Comparação entre ganhos e perdas de seguidores por intervalo de tempo."
-            legend={
-              <>
-                <span><span className="legend-dot bg-foreground/55" />Gained</span>
-                <span><span className="legend-dot bg-foreground/30" />Lost</span>
-              </>
-            }
-          >
-            <div className="h-60 rounded-xl border border-border bg-background p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={gainLossData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '12px',
-                      fontSize: '12px'
-                    }}
-                  />
-                  <Bar dataKey="gained" fill="hsl(var(--foreground) / 0.55)" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="lost" fill="hsl(var(--foreground) / 0.30)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
-        </div>
-      </section>
+      )}
 
-      {/* Demographics Row */}
-      <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-5" style={{ animationDelay: '0.3s' }}>
-        <div className="lg:col-span-3">
-          <ChartCard
-            title="Gender"
-            subtitle="Proporção de gênero."
-            tooltip="Distribuição de seguidores por gênero. Útil para direcionar linguagem e criativos."
-            badge="All time"
-            legend={
-              <>
-                <span><span className="legend-dot bg-foreground/70" />Feminino</span>
-                <span><span className="legend-dot bg-foreground/35" />Masculino</span>
-                <span><span className="legend-dot bg-foreground/15" />Outro</span>
-              </>
-            }
-          >
-            <div className="flex h-60 items-center justify-center gap-10 rounded-xl border border-border bg-background p-4">
-              <div className="relative">
-                <ResponsiveContainer width={200} height={200}>
-                  <PieChart>
-                    <Pie
-                      data={genderData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {genderData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold">{genderData[0]?.value || 0}%</span>
-                  <span className="text-xs text-muted-foreground">Feminino</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {genderData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between gap-8">
-                    <span className="text-sm">{item.name}</span>
-                    <span className="font-semibold">{item.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </ChartCard>
-        </div>
-        <div className="lg:col-span-2">
-          <ChartCard
-            title="Age"
-            subtitle="Faixas etárias predominantes."
-            tooltip="Distribuição de seguidores por faixa etária. Importante para segmentação de anúncios."
-            badge="All time"
-          >
-            <div className="h-60 rounded-xl border border-border bg-background p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="range" fontSize={11} tickLine={false} axisLine={false} width={50} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '12px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: number) => [`${value}%`, 'Share']}
-                  />
-                  <Bar dataKey="value" fill="hsl(var(--foreground) / 0.6)" radius={[0, 8, 8, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
-        </div>
-      </section>
-
-      {/* Top Countries */}
-      <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-2" style={{ animationDelay: '0.4s' }}>
-        <ChartCard
-          title="Countries"
-          subtitle="Top 5 países por audiência."
-          tooltip="Países com maior concentração de seguidores."
-        >
-          <div className="space-y-2 rounded-xl border border-border bg-background p-4">
-            {topCountries.map((item, idx) => (
-              <div key={item.country} className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50">
-                <span className="w-5 text-xs text-muted-foreground">{idx + 1}</span>
-                <span className="flex-1 text-sm font-medium">{item.country}</span>
-                <span className="text-xs text-muted-foreground">{item.followers}</span>
-                <div className="w-24">
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div 
-                      className="h-full rounded-full bg-foreground/60" 
-                      style={{ width: `${item.share}%` }}
-                    />
+      {/* Demographics Row - Only show if real data exists */}
+      {genderData.length > 0 && (
+        <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            <ChartCard
+              title="Gender"
+              subtitle="Proporção de gênero."
+              tooltip="Distribuição de seguidores por gênero."
+              badge="API Data"
+            >
+              <div className="flex h-60 items-center justify-center gap-10 rounded-xl border border-border bg-background p-4">
+                <div className="relative">
+                  <ResponsiveContainer width={200} height={200}>
+                    <PieChart>
+                      <Pie
+                        data={genderData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {genderData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold">{genderData[0]?.value || 0}%</span>
+                    <span className="text-xs text-muted-foreground">{genderData[0]?.name}</span>
                   </div>
                 </div>
-                <span className="w-10 text-right text-sm font-semibold">{item.share}%</span>
-              </div>
-            ))}
-          </div>
-        </ChartCard>
-
-        <ChartCard
-          title="Cities"
-          subtitle="Top 5 cidades por audiência."
-          tooltip="Cidades com maior concentração de seguidores."
-        >
-          <div className="space-y-2 rounded-xl border border-border bg-background p-4">
-            {topCities.map((item, idx) => (
-              <div key={item.city} className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50">
-                <span className="w-5 text-xs text-muted-foreground">{idx + 1}</span>
-                <span className="flex-1 text-sm font-medium">{item.city}</span>
-                <span className="text-xs text-muted-foreground">{item.followers}</span>
-                <div className="w-24">
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div 
-                      className="h-full rounded-full bg-foreground/60" 
-                      style={{ width: `${item.share}%` }}
-                    />
-                  </div>
-                </div>
-                <span className="w-10 text-right text-sm font-semibold">{item.share}%</span>
-              </div>
-            ))}
-          </div>
-        </ChartCard>
-      </section>
-
-      {/* Online Followers Heatmap */}
-      <section style={{ animationDelay: '0.5s' }}>
-        <ChartCard
-          title="Online Followers"
-          subtitle="Melhores horários para publicar baseado na atividade dos seguidores."
-          tooltip="Heatmap mostrando quando seus seguidores estão mais ativos. Tons mais escuros = mais ativos."
-        >
-          <div className="rounded-xl border border-border bg-background p-4">
-            {/* Day Labels */}
-            <div className="mb-2 flex">
-              <div className="w-14" /> {/* Spacer for time column */}
-              {dayLabels.map((day) => (
-                <div key={day} className="flex-1 text-center text-xs text-muted-foreground">{day}</div>
-              ))}
-            </div>
-            
-            {/* Heatmap Grid */}
-            <div className="space-y-1">
-              {heatmapData.map((row) => (
-                <div key={row.time} className="flex items-center gap-1">
-                  <div className="w-14 text-xs text-muted-foreground">{row.time}</div>
-                  {row.days.map((intensity, idx) => (
-                    <div
-                      key={idx}
-                      className="flex-1 h-8 rounded transition-colors"
-                      style={{
-                        backgroundColor: `hsl(var(--foreground) / ${intensity * 0.15})`,
-                      }}
-                    />
+                <div className="space-y-3">
+                  {genderData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between gap-8">
+                      <span className="text-sm">{item.name}</span>
+                      <span className="font-semibold">{item.value}%</span>
+                    </div>
                   ))}
                 </div>
-              ))}
+              </div>
+            </ChartCard>
+          </div>
+          
+          {ageData.length > 0 && (
+            <div className="lg:col-span-2">
+              <ChartCard
+                title="Age"
+                subtitle="Faixas etárias predominantes."
+                tooltip="Distribuição de seguidores por faixa etária."
+                badge="API Data"
+              >
+                <div className="h-60 rounded-xl border border-border bg-background p-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={ageData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                      <XAxis type="number" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis type="category" dataKey="range" fontSize={11} tickLine={false} axisLine={false} width={50} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '12px',
+                          fontSize: '12px'
+                        }}
+                        formatter={(value: number) => [`${value}%`, 'Share']}
+                      />
+                      <Bar dataKey="value" fill="hsl(var(--foreground) / 0.6)" radius={[0, 8, 8, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </ChartCard>
             </div>
+          )}
+        </section>
+      )}
 
-            {/* Legend */}
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <span className="text-xs text-muted-foreground">Menos ativo</span>
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((level) => (
-                  <div
-                    key={level}
-                    className="h-3 w-6 rounded"
-                    style={{ backgroundColor: `hsl(var(--foreground) / ${level * 0.15})` }}
-                  />
+      {/* Top Countries - Only show if real data exists */}
+      {(topCountries.length > 0 || topCities.length > 0) && (
+        <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+          {topCountries.length > 0 && (
+            <ChartCard
+              title="Countries"
+              subtitle="Top países por audiência."
+              tooltip="Países com maior concentração de seguidores."
+            >
+              <div className="space-y-2 rounded-xl border border-border bg-background p-4">
+                {topCountries.map((item, idx) => (
+                  <div key={item.country} className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50">
+                    <span className="w-5 text-xs text-muted-foreground">{idx + 1}</span>
+                    <span className="flex-1 text-sm font-medium">{item.country}</span>
+                    <span className="text-xs text-muted-foreground">{item.followers}</span>
+                    <div className="w-24">
+                      <div className="h-1.5 rounded-full bg-muted">
+                        <div 
+                          className="h-full rounded-full bg-foreground/60" 
+                          style={{ width: `${item.share}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-10 text-right text-sm font-semibold">{item.share}%</span>
+                  </div>
                 ))}
               </div>
-              <span className="text-xs text-muted-foreground">Mais ativo</span>
-            </div>
-          </div>
-        </ChartCard>
-      </section>
+            </ChartCard>
+          )}
+
+          {topCities.length > 0 && (
+            <ChartCard
+              title="Cities"
+              subtitle="Top cidades por audiência."
+              tooltip="Cidades com maior concentração de seguidores."
+            >
+              <div className="space-y-2 rounded-xl border border-border bg-background p-4">
+                {topCities.map((item, idx) => (
+                  <div key={item.city} className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50">
+                    <span className="w-5 text-xs text-muted-foreground">{idx + 1}</span>
+                    <span className="flex-1 text-sm font-medium">{item.city}</span>
+                    <span className="text-xs text-muted-foreground">{item.followers}</span>
+                    <div className="w-24">
+                      <div className="h-1.5 rounded-full bg-muted">
+                        <div 
+                          className="h-full rounded-full bg-foreground/60" 
+                          style={{ width: `${item.share}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-10 text-right text-sm font-semibold">{item.share}%</span>
+                  </div>
+                ))}
+              </div>
+            </ChartCard>
+          )}
+        </section>
+      )}
+
+      {/* Online Followers info */}
+      {!hasOnlineData && (
+        <div className="chart-card p-6">
+          <h3 className="text-sm font-semibold mb-2">Seguidores Online</h3>
+          <p className="text-sm text-muted-foreground">
+            Dados de atividade online não disponíveis. Acesse a página "Online" para mais detalhes quando conectar uma conta.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
