@@ -75,6 +75,7 @@ type MediaItem = {
   id: string;
   caption?: string;
   media_type: string;
+  media_product_type?: string;
   media_url?: string;
   permalink?: string;
   thumbnail_url?: string;
@@ -144,22 +145,28 @@ async function graphGetWithUrl(fullUrl: string): Promise<unknown> {
   return json;
 }
 
-async function fetchMediaInsights(accessToken: string, mediaId: string, mediaType: string): Promise<Record<string, number>> {
+async function fetchMediaInsights(
+  accessToken: string, 
+  mediaId: string, 
+  mediaType: string, 
+  mediaProductType?: string
+): Promise<Record<string, number>> {
   // Different metrics available per media type - updated for Graph API v24.0
-  // Note: shares is NOT available for individual posts, only for REELS
   // CAROUSEL_ALBUM posts have NO individual insights available via API
   
   if (mediaType === "CAROUSEL_ALBUM") {
-    // Carousels don't have individual insights in API - return empty
-    return {};
+    return {}; // Carousels don't have individual insights
   }
   
+  // Determine if this is a Reel based on media_product_type
+  const isReel = mediaProductType === "REELS" || mediaProductType === "REEL";
+  
   let metrics: string;
-  if (mediaType === "REELS") {
-    // REELS-specific metrics
+  if (isReel) {
+    // REELS-specific metrics (plays = views, shares available)
     metrics = "plays,reach,saved,shares,total_interactions";
   } else if (mediaType === "VIDEO") {
-    // VIDEO metrics
+    // Feed VIDEO metrics (video_views = views)
     metrics = "reach,saved,video_views";
   } else {
     // IMAGE metrics
@@ -170,6 +177,7 @@ async function fetchMediaInsights(accessToken: string, mediaId: string, mediaTyp
     const json = await graphGet(`/${mediaId}/insights`, accessToken, { metric: metrics });
     const data = (json as { data?: unknown }).data;
     if (!Array.isArray(data)) {
+      console.log(`[ig-dashboard] No insights data for ${mediaId} (${mediaType}/${mediaProductType})`);
       return {};
     }
     const out: Record<string, number> = {};
@@ -177,16 +185,23 @@ async function fetchMediaInsights(accessToken: string, mediaId: string, mediaTyp
       const name = typeof item === "object" && item && "name" in item ? (item as any).name : null;
       const values = typeof item === "object" && item && "values" in item ? (item as any).values : null;
       const lastValue = Array.isArray(values) && values.length > 0 ? values[values.length - 1]?.value : null;
-      if (typeof name === "string" && typeof lastValue === "number") out[name] = lastValue;
+      if (typeof name === "string" && typeof lastValue === "number") {
+        out[name] = lastValue;
+      }
     }
+    
+    // Normalize views: plays (reels) or video_views (feed videos) -> views
+    if (out.plays) {
+      out.views = out.plays;
+    } else if (out.video_views) {
+      out.views = out.video_views;
+    }
+    
     return out;
   } catch (err) {
-    // Insights may not be available for older posts (>2 years) or certain media types
-    // Log error for debugging
     const errMsg = err instanceof Error ? err.message : String(err);
-    if (!errMsg.includes("10")) { // Suppress common "permission denied" errors
-      console.log(`[ig-dashboard] Insights error for ${mediaId} (${mediaType}): ${errMsg.slice(0, 100)}`);
-    }
+    // Log all errors for better debugging (remove error code filter)
+    console.log(`[ig-dashboard] Insights error for ${mediaId} (${mediaType}/${mediaProductType}): ${errMsg.slice(0, 150)}`);
     return {};
   }
 }
@@ -246,7 +261,7 @@ serve(async (req) => {
     // Fetch ALL posts with pagination
     const allMedia: MediaItem[] = [];
     let nextUrl: string | null = null;
-    const mediaFields = "id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count";
+    const mediaFields = "id,caption,media_type,media_product_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count";
     
     // First request
     const firstMediaJson = await graphGet(`/${businessId}/media`, accessToken, {
@@ -292,12 +307,13 @@ serve(async (req) => {
     let insightsSuccessCount = 0;
     let insightsErrorCount = 0;
     
-    // First, log media type distribution
+    // Log media type and product type distribution
     const mediaTypeCounts = mediaItems.reduce((acc, m) => {
-      acc[m.media_type] = (acc[m.media_type] || 0) + 1;
+      const key = m.media_product_type ? `${m.media_type}/${m.media_product_type}` : m.media_type;
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    console.log(`[ig-dashboard] Media types: ${JSON.stringify(mediaTypeCounts)}`);
+    console.log(`[ig-dashboard] Media types (type/product): ${JSON.stringify(mediaTypeCounts)}`);
     
     for (let i = 0; i < mediaItems.length; i += INSIGHTS_BATCH_SIZE) {
       const batch = mediaItems.slice(i, i + INSIGHTS_BATCH_SIZE);
@@ -305,7 +321,7 @@ serve(async (req) => {
       
       const batchResults = await Promise.all(
         batch.map(async (m) => {
-          const insights = await fetchMediaInsights(accessToken, m.id, m.media_type);
+          const insights = await fetchMediaInsights(accessToken, m.id, m.media_type, m.media_product_type);
           if (Object.keys(insights).length > 0) {
             insightsSuccessCount++;
           } else if (m.media_type !== "CAROUSEL_ALBUM") {
