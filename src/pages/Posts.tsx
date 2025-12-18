@@ -115,13 +115,13 @@ const Posts = () => {
       case 'comments':
         return (b.comments_count || 0) - (a.comments_count || 0);
       case 'saves':
-        return (b.insights?.saved || 0) - (a.insights?.saved || 0);
+        return (b.insights?.saved || b.insights?.saves || 0) - (a.insights?.saved || a.insights?.saves || 0);
       case 'reach':
         return (b.insights?.reach || 0) - (a.insights?.reach || 0);
       case 'engagement':
       default:
-        const engA = (a.like_count || 0) + (a.comments_count || 0) + (a.insights?.saved || 0);
-        const engB = (b.like_count || 0) + (b.comments_count || 0) + (b.insights?.saved || 0);
+        const engA = (a.like_count || 0) + (a.comments_count || 0) + (a.insights?.saved || a.insights?.saves || 0);
+        const engB = (b.like_count || 0) + (b.comments_count || 0) + (b.insights?.saved || b.insights?.saves || 0);
         return engB - engA;
     }
   });
@@ -135,7 +135,7 @@ const Posts = () => {
     name: `#${idx + 1}`,
     likes: p.like_count || 0,
     comments: p.comments_count || 0,
-    saves: p.insights?.saved || 0,
+    saves: p.insights?.saved || p.insights?.saves || 0,
   }));
 
   const getTypeIcon = (type: string) => {

@@ -34,11 +34,21 @@ const Reels = () => {
 
   // Filter reels/videos from media
   const reels = media.filter(item => item.media_type === 'VIDEO' || item.media_type === 'REELS');
-  const hasReels = reels.length > 0;
+    const sortedReels = [...reels].sort((a: any, b: any) => {
+    const av = Number(a.insights?.views) || 0;
+    const bv = Number(b.insights?.views) || 0;
+    if (bv !== av) return bv - av;
+    const ae = Number(a.insights?.total_interactions ?? a.insights?.engagement) || 0;
+    const be = Number(b.insights?.total_interactions ?? b.insights?.engagement) || 0;
+    return be - ae;
+  });
+
+const hasReels = reels.length > 0;
 
   // Calculate metrics from real data only
   const totalLikes = reels.reduce((sum, reel) => sum + (reel.like_count || 0), 0);
   const totalComments = reels.reduce((sum, reel) => sum + (reel.comments_count || 0), 0);
+  const totalViews = reels.reduce((sum, reel) => sum + (Number(reel.insights?.views) || 0), 0);
 
   // Real performance data from API
   const reelsPerformance = reels.slice(0, 10).map((reel, index) => ({
@@ -78,9 +88,9 @@ const Reels = () => {
         />
         <MetricCard
           label="Visualizações"
-          value="--"
+          value={(totalViews || 0).toLocaleString()}
           icon={<Eye className="w-4 h-4" />}
-          tooltip="Visualizações requerem permissões adicionais da API do Instagram."
+          tooltip={totalViews ? undefined : "Sem dados de visualizações via API para o período selecionado."}
         />
       </div>
 
@@ -124,7 +134,7 @@ const Reels = () => {
           {/* Top Reels */}
           <ChartCard title="Top Reels" subtitle="Melhores performances">
             <div className="space-y-3">
-              {reels.slice(0, 5).map((reel, index) => (
+              {sortedReels.slice(0, 5).map((reel, index) => (
                 <a
                   key={reel.id}
                   href={reel.permalink}

@@ -161,20 +161,47 @@ function parseInsightsResponse(json: unknown): Record<string, number> {
 }
 
 function normalizeMediaInsights(raw: Record<string, number>): Record<string, number> {
-  const saved = raw.saved ?? raw.carousel_album_saved ?? 0;
-  const reach = raw.reach ?? raw.carousel_album_reach ?? 0;
-  const views = raw.views ?? raw.plays ?? raw.video_views ?? raw.carousel_album_video_views ?? 0;
+  // Normalize metric name changes across Graph API versions.
+  // - "saved" vs "saves"
+  // - "plays" / "video_views" -> "views" (post-level "media views")
+  // Keep canonical keys used by the frontend: views, reach, saved, shares, total_interactions, engagement.
+
+  const saved =
+    raw.saved ??
+    raw.saves ??
+    raw.carousel_album_saved ??
+    0;
+
+  const views =
+    raw.views ??
+    raw.video_views ??
+    raw.plays ??
+    raw.carousel_album_video_views ??
+    0;
+
+  const reach =
+    raw.reach ??
+    raw.carousel_album_reach ??
+    0;
 
   const shares = raw.shares ?? 0;
-  const totalInteractions = raw.total_interactions ?? 0;
 
+  const total_interactions =
+    raw.total_interactions ??
+    // Some API versions expose "engagement" at media-level; treat it as interactions when present.
+    raw.engagement ??
+    0;
+
+  // Provide both aliases so older/newer frontends keep working.
+  // Frontend uses "saved" today, but we also include "saves" for convenience.
   return {
     ...raw,
-    saved,
-    reach,
     views,
+    reach,
+    saved,
+    saves: raw.saves ?? saved,
     shares,
-    total_interactions: totalInteractions,
+    total_interactions,
   };
 }
 
@@ -413,7 +440,6 @@ serve(async (req) => {
           period: "lifetime",
           metric_type: "total_value",
           breakdown: breakdownType,
-          timeframe: "this_month",
         });
 
         const demoData = (demoJson as { data?: unknown[] }).data;
@@ -448,7 +474,6 @@ serve(async (req) => {
             period: "lifetime",
             metric_type: "total_value",
             breakdown: breakdownType,
-            timeframe: "this_month",
           });
 
           const demoData = (demoJson as { data?: unknown[] }).data;
