@@ -168,7 +168,9 @@ async function fetchMediaInsights(accessToken: string, mediaId: string, mediaTyp
   try {
     const json = await graphGet(`/${mediaId}/insights`, accessToken, { metric: metrics });
     const data = (json as { data?: unknown }).data;
-    if (!Array.isArray(data)) return {};
+    if (!Array.isArray(data)) {
+      return {};
+    }
     const out: Record<string, number> = {};
     for (const item of data) {
       const name = typeof item === "object" && item && "name" in item ? (item as any).name : null;
@@ -179,6 +181,11 @@ async function fetchMediaInsights(accessToken: string, mediaId: string, mediaTyp
     return out;
   } catch (err) {
     // Insights may not be available for older posts (>2 years) or certain media types
+    // Log error for debugging
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (!errMsg.includes("10")) { // Suppress common "permission denied" errors
+      console.log(`[ig-dashboard] Insights error for ${mediaId} (${mediaType}): ${errMsg.slice(0, 100)}`);
+    }
     return {};
   }
 }
@@ -281,18 +288,36 @@ serve(async (req) => {
     // Fetch per-item insights (batch in groups to avoid rate limits)
     const INSIGHTS_BATCH_SIZE = 50;
     const mediaWithInsights: MediaItem[] = [];
+    let insightsSuccessCount = 0;
+    let insightsErrorCount = 0;
+    
+    // First, log media type distribution
+    const mediaTypeCounts = mediaItems.reduce((acc, m) => {
+      acc[m.media_type] = (acc[m.media_type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`[ig-dashboard] Media types: ${JSON.stringify(mediaTypeCounts)}`);
     
     for (let i = 0; i < mediaItems.length; i += INSIGHTS_BATCH_SIZE) {
       const batch = mediaItems.slice(i, i + INSIGHTS_BATCH_SIZE);
+      console.log(`[ig-dashboard] Fetching insights batch ${Math.floor(i/INSIGHTS_BATCH_SIZE) + 1}/${Math.ceil(mediaItems.length/INSIGHTS_BATCH_SIZE)}`);
+      
       const batchResults = await Promise.all(
         batch.map(async (m) => {
           const insights = await fetchMediaInsights(accessToken, m.id, m.media_type);
+          if (Object.keys(insights).length > 0) {
+            insightsSuccessCount++;
+          } else if (m.media_type !== "CAROUSEL_ALBUM") {
+            insightsErrorCount++;
+          }
           const engagement = (m.like_count ?? 0) + (m.comments_count ?? 0) + (insights.saved ?? 0);
           return { ...m, insights: { ...insights, engagement } };
         }),
       );
       mediaWithInsights.push(...batchResults);
     }
+    
+    console.log(`[ig-dashboard] Insights fetch complete: ${insightsSuccessCount} success, ${insightsErrorCount} failed/empty (carousels excluded)`);
 
     const storiesWithInsights = await Promise.all(
       storyItems.map(async (s) => {
