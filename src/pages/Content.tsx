@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
-import { formatPercent, getComputedNumber, getReach } from "@/utils/ig";
-import { Image, Play, Clock, Grid2X2, Heart, MessageCircle, Bookmark, Eye, FileX } from "lucide-react";
+import { formatPercent, getComputedNumber, getReach, type IgMediaItem } from "@/utils/ig";
+import { Image, Play, Clock, Grid2X2, Heart, MessageCircle, Bookmark, Eye, FileX, ExternalLink } from "lucide-react";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
+import { PostDetailModal } from "@/components/PostDetailModal";
+import { usePostClick } from "@/hooks/usePostClick";
 import {
   AreaChart,
   Area,
@@ -25,6 +27,9 @@ export default function Content() {
   const stories = data?.stories ?? [];
   const media = useFilteredMedia(allMedia);
   const [activeTab, setActiveTab] = useState<ContentTab>("overview");
+
+  // Post click handling
+  const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
 
   // Sort states
   const [mediaTypeSort, setMediaTypeSort] = useState<SortOrder>("desc");
@@ -106,7 +111,7 @@ export default function Content() {
   // Media type analysis with sorting
   const mediaTypes = useMemo(() => {
     const dataToAnalyze = activeTab === "overview" ? media : filteredByTab;
-    const groups: Record<string, { reach: number; er: number; likes: number; comments: number; saves: number; count: number }> = {};
+    const groups: Record<string, { reach: number; er: number; likes: number; comments: number; saves: number; count: number; posts: IgMediaItem[] }> = {};
     
     for (const item of dataToAnalyze) {
       const key = item.media_product_type === "REELS" || item.media_product_type === "REEL" 
@@ -115,13 +120,14 @@ export default function Content() {
         ? "CAROUSEL" 
         : item.media_type || "FEED";
       
-      if (!groups[key]) groups[key] = { reach: 0, er: 0, likes: 0, comments: 0, saves: 0, count: 0 };
+      if (!groups[key]) groups[key] = { reach: 0, er: 0, likes: 0, comments: 0, saves: 0, count: 0, posts: [] };
       groups[key].reach += getReach(item) ?? 0;
       groups[key].er += getComputedNumber(item, "er") ?? 0;
       groups[key].likes += item.like_count ?? 0;
       groups[key].comments += item.comments_count ?? 0;
       groups[key].saves += (item.computed?.saves as number) ?? 0;
       groups[key].count += 1;
+      groups[key].posts.push(item);
     }
 
     const maxReach = Math.max(...Object.values(groups).map(g => g.reach), 1);
@@ -135,6 +141,7 @@ export default function Content() {
       comments: v.comments,
       saves: v.saves,
       count: v.count,
+      posts: v.posts,
     }));
 
     // Sort based on preference
@@ -158,6 +165,16 @@ export default function Content() {
 
     return result;
   }, [media, filteredByTab, activeTab, mediaTypeSort, mediaTypeSortBy]);
+
+  // Handler for media type row click
+  const handleMediaTypeClick = (posts: IgMediaItem[]) => {
+    if (posts.length > 0) {
+      const bestPost = [...posts].sort((a, b) => 
+        (getReach(b) ?? 0) - (getReach(a) ?? 0)
+      )[0];
+      handlePostClick(bestPost);
+    }
+  };
 
   // Sorted content grid
   const sortedContentGrid = useMemo(() => {
@@ -505,7 +522,11 @@ export default function Content() {
                         </thead>
                         <tbody>
                           {mediaTypes.map((row, idx) => (
-                            <tr key={row.key} className={idx === 0 ? "bg-primary/5" : ""}>
+                            <tr 
+                              key={row.key} 
+                              className={`cursor-pointer transition-colors hover:bg-accent/50 ${idx === 0 ? "bg-primary/5" : ""}`}
+                              onClick={() => handleMediaTypeClick(row.posts)}
+                            >
                               <td className="text-muted-foreground">{idx + 1}.</td>
                               <td>
                                 <span className="flex items-center gap-2 font-medium">
@@ -513,6 +534,7 @@ export default function Content() {
                                   {row.key === "IMAGE" && <Image className="w-4 h-4" />}
                                   {row.key === "CAROUSEL" && <Grid2X2 className="w-4 h-4" />}
                                   {row.key}
+                                  <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
                                 </span>
                               </td>
                               <td>{row.count}</td>
@@ -574,6 +596,7 @@ export default function Content() {
                       {sortedContentGrid.slice(0, 12).map((item) => (
                         <div
                           key={item.id}
+                          onClick={() => handlePostClick(item)}
                           className="relative aspect-square rounded-lg overflow-hidden bg-secondary group cursor-pointer"
                         >
                           {item.media_url || item.thumbnail_url ? (
@@ -600,7 +623,7 @@ export default function Content() {
                           )}
                           
                           {/* Hover overlay with metrics */}
-                          <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center">
                             <div className="grid grid-cols-2 gap-2 text-white text-xs p-2">
                               <span className="flex items-center gap-1">
                                 <Heart className="w-3 h-3" />
@@ -623,6 +646,8 @@ export default function Content() {
                                 </span>
                               )}
                             </div>
+                            {/* Click hint */}
+                            <ExternalLink className="w-5 h-5 text-white mt-2" />
                           </div>
                         </div>
                       ))}
@@ -648,6 +673,9 @@ export default function Content() {
           </div>
         )}
       </div>
+
+      {/* Post Detail Modal */}
+      <PostDetailModal post={selectedPost} isOpen={isModalOpen} onClose={closeModal} />
     </>
   );
 }
