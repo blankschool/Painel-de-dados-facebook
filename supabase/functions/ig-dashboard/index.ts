@@ -209,6 +209,8 @@ async function fetchMediaInsights(
       "impressions,reach,saved,total_interactions",
       "reach,saved,total_interactions",
       "reach,saved",
+      "impressions,reach",
+      "reach",
     );
   } else if (isReel) {
     // reels: "plays" may be supported depending on API/account; keep fallbacks.
@@ -218,6 +220,8 @@ async function fetchMediaInsights(
       "plays,reach,saved",
       "impressions,reach,saved",
       "reach,saved",
+      "impressions,reach",
+      "reach",
     );
   } else if (mediaType === "VIDEO") {
     // vídeo feed: "video_views" is the common metric; use impressions as a fallback.
@@ -228,10 +232,18 @@ async function fetchMediaInsights(
       "video_views,reach,saved",
       "impressions,reach,saved",
       "reach,saved",
+      "impressions,reach",
+      "reach",
     );
   } else {
     // imagem (no video views; use impressions as an exposure proxy)
-    candidates.push("impressions,reach,saved,total_interactions", "impressions,reach,saved", "reach,saved");
+    candidates.push(
+      "impressions,reach,saved,total_interactions",
+      "impressions,reach,saved",
+      "reach,saved",
+      "impressions,reach",
+      "reach",
+    );
   }
 
   for (const metric of candidates) {
@@ -299,7 +311,7 @@ function computeMediaMetrics(
 
   const saves = savesPick.value;
   const reach = reachPick.value;
-  const views = viewsPick.value;
+  const views = viewsPick.value ?? reach;
   const shares = sharesPick.value;
 
   const engagement = likes + comments + (saves ?? 0) + (shares ?? 0);
@@ -344,7 +356,7 @@ function computeMediaMetrics(
     shares,
     reach,
     views,
-    views_source: viewsPick.source,
+    views_source: viewsPick.value !== null ? viewsPick.source : reach !== null ? "reach" : null,
     total_interactions: totalInteractionsPick.value,
     engagement,
     score,

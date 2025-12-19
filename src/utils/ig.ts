@@ -67,7 +67,12 @@ export function getViews(item: IgMediaItem): number | null {
   if (computed !== null) return computed;
   const hasInsights = getComputedBool(item, "has_insights");
   if (hasInsights) return null;
-  return getInsightsNumber(item, "views") ?? null;
+  return (
+    getInsightsNumber(item, "views") ??
+    getInsightsNumber(item, "impressions") ??
+    getInsightsNumber(item, "reach") ??
+    null
+  );
 }
 
 export function getEngagement(item: IgMediaItem): number {

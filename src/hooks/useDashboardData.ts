@@ -47,7 +47,9 @@ export function useDashboardData() {
     const since = dateRange?.from ? toYmd(dateRange.from) : undefined;
     const until = dateRange?.to ? toYmd(dateRange.to) : undefined;
     const businessId = import.meta.env.VITE_IG_BUSINESS_ID as string | undefined;
-    return { since, until, ...(businessId ? { businessId } : {}) };
+    const maxInsightsPostsEnv = Number(import.meta.env.VITE_MAX_INSIGHTS_POSTS ?? '');
+    const maxInsightsPosts = Number.isFinite(maxInsightsPostsEnv) && maxInsightsPostsEnv > 0 ? maxInsightsPostsEnv : 500;
+    return { since, until, maxInsightsPosts, ...(businessId ? { businessId } : {}) };
   }, [dateRange?.from, dateRange?.to]);
 
   const query = useQuery({

@@ -401,7 +401,7 @@ const Posts = () => {
                       <th>Salvos</th>
                       <th>Compartilhados</th>
                       <th>Alcance</th>
-                      <th>Views</th>
+                      <th title="Views usa impressions/reach quando views não está disponível.">Views</th>
                     </tr>
                   </thead>
                   <tbody>
