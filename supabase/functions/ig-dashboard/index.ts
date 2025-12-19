@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = [
   "https://insta-glow-up-39.lovable.app",
@@ -165,19 +166,11 @@ function parseInsightsResponse(json: unknown): Record<string, number> {
   return out;
 }
 
-// ✅ CORRIGIDO: Normalização para API v24
 function normalizeMediaInsights(raw: Record<string, number>): Record<string, number> {
-  // API v24 (abril 2025): "views" é a métrica canônica
-  // - impressions, plays, video_views foram depreciados
-  // - views é agora a métrica principal para todos os tipos de conteúdo
-
   const saved = raw.saved ?? raw.saves;
   const shares = raw.shares;
   const reach = raw.reach;
-
-  // views é a métrica principal - usar diretamente sem fallback para métricas depreciadas
   const views = raw.views;
-
   const total_interactions = raw.total_interactions ?? raw.engagement;
 
   return {
@@ -190,7 +183,6 @@ function normalizeMediaInsights(raw: Record<string, number>): Record<string, num
   };
 }
 
-// ✅ CORRIGIDO: Métricas atualizadas para API v24
 async function fetchMediaInsights(
   accessToken: string,
   mediaId: string,
@@ -204,7 +196,6 @@ async function fetchMediaInsights(
   const candidates: string[] = [];
 
   if (isCarousel) {
-    // Carousels: views conta cada imagem separadamente na API v24
     candidates.push(
       "views,reach,saved,shares,total_interactions",
       "views,reach,saved,total_interactions",
@@ -216,7 +207,6 @@ async function fetchMediaInsights(
       "reach",
     );
   } else if (isReel) {
-    // Reels: views substitui plays na API v24
     candidates.push(
       "views,reach,saved,shares,total_interactions",
       "views,reach,saved,shares",
@@ -228,7 +218,6 @@ async function fetchMediaInsights(
       "reach",
     );
   } else if (isVideo) {
-    // Vídeos no feed: views substitui video_views na API v24
     candidates.push(
       "views,reach,saved,shares,total_interactions",
       "views,reach,saved,total_interactions",
@@ -240,7 +229,6 @@ async function fetchMediaInsights(
       "reach",
     );
   } else {
-    // Imagens: views agora disponível para imagens na API v24
     candidates.push(
       "views,reach,saved,shares,total_interactions",
       "views,reach,saved,total_interactions",
@@ -259,7 +247,6 @@ async function fetchMediaInsights(
       const raw = parseInsightsResponse(json);
       const normalized = normalizeMediaInsights(raw);
 
-      // Log de sucesso para debug
       if (Object.keys(normalized).length > 0) {
         console.log(
           `[ig-dashboard] Insights SUCCESS media=${mediaId} metric=${metric} keys=${Object.keys(normalized).join(",")}`,
@@ -320,7 +307,6 @@ function computeMediaMetrics(
 
   const savesPick = pickMetric(insightsRaw, ["saved", "saves"]);
   const reachPick = pickMetric(insightsRaw, ["reach"]);
-  // ✅ CORRIGIDO: views é a métrica principal, sem fallback para métricas depreciadas
   const viewsPick = pickMetric(insightsRaw, ["views"]);
   const sharesPick = pickMetric(insightsRaw, ["shares"]);
   const totalInteractionsPick = pickMetric(insightsRaw, ["total_interactions", "engagement"]);
@@ -340,7 +326,6 @@ function computeMediaMetrics(
   const viewsRate = typeof reach === "number" && reach > 0 && typeof views === "number" ? (views / reach) * 100 : null;
   const interactionsPer1000Reach = typeof reach === "number" && reach > 0 ? (engagement / reach) * 1000 : null;
 
-  // Todos os tipos de mídia agora suportam views na API v24
   const expectsViews = true;
 
   const missingMetrics = ["saves", "shares", "reach", ...(expectsViews ? ["views"] : [])].filter((k) => {
@@ -389,20 +374,17 @@ function computeMediaMetrics(
 
 async function fetchStoryInsights(accessToken: string, storyId: string): Promise<Record<string, number>> {
   try {
-    // ✅ Stories também usam views na API v24
     const json = await graphGet(`/${storyId}/insights`, accessToken, {
       metric: "views,reach,replies,exits,taps_forward,taps_back",
     });
     const raw = parseInsightsResponse(json);
     return raw;
   } catch {
-    // Fallback para métricas antigas caso a conta ainda não tenha migrado
     try {
       const json = await graphGet(`/${storyId}/insights`, accessToken, {
         metric: "impressions,reach,replies,exits,taps_forward,taps_back",
       });
       const raw = parseInsightsResponse(json);
-      // Normalizar impressions para views
       if (raw.impressions && !raw.views) {
         raw.views = raw.impressions;
       }
@@ -424,13 +406,50 @@ serve(async (req) => {
   const startedAt = Date.now();
 
   try {
+    // Verify JWT and get user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      console.error('[ig-dashboard] Auth error:', authError?.message || 'No user');
+      throw new Error('Unauthorized');
+    }
+    console.log('[ig-dashboard] User authenticated:', user.id);
+
+    // Fetch connected account from database
+    const { data: connectedAccount, error: accountError } = await supabaseAuth
+      .from('connected_accounts')
+      .select('provider_account_id, access_token')
+      .eq('user_id', user.id)
+      .eq('provider', 'facebook')
+      .maybeSingle();
+
+    if (accountError) {
+      console.error('[ig-dashboard] Error fetching connected account:', accountError);
+      throw new Error('Failed to fetch connected account');
+    }
+
+    if (!connectedAccount) {
+      console.error('[ig-dashboard] No connected account found for user:', user.id);
+      throw new Error('No Instagram account connected. Please connect your account first.');
+    }
+
     const body = (await req.json().catch(() => ({}))) as DashboardRequest;
 
-    const businessId = body.businessId ?? Deno.env.get("IG_BUSINESS_ID") ?? "";
-    const accessToken = Deno.env.get("IG_ACCESS_TOKEN") ?? "";
-    if (!businessId || !accessToken) {
-      throw new Error("Missing IG_BUSINESS_ID / IG_ACCESS_TOKEN secrets");
-    }
+    const businessId = connectedAccount.provider_account_id;
+    const accessToken = connectedAccount.access_token;
+
+    console.log(`[ig-dashboard] Fetching data for businessId=${businessId} (user=${user.id})`);
 
     const maxPosts = typeof body.maxPosts === "number" ? Math.max(1, Math.min(2000, body.maxPosts)) : 500;
     const maxStories = typeof body.maxStories === "number" ? Math.max(1, Math.min(50, body.maxStories)) : 25;
@@ -512,7 +531,6 @@ serve(async (req) => {
     const storiesWithInsights = await Promise.all(
       storyItems.map(async (s) => {
         const insights = await fetchStoryInsights(accessToken, s.id);
-        // ✅ CORRIGIDO: usar views em vez de impressions
         const views = insights.views ?? insights.impressions ?? 0;
         const exits = insights.exits ?? 0;
         const completionRate = views > 0 ? Math.round((1 - exits / views) * 100) : 0;
@@ -535,7 +553,6 @@ serve(async (req) => {
       (acc, s) => {
         const insights = (s.insights ?? {}) as StoryInsightsData;
         acc.total_stories += 1;
-        // ✅ CORRIGIDO: usar views como métrica principal
         acc.total_views += asNumber(insights.views) ?? asNumber(insights.impressions) ?? 0;
         acc.total_reach += asNumber(insights.reach) ?? 0;
         acc.total_replies += asNumber(insights.replies) ?? 0;
@@ -547,7 +564,7 @@ serve(async (req) => {
       {
         total_stories: 0,
         total_views: 0,
-        total_impressions: 0, // Mantido para compatibilidade
+        total_impressions: 0,
         total_reach: 0,
         total_replies: 0,
         total_exits: 0,
@@ -557,7 +574,6 @@ serve(async (req) => {
       },
     );
 
-    // Manter impressions = views para compatibilidade com frontend antigo
     storiesAggregate.total_impressions = storiesAggregate.total_views;
 
     if (storiesAggregate.total_views > 0) {
@@ -566,7 +582,6 @@ serve(async (req) => {
       );
     }
 
-    // Demographics e online_followers mantidos como estavam
     const demographics: Record<string, unknown> = {};
     const breakdownTypes = ["age", "gender", "country", "city"];
 
@@ -698,7 +713,6 @@ serve(async (req) => {
     const top_reels_by_views = [...reelsOnly].sort(byViewsDesc).slice(0, 20);
     const top_reels_by_score = [...reelsOnly].sort(byScoreDesc).slice(0, 20);
 
-    // ✅ Calcular totais agregados de views e reach
     const totalViews = mediaWithInsights.reduce((sum, m) => sum + (m.computed?.views ?? 0), 0);
     const totalReach = mediaWithInsights.reduce((sum, m) => sum + (m.computed?.reach ?? 0), 0);
 
@@ -714,7 +728,6 @@ serve(async (req) => {
         media: mediaWithInsights,
         posts: mediaWithInsights,
         total_posts: mediaWithInsights.length,
-        // ✅ Totais agregados para o dashboard
         total_views: totalViews,
         total_reach: totalReach,
         top_posts_by_score,
@@ -735,8 +748,10 @@ serve(async (req) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error(`[ig-dashboard] Error:`, msg);
+    
+    const status = msg === 'Unauthorized' ? 401 : 500;
     return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
