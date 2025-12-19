@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
-import { formatPercent, getComputedNumber, getReach } from "@/utils/ig";
+import { formatPercent, getComputedNumber, getReach, type IgMediaItem } from "@/utils/ig";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
+import { PostDetailModal } from "@/components/PostDetailModal";
+import { usePostClick } from "@/hooks/usePostClick";
 
 const dayLabels = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
@@ -18,6 +20,9 @@ export default function Time() {
   const { data, loading, error } = useDashboardData();
   const allMedia = data?.media ?? [];
   const media = useFilteredMedia(allMedia);
+
+  // Post click handling
+  const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
 
   // Sort states
   const [daySort, setDaySort] = useState<SortOrder>("desc");
@@ -37,19 +42,21 @@ export default function Time() {
 
   // Performance by day of week with sorting
   const dayData = useMemo(() => {
-    const buckets = Array.from({ length: 7 }, () => ({ reach: 0, count: 0 }));
+    const buckets = Array.from({ length: 7 }, () => ({ reach: 0, count: 0, posts: [] as IgMediaItem[] }));
     for (const item of media) {
       if (!item.timestamp) continue;
       const dt = new Date(item.timestamp);
       const reach = getReach(item) ?? 0;
       buckets[dt.getDay()].reach += reach;
       buckets[dt.getDay()].count += 1;
+      buckets[dt.getDay()].posts.push(item);
     }
     const max = Math.max(...buckets.map((b) => b.reach), 1);
     const rawData = buckets.map((bucket, idx) => ({
       label: dayLabels[idx],
       value: bucket.reach,
       count: bucket.count,
+      posts: bucket.posts,
       height: Math.round((bucket.reach / max) * 180),
     }));
 
@@ -62,15 +69,16 @@ export default function Time() {
 
   // Monthly aggregation with sorting
   const monthlyData = useMemo(() => {
-    const buckets: Record<string, { reach: number; likes: number; comments: number; ers: number[] }> = {};
+    const buckets: Record<string, { reach: number; likes: number; comments: number; ers: number[]; posts: IgMediaItem[] }> = {};
     for (const item of media) {
       if (!item.timestamp) continue;
       const d = new Date(item.timestamp);
       const key = `${d.toLocaleDateString("pt-BR", { month: "short" })}. de ${d.getFullYear()}`;
-      if (!buckets[key]) buckets[key] = { reach: 0, likes: 0, comments: 0, ers: [] };
+      if (!buckets[key]) buckets[key] = { reach: 0, likes: 0, comments: 0, ers: [], posts: [] };
       buckets[key].reach += getReach(item) ?? 0;
       buckets[key].likes += item.like_count ?? 0;
       buckets[key].comments += item.comments_count ?? 0;
+      buckets[key].posts.push(item);
       const er = getComputedNumber(item, "er");
       if (typeof er === "number") buckets[key].ers.push(er);
     }
@@ -79,6 +87,7 @@ export default function Time() {
       reach: v.reach,
       likes: v.likes,
       comments: v.comments,
+      posts: v.posts,
       er: v.ers.length ? v.ers.reduce((s, x) => s + x, 0) / v.ers.length : null,
     }));
 
@@ -92,6 +101,26 @@ export default function Time() {
       return monthSort === "desc" ? bVal - aVal : aVal - bVal;
     });
   }, [media, monthSort, monthSortBy]);
+
+  // Handler for day bar click
+  const handleDayClick = (posts: IgMediaItem[]) => {
+    if (posts.length > 0) {
+      const bestPost = [...posts].sort((a, b) => 
+        (getReach(b) ?? 0) - (getReach(a) ?? 0)
+      )[0];
+      handlePostClick(bestPost);
+    }
+  };
+
+  // Handler for monthly row click
+  const handleMonthClick = (posts: IgMediaItem[]) => {
+    if (posts.length > 0) {
+      const bestPost = [...posts].sort((a, b) => 
+        (getReach(b) ?? 0) - (getReach(a) ?? 0)
+      )[0];
+      handlePostClick(bestPost);
+    }
+  };
 
   if (loading) {
     return (
@@ -137,7 +166,12 @@ export default function Time() {
               <span>0</span>
             </div>
             {dayData.map((d, idx) => (
-              <div key={d.label} className="bar-group" style={idx === 0 ? { marginLeft: 40 } : undefined}>
+              <div 
+                key={d.label} 
+                className="bar-group cursor-pointer hover:opacity-80 transition-opacity" 
+                style={idx === 0 ? { marginLeft: 40 } : undefined}
+                onClick={() => handleDayClick(d.posts)}
+              >
                 <div className="bar" style={{ height: `${Math.max(12, d.height)}px` }}>
                   <span className="bar-value">{formatCompact(d.value)}</span>
                 </div>
@@ -176,7 +210,11 @@ export default function Time() {
               </thead>
               <tbody>
                 {monthlyData.map((row) => (
-                  <tr key={row.label}>
+                  <tr 
+                    key={row.label}
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => handleMonthClick(row.posts)}
+                  >
                     <td className="font-medium">{row.label}</td>
                     <td>{row.reach.toLocaleString()}</td>
                     <td>{formatPercent(row.er)}</td>
@@ -202,6 +240,9 @@ export default function Time() {
           </div>
         )}
       </div>
+
+      {/* Post Detail Modal */}
+      <PostDetailModal post={selectedPost} isOpen={isModalOpen} onClose={closeModal} />
     </>
   );
 }

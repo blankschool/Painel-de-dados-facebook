@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
-import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews } from "@/utils/ig";
-import { Grid2X2, Search, Play, Clock, Image } from "lucide-react";
+import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
+import { Grid2X2, Search, Play, Clock, Image, ExternalLink } from "lucide-react";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
+import { PostDetailModal } from "@/components/PostDetailModal";
+import { usePostClick } from "@/hooks/usePostClick";
 import {
   LineChart,
   Line,
@@ -43,6 +45,9 @@ export default function Overview() {
   
   // Apply filters to media
   const media = useFilteredMedia(allMedia);
+
+  // Post click handling
+  const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
 
   // Sort states
   const [daySort, setDaySort] = useState<SortOrder>("desc");
@@ -108,17 +113,19 @@ export default function Overview() {
 
   // Performance by day of week (with sorting)
   const dayData = useMemo(() => {
-    const buckets = Array.from({ length: 7 }, () => 0);
+    const buckets = Array.from({ length: 7 }, () => ({ reach: 0, posts: [] as IgMediaItem[] }));
     for (const item of media) {
       if (!item.timestamp) continue;
       const dt = new Date(item.timestamp);
       const reach = getReach(item) ?? 0;
-      buckets[dt.getDay()] += reach;
+      buckets[dt.getDay()].reach += reach;
+      buckets[dt.getDay()].posts.push(item);
     }
-    const rawData = buckets.map((value, idx) => ({
+    const rawData = buckets.map((bucket, idx) => ({
       day: dayLabels[idx],
       dayFull: dayLabelsFull[idx],
-      value,
+      value: bucket.reach,
+      posts: bucket.posts,
       originalIndex: idx,
     }));
 
@@ -156,12 +163,32 @@ export default function Overview() {
     const totalEngagement = feedEngagement + reelsEngagement;
     
     const items = [
-      { type: "FEED", value: feedEngagement, percentage: totalEngagement > 0 ? (feedEngagement / totalEngagement) * 100 : 50 },
-      { type: "REELS", value: reelsEngagement, percentage: totalEngagement > 0 ? (reelsEngagement / totalEngagement) * 100 : 50 },
+      { type: "FEED", value: feedEngagement, percentage: totalEngagement > 0 ? (feedEngagement / totalEngagement) * 100 : 50, posts: feedPosts },
+      { type: "REELS", value: reelsEngagement, percentage: totalEngagement > 0 ? (reelsEngagement / totalEngagement) * 100 : 50, posts: reels },
     ];
 
     return items.sort((a, b) => engagementSort === "desc" ? b.value - a.value : a.value - b.value);
   }, [media, engagementSort]);
+
+  // Handler for day of week bar click
+  const handleDayBarClick = (data: { posts: IgMediaItem[] }) => {
+    if (data.posts.length > 0) {
+      const bestPost = [...data.posts].sort((a, b) => 
+        (getReach(b) ?? 0) - (getReach(a) ?? 0)
+      )[0];
+      handlePostClick(bestPost);
+    }
+  };
+
+  // Handler for engagement bar click
+  const handleEngagementBarClick = (data: { posts: IgMediaItem[] }) => {
+    if (data.posts.length > 0) {
+      const bestPost = [...data.posts].sort((a, b) => 
+        ((b.like_count ?? 0) + (b.comments_count ?? 0)) - ((a.like_count ?? 0) + (a.comments_count ?? 0))
+      )[0];
+      handlePostClick(bestPost);
+    }
+  };
 
   if (loading) {
     return (
@@ -349,6 +376,7 @@ export default function Overview() {
                       fill="hsl(var(--primary))"
                       radius={[4, 4, 0, 0]}
                       cursor="pointer"
+                      onClick={(data) => handleDayBarClick(data)}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -371,16 +399,22 @@ export default function Overview() {
             </div>
             <div className="engagement-chart">
               {engagementData.map((item) => (
-                <div key={item.type} className="engagement-bar-container group relative mt-3 first:mt-0">
+                <div 
+                  key={item.type} 
+                  className="engagement-bar-container group relative mt-3 first:mt-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => handleEngagementBarClick(item)}
+                >
                   <span className="engagement-label">{item.type}</span>
                   <div className="engagement-bar-bg">
                     <div className="engagement-bar-fill transition-all duration-500" style={{ width: `${item.percentage}%` }} />
                   </div>
                   <span className="text-xs text-muted-foreground ml-2">{item.percentage.toFixed(0)}%</span>
+                  {/* Click hint */}
+                  <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
                   {/* Tooltip */}
                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     <div className="bg-popover border border-border text-popover-foreground px-3 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg">
-                      <span className="font-semibold">{item.value.toLocaleString("pt-BR")}</span> interações
+                      <span className="font-semibold">{item.value.toLocaleString("pt-BR")}</span> interações • Clique para ver
                     </div>
                   </div>
                 </div>
@@ -441,20 +475,25 @@ export default function Overview() {
                 <span>{topContentSortBy === "er" ? "Engagement rate" : topContentSortBy === "reach" ? "Alcance" : "Curtidas"} {topContentSort === "desc" ? "▼" : "▲"}</span>
               </div>
               {topContent.map((row, index) => (
-                <Link 
-                  to={`/media/${row.item.id}`}
-                  className="top-content-item hover:bg-accent/50 rounded-lg transition-colors cursor-pointer" 
+                <div 
+                  onClick={() => handlePostClick(row.item)}
+                  className="top-content-item hover:bg-accent/50 rounded-lg transition-colors cursor-pointer group" 
                   key={row.item.id ?? index}
                 >
                   <span className="item-rank">{index + 1}.</span>
-                  <div
-                    className="item-preview teal"
-                    style={
-                      row.item.thumbnail_url || row.item.media_url
-                        ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
-                        : undefined
-                    }
-                  />
+                  <div className="relative">
+                    <div
+                      className="item-preview teal"
+                      style={
+                        row.item.thumbnail_url || row.item.media_url
+                          ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
+                          : undefined
+                      }
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                      <ExternalLink className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
                   <div className="item-engagement">
                     <span className="engagement-value">
                       {topContentSortBy === "er" ? formatPercent(row.er) : 
@@ -465,7 +504,7 @@ export default function Overview() {
                       <div className="engagement-bar-small-fill" style={{ width: `${Math.max(10, topContentSortBy === "er" ? row.er : 50)}%` }} />
                     </div>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           </div>
@@ -477,6 +516,9 @@ export default function Overview() {
           </div>
         )}
       </div>
+
+      {/* Post Detail Modal */}
+      <PostDetailModal post={selectedPost} isOpen={isModalOpen} onClose={closeModal} />
     </>
   );
 }
