@@ -242,15 +242,15 @@ export default function Overview() {
                   <Line
                     type="monotone"
                     dataKey="reach"
-                    stroke="#4facfe"
+                    stroke="hsl(var(--foreground))"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: "#4facfe" }}
-                    activeDot={{ r: 6, fill: "#4facfe", stroke: "#fff", strokeWidth: 2 }}
+                    dot={{ r: 3, fill: "hsl(var(--foreground))" }}
+                    activeDot={{ r: 6, fill: "hsl(var(--foreground))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
                   />
                   <Line
                     type="monotone"
                     dataKey="reachPrev"
-                    stroke="#90cdf4"
+                    stroke="hsl(var(--muted-foreground))"
                     strokeWidth={2}
                     strokeDasharray="8 4"
                     dot={false}

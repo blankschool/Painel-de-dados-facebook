@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Montserrat', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -64,6 +64,17 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        chart: {
+          line: "hsl(var(--chart-line))",
+          "line-secondary": "hsl(var(--chart-line-secondary))",
+          grid: "hsl(var(--chart-grid))",
+          text: "hsl(var(--chart-text))",
+        },
+        dark: {
+          bg: "#0A0A0A",
+          card: "#1F1F1F",
+          border: "#2E2E2E",
         },
       },
       borderRadius: {
