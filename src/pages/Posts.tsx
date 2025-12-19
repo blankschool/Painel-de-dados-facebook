@@ -248,6 +248,7 @@ const Posts = () => {
               label="Compartilhados"
               value={formatNumberOrDash(totalShares)}
               icon={<Share2 className="w-4 h-4" />}
+              tooltip="Compartilhamentos só estão disponíveis para alguns formatos (principalmente Reels)."
             />
             <MetricCard
               label="Alcance Total"

@@ -31,7 +31,7 @@ export function Topbar() {
 
   return (
     <header className="topbar">
-      <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* Handle */}
           <div className="chip">
@@ -39,14 +39,14 @@ export function Topbar() {
               <img 
                 src={data.profile.profile_picture_url} 
                 alt={username}
-                className="h-7 w-7 rounded-full border border-border object-cover"
+                className="h-8 w-8 rounded-full border border-border object-cover"
               />
             ) : (
-              <div className="h-7 w-7 rounded-full border border-border bg-secondary" />
+              <div className="h-8 w-8 rounded-full border border-border bg-secondary" />
             )}
             <span className="flex flex-col leading-tight">
               <b className="text-sm font-semibold">{username}</b>
-              <small className="text-xs text-muted-foreground">{pageName}</small>
+              <small className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{pageName}</small>
             </span>
           </div>
 

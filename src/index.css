@@ -9,7 +9,7 @@
     --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
     
     --background: 210 20% 98%;
-    --background-secondary: 210 20% 96%;
+    --background-secondary: 210 20% 97%;
     --foreground: 220 10% 10%;
 
     --card: 0 0% 100%;
@@ -36,18 +36,18 @@
     --success: 142 76% 36%;
     --success-foreground: 0 0% 98%;
 
-    --border: 210 12% 88%;
-    --input: 210 12% 88%;
+    --border: 210 14% 90%;
+    --input: 210 14% 90%;
     --ring: 220 30% 18%;
 
     --radius: 0.9rem;
     --radius-sm: 0.65rem;
     
-    --shadow-card: 0 4px 12px hsla(220, 20%, 10%, 0.06);
-    --shadow-hover: 0 10px 22px hsla(220, 20%, 10%, 0.12);
+    --shadow-card: 0 1px 2px hsla(220, 20%, 10%, 0.06);
+    --shadow-hover: 0 8px 20px hsla(220, 20%, 10%, 0.12);
     
     --sidebar-width: 272px;
-    --content-max-width: 1180px;
+    --content-max-width: 1240px;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 220 8% 35%;
@@ -119,16 +119,16 @@
 
 @layer components {
   .metric-card {
-    @apply rounded-2xl border border-border/60 bg-card p-4;
+    @apply rounded-xl border border-border/60 bg-card p-4;
     box-shadow: var(--shadow-card);
   }
 
   .metric-label {
-    @apply flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.12em] text-muted-foreground;
+    @apply flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground;
   }
 
   .metric-value {
-    @apply mt-2 text-2xl font-semibold tracking-tight;
+    @apply mt-2 text-[26px] font-semibold tracking-tight;
   }
 
   .metric-delta {
@@ -152,7 +152,7 @@
   }
 
   .nav-link {
-    @apply flex items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors;
+    @apply flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors;
   }
 
   .nav-link:hover {
@@ -172,7 +172,7 @@
   }
 
   .chart-card {
-    @apply rounded-2xl border border-border/60 bg-card;
+    @apply rounded-xl border border-border/60 bg-card;
     box-shadow: var(--shadow-card);
   }
 
@@ -185,7 +185,7 @@
   }
 
   .chart-subtitle {
-    @apply mt-1 text-[11px] uppercase tracking-wide text-muted-foreground;
+    @apply mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground;
   }
 
   .chart-body {
@@ -206,11 +206,11 @@
 
   .data-table th,
   .data-table td {
-    @apply whitespace-nowrap border-b border-border/40 px-3 py-2.5 text-left text-xs;
+    @apply whitespace-nowrap border-b border-border/40 px-3 py-3 text-left text-xs;
   }
 
   .data-table th {
-    @apply bg-secondary/70 font-semibold uppercase tracking-wide text-[11px] text-foreground;
+    @apply bg-secondary/60 font-semibold uppercase tracking-[0.12em] text-[11px] text-foreground;
   }
 
   .data-table td {
@@ -248,7 +248,19 @@
   }
 
   .topbar {
-    @apply sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-md;
+    @apply sticky top-0 z-20 -mx-6 -mt-6 mb-4 border-b border-border bg-background/95 px-6 py-4 backdrop-blur-md;
+  }
+
+  .app-shell {
+    @apply grid min-h-screen grid-cols-[260px_1fr] bg-background-secondary;
+  }
+
+  .app-sidebar {
+    @apply sticky top-0 h-screen border-r border-border bg-background px-4 py-5;
+  }
+
+  .app-main {
+    @apply overflow-auto px-6 py-6;
   }
 }
 

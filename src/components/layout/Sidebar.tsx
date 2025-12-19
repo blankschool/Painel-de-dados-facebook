@@ -76,23 +76,23 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[272px] flex-col border-r border-border bg-background p-4 overflow-y-auto">
-      <Link to="/" className="flex items-center gap-2.5 rounded-xl p-2.5 transition-colors hover:bg-secondary">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary">
+    <aside className="app-sidebar">
+      <Link to="/" className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background">
           <Instagram className="h-[18px] w-[18px] text-foreground" />
         </span>
         <span className="flex flex-col leading-tight">
-          <strong className="text-sm font-semibold">Analytics</strong>
-          <span className="text-xs text-muted-foreground">Painel de Dados</span>
+          <strong className="text-sm font-semibold">Insta Insights</strong>
+          <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Dashboard</span>
         </span>
       </Link>
 
-      <nav className="mt-4 flex flex-col gap-1 flex-1">
+      <nav className="mt-6 flex flex-col gap-1 flex-1">
         {navGroups.map((group) => (
           <div key={group.title} className="mb-2">
             <button
               onClick={() => toggleGroup(group.title)}
-              className="flex w-full items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="flex w-full items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70 hover:text-foreground transition-colors"
             >
               {group.title}
               <ChevronDown
