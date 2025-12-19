@@ -1,6 +1,6 @@
-import { Filter, X, ChevronDown } from "lucide-react";
+import { Filter, X, ChevronDown, Calendar } from "lucide-react";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { useFilters, type DayOfWeek, type MediaType, type WeekFilter } from "@/contexts/FiltersContext";
+import { useFilters, type DayFilter, type MediaType, type DateRangePreset } from "@/contexts/FiltersContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,16 +9,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-const dayOptions: { value: DayOfWeek; label: string }[] = [
+const dayOptions: { value: DayFilter; label: string }[] = [
   { value: "all", label: "Todos os dias" },
-  { value: "domingo", label: "Domingo" },
-  { value: "segunda-feira", label: "Segunda-feira" },
-  { value: "terça-feira", label: "Terça-feira" },
-  { value: "quarta-feira", label: "Quarta-feira" },
-  { value: "quinta-feira", label: "Quinta-feira" },
-  { value: "sexta-feira", label: "Sexta-feira" },
-  { value: "sábado", label: "Sábado" },
+  { value: "weekdays", label: "Dias úteis (Seg-Sex)" },
+  { value: "weekends", label: "Finais de semana" },
+  { value: "best", label: "Melhores dias (auto)" },
 ];
 
 const mediaTypeOptions: { value: MediaType; label: string }[] = [
@@ -29,88 +26,106 @@ const mediaTypeOptions: { value: MediaType; label: string }[] = [
   { value: "REELS", label: "Reels" },
 ];
 
-const weekOptions: { value: WeekFilter; label: string }[] = [
-  { value: "all", label: "Todas as semanas" },
-  { value: "1", label: "Semana 1" },
-  { value: "2", label: "Semana 2" },
-  { value: "3", label: "Semana 3" },
-  { value: "4", label: "Semana 4" },
-  { value: "5", label: "Semana 5" },
+const dateRangeOptions: { value: DateRangePreset; label: string }[] = [
+  { value: "7d", label: "Últimos 7 dias" },
+  { value: "14d", label: "Últimos 14 dias" },
+  { value: "30d", label: "Últimos 30 dias" },
+  { value: "60d", label: "Últimos 60 dias" },
+  { value: "90d", label: "Últimos 90 dias" },
+  { value: "6m", label: "Últimos 6 meses" },
+  { value: "1y", label: "Último ano" },
 ];
+
+const quickFilters: DateRangePreset[] = ["7d", "30d", "90d"];
 
 export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean }) {
   const { data } = useDashboardData();
-  const { filters, setDayOfWeek, setMediaType, setWeek, resetFilters, activeFiltersCount } = useFilters();
+  const { filters, setDayFilter, setMediaType, setDateRangePreset, resetFilters, activeFiltersCount } = useFilters();
   
   const accountName = data?.profile?.username ? data.profile.username : "Instagram Business";
+  const profilePicture = data?.profile?.profile_picture_url;
 
-  const selectedDay = dayOptions.find((d) => d.value === filters.dayOfWeek)?.label || "Day of Week";
-  const selectedMediaType = mediaTypeOptions.find((m) => m.value === filters.mediaType)?.label || "Media Type";
-  const selectedWeek = weekOptions.find((w) => w.value === filters.week)?.label || "Week";
+  const selectedDay = dayOptions.find((d) => d.value === filters.dayFilter)?.label || "Dias";
+  const selectedMediaType = mediaTypeOptions.find((m) => m.value === filters.mediaType)?.label || "Tipo";
+  const selectedDateRange = dateRangeOptions.find((r) => r.value === filters.dateRangePreset)?.label || "Período";
 
   return (
-    <div className="filters-bar">
+    <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-xl border border-border/40 shadow-card mb-6">
       {/* Filter Button with count */}
       <Button
-        variant="outline"
+        variant={activeFiltersCount > 0 ? "default" : "outline"}
         size="sm"
         className="gap-2"
         onClick={resetFilters}
         disabled={activeFiltersCount === 0}
       >
         <Filter className="h-4 w-4" />
-        + Filter
+        <span>Filtros</span>
         {activeFiltersCount > 0 && (
-          <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+          <span className="ml-1 px-2 py-0.5 bg-primary-foreground/20 rounded-full text-xs">
             {activeFiltersCount}
-          </Badge>
+          </span>
         )}
       </Button>
 
       {/* Account Display */}
-      <div className="filter-dropdown cursor-default">
-        <span className="label">Account:</span> {accountName}
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-lg">
+        {profilePicture ? (
+          <img src={profilePicture} alt={accountName} className="w-5 h-5 rounded-full object-cover" />
+        ) : (
+          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+            <span className="text-[10px] font-medium text-muted-foreground">IG</span>
+          </div>
+        )}
+        <span className="text-sm font-medium">{accountName}</span>
       </div>
 
-      {/* Week Filter */}
+      {/* Date Range Selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="filter-dropdown" type="button">
-            {filters.week !== "all" ? selectedWeek : "Week"}
-            <ChevronDown className="h-4 w-4 ml-auto" />
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span>{selectedDateRange}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {weekOptions.map((option) => (
+        <DropdownMenuContent align="start" className="w-48">
+          {dateRangeOptions.map((option) => (
             <DropdownMenuItem
               key={option.value}
-              onClick={() => setWeek(option.value)}
-              className={filters.week === option.value ? "bg-accent" : ""}
+              onClick={() => setDateRangePreset(option.value)}
+              className={cn(
+                "cursor-pointer",
+                filters.dateRangePreset === option.value && "bg-accent font-medium"
+              )}
             >
               {option.label}
-              {filters.week === option.value && <span className="ml-auto">✓</span>}
+              {filters.dateRangePreset === option.value && <span className="ml-auto">✓</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Day of Week Filter */}
+      {/* Day Filter */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="filter-dropdown" type="button">
-            {filters.dayOfWeek !== "all" ? selectedDay : "Day of Week"}
-            <ChevronDown className="h-4 w-4 ml-auto" />
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
+            <span>{filters.dayFilter !== "all" ? selectedDay : "Dias"}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {dayOptions.map((option) => (
             <DropdownMenuItem
               key={option.value}
-              onClick={() => setDayOfWeek(option.value)}
-              className={filters.dayOfWeek === option.value ? "bg-accent" : ""}
+              onClick={() => setDayFilter(option.value)}
+              className={cn(
+                "cursor-pointer",
+                filters.dayFilter === option.value && "bg-accent font-medium"
+              )}
             >
               {option.label}
-              {filters.dayOfWeek === option.value && <span className="ml-auto">✓</span>}
+              {filters.dayFilter === option.value && <span className="ml-auto">✓</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -120,9 +135,9 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
       {showMediaType && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="filter-dropdown" type="button">
-              {filters.mediaType !== "all" ? selectedMediaType : "Media Type"}
-              <ChevronDown className="h-4 w-4 ml-auto" />
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
+              <span>{filters.mediaType !== "all" ? selectedMediaType : "Tipo"}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -130,7 +145,10 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
               <DropdownMenuItem
                 key={option.value}
                 onClick={() => setMediaType(option.value)}
-                className={filters.mediaType === option.value ? "bg-accent" : ""}
+                className={cn(
+                  "cursor-pointer",
+                  filters.mediaType === option.value && "bg-accent font-medium"
+                )}
               >
                 {option.label}
                 {filters.mediaType === option.value && <span className="ml-auto">✓</span>}
@@ -139,6 +157,25 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+
+      {/* Quick Filters - pushed to right */}
+      <div className="flex items-center gap-1 ml-auto">
+        {quickFilters.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setDateRangePreset(preset)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              filters.dateRangePreset === preset
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            {preset.toUpperCase().replace("D", "D").replace("M", "M").replace("Y", "A")}
+          </button>
+        ))}
+      </div>
 
       {/* Clear Filters Button */}
       {activeFiltersCount > 0 && (
@@ -149,7 +186,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           className="gap-1 text-muted-foreground hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
-          Limpar filtros
+          Limpar
         </Button>
       )}
     </div>

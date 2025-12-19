@@ -1,30 +1,30 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 
-export type DayOfWeek = 'all' | 'domingo' | 'segunda-feira' | 'terça-feira' | 'quarta-feira' | 'quinta-feira' | 'sexta-feira' | 'sábado';
+export type DayFilter = 'all' | 'weekdays' | 'weekends' | 'best';
 export type MediaType = 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS';
-export type WeekFilter = 'all' | '1' | '2' | '3' | '4' | '5';
+export type DateRangePreset = '7d' | '14d' | '30d' | '60d' | '90d' | '6m' | '1y' | 'custom';
 
 interface FiltersState {
-  dayOfWeek: DayOfWeek;
+  dayFilter: DayFilter;
   mediaType: MediaType;
-  week: WeekFilter;
+  dateRangePreset: DateRangePreset;
   searchQuery: string;
 }
 
 interface FiltersContextType {
   filters: FiltersState;
-  setDayOfWeek: (day: DayOfWeek) => void;
+  setDayFilter: (day: DayFilter) => void;
   setMediaType: (type: MediaType) => void;
-  setWeek: (week: WeekFilter) => void;
+  setDateRangePreset: (preset: DateRangePreset) => void;
   setSearchQuery: (query: string) => void;
   resetFilters: () => void;
   activeFiltersCount: number;
 }
 
 const defaultFilters: FiltersState = {
-  dayOfWeek: 'all',
+  dayFilter: 'all',
   mediaType: 'all',
-  week: 'all',
+  dateRangePreset: '30d',
   searchQuery: '',
 };
 
@@ -33,16 +33,16 @@ const FiltersContext = createContext<FiltersContextType | undefined>(undefined);
 export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
 
-  const setDayOfWeek = (day: DayOfWeek) => {
-    setFilters((prev) => ({ ...prev, dayOfWeek: day }));
+  const setDayFilter = (day: DayFilter) => {
+    setFilters((prev) => ({ ...prev, dayFilter: day }));
   };
 
   const setMediaType = (type: MediaType) => {
     setFilters((prev) => ({ ...prev, mediaType: type }));
   };
 
-  const setWeek = (week: WeekFilter) => {
-    setFilters((prev) => ({ ...prev, week: week }));
+  const setDateRangePreset = (preset: DateRangePreset) => {
+    setFilters((prev) => ({ ...prev, dateRangePreset: preset }));
   };
 
   const setSearchQuery = (query: string) => {
@@ -55,9 +55,9 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (filters.dayOfWeek !== 'all') count++;
+    if (filters.dayFilter !== 'all') count++;
     if (filters.mediaType !== 'all') count++;
-    if (filters.week !== 'all') count++;
+    if (filters.dateRangePreset !== '30d') count++;
     if (filters.searchQuery) count++;
     return count;
   }, [filters]);
@@ -66,9 +66,9 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     <FiltersContext.Provider
       value={{
         filters,
-        setDayOfWeek,
+        setDayFilter,
         setMediaType,
-        setWeek,
+        setDateRangePreset,
         setSearchQuery,
         resetFilters,
         activeFiltersCount,
