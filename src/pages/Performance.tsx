@@ -218,7 +218,7 @@ const Performance = () => {
       <ChartCard 
         title="Engajamento Médio por Tipo" 
         subtitle="Comparativo de performance entre formatos"
-        action={
+        actions={
           <SortToggle 
             sortOrder={typeSort} 
             onToggle={() => setTypeSort(o => o === "desc" ? "asc" : "desc")} 
@@ -259,7 +259,7 @@ const Performance = () => {
       <ChartCard 
         title="Resumo de Performance por Tipo" 
         subtitle="Métricas detalhadas"
-        action={
+        actions={
           <SortToggle 
             sortOrder={typeSort} 
             onToggle={() => setTypeSort(o => o === "desc" ? "asc" : "desc")} 
@@ -304,7 +304,7 @@ const Performance = () => {
       <ChartCard 
         title="Resumo Geral" 
         subtitle="Métricas totais de todos os posts"
-        action={
+        actions={
           <SortToggle 
             sortOrder={summarySort} 
             onToggle={() => setSummarySort(o => o === "desc" ? "asc" : "desc")} 
