@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDashboardData } from '@/hooks/useDashboardData';
+import { useDashboardData, type StoriesAggregate } from '@/hooks/useDashboardData';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { Button } from '@/components/ui/button';
@@ -69,7 +69,7 @@ const Stories = () => {
   };
 
   const stories = data?.stories || [];
-  const agg = data?.stories_aggregate || {
+  const defaultAgg: StoriesAggregate = {
     total_stories: 0,
     total_impressions: 0,
     total_reach: 0,
@@ -79,6 +79,7 @@ const Stories = () => {
     total_taps_back: 0,
     avg_completion_rate: 0,
   };
+  const agg: StoriesAggregate = data?.stories_aggregate ?? defaultAgg;
 
   const exitRate = agg.total_impressions > 0 
     ? Math.round((agg.total_exits / agg.total_impressions) * 100) 

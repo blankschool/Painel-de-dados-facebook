@@ -10,118 +10,120 @@ import {
   Clock,
   Play,
   User as UserIcon,
-  Server,
-  Code,
   Instagram,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: React.ReactNode;
+  icon: React.ElementType;
 }
 
-interface NavGroup {
-  title: string;
-  items: NavItem[];
-  defaultOpen?: boolean;
-}
-
-const navGroups: NavGroup[] = [
-  {
-    title: "Principal",
-    defaultOpen: true,
-    items: [
-      { label: "Início", href: "/", icon: <Home className="h-[18px] w-[18px]" /> },
-      { label: "Visão Geral", href: "/overview", icon: <BarChart3 className="h-[18px] w-[18px]" /> },
-    ],
-  },
-  {
-    title: "Análises",
-    defaultOpen: true,
-    items: [
-      { label: "Performance", href: "/performance", icon: <Activity className="h-[18px] w-[18px]" /> },
-      { label: "Posts", href: "/posts", icon: <Grid3X3 className="h-[18px] w-[18px]" /> },
-      { label: "Análise Avançada", href: "/advanced", icon: <TrendingUp className="h-[18px] w-[18px]" /> },
-      { label: "Stories", href: "/stories", icon: <Layers className="h-[18px] w-[18px]" /> },
-      { label: "Reels", href: "/reels", icon: <Play className="h-[18px] w-[18px]" /> },
-    ],
-  },
-  {
-    title: "Audiência",
-    defaultOpen: true,
-    items: [
-      { label: "Demografia", href: "/demographics", icon: <Users className="h-[18px] w-[18px]" /> },
-      { label: "Online", href: "/online", icon: <Clock className="h-[18px] w-[18px]" /> },
-    ],
-  },
-  {
-    title: "Configurações",
-    defaultOpen: false,
-    items: [{ label: "Perfil", href: "/profile", icon: <UserIcon className="h-[18px] w-[18px]" /> }],
-  },
+const navItems: NavItem[] = [
+  { label: "Início", href: "/", icon: Home },
+  { label: "Visão Geral", href: "/overview", icon: BarChart3 },
+  { label: "Performance", href: "/performance", icon: Activity },
+  { label: "Posts", href: "/posts", icon: Grid3X3 },
+  { label: "Análise Avançada", href: "/advanced", icon: TrendingUp },
+  { label: "Stories", href: "/stories", icon: Layers },
+  { label: "Reels", href: "/reels", icon: Play },
+  { label: "Demografia", href: "/demographics", icon: Users },
+  { label: "Online", href: "/online", icon: Clock },
+  { label: "Perfil", href: "/profile", icon: UserIcon },
 ];
 
 export function Sidebar() {
   const location = useLocation();
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    navGroups.reduce((acc, group) => ({ ...acc, [group.title]: group.defaultOpen ?? true }), {}),
-  );
-
-  const toggleGroup = (title: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [title]: !prev[title] }));
-  };
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <aside className="app-sidebar">
-      <Link to="/" className="flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-sm">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background">
-          <Instagram className="h-[18px] w-[18px] text-foreground" />
-        </span>
-        <span className="flex flex-col leading-tight">
-          <strong className="text-sm font-semibold">Insta Insights</strong>
-          <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Dashboard</span>
-        </span>
-      </Link>
-
-      <nav className="mt-6 flex flex-col gap-1 flex-1">
-        {navGroups.map((group) => (
-          <div key={group.title} className="mb-2">
-            <button
-              onClick={() => toggleGroup(group.title)}
-              className="flex w-full items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70 hover:text-foreground transition-colors"
-            >
-              {group.title}
-              <ChevronDown
-                className={cn("h-3 w-3 transition-transform", expandedGroups[group.title] ? "" : "-rotate-90")}
-              />
-            </button>
-            {expandedGroups[group.title] && (
-              <div className="flex flex-col gap-0.5 mt-1">
-                {group.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    aria-current={location.pathname === item.href ? "page" : undefined}
-                    className={cn(
-                      "nav-link",
-                      location.pathname === item.href && "border-border bg-secondary text-foreground",
-                    )}
-                  >
-                    <span className={cn("nav-icon", location.pathname === item.href && "text-foreground")}>
-                      {item.icon}
-                    </span>
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            )}
+    <aside className={cn("app-sidebar", expanded && "expanded")}>
+      {/* Logo */}
+      <div className="flex items-center justify-center px-3 mb-6">
+        <Link 
+          to="/" 
+          className={cn(
+            "flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-sidebar-accent",
+            expanded ? "w-full" : "justify-center"
+          )}
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary">
+            <Instagram className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
-        ))}
+          {expanded && (
+            <span className="font-semibold text-sidebar-foreground whitespace-nowrap">
+              Insta Insights
+            </span>
+          )}
+        </Link>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto scrollbar-thin">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.href;
+          const Icon = item.icon;
+          
+          if (expanded) {
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "nav-link justify-start",
+                  isActive && "bg-sidebar-primary text-sidebar-primary-foreground"
+                )}
+              >
+                <Icon className="nav-icon" />
+                <span className="whitespace-nowrap">{item.label}</span>
+              </Link>
+            );
+          }
+
+          return (
+            <Tooltip key={item.href} delayDuration={0}>
+              <TooltipTrigger asChild>
+                <Link
+                  to={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "nav-link",
+                    isActive && "bg-sidebar-primary text-sidebar-primary-foreground"
+                  )}
+                >
+                  <Icon className="nav-icon" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="font-medium">
+                {item.label}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
       </nav>
+
+      {/* Expand/Collapse Toggle */}
+      <div className="px-3 pt-4 border-t border-sidebar-border mt-2">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="nav-link w-full"
+        >
+          {expanded ? (
+            <>
+              <ChevronLeft className="nav-icon" />
+              <span className="whitespace-nowrap">Recolher</span>
+            </>
+          ) : (
+            <ChevronRight className="nav-icon" />
+          )}
+        </button>
+      </div>
     </aside>
   );
 }

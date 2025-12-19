@@ -36,7 +36,9 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  AreaChart,
+  Area
 } from 'recharts';
 
 const Overview = () => {
@@ -55,7 +57,7 @@ const Overview = () => {
 
   const hasData = profile || media.length > 0;
 
-  // Aggregate metrics (computed when available)
+  // Aggregate metrics
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count || 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count || 0), 0);
   const savesValues = media.map(getSaves).filter((v): v is number => typeof v === 'number');
@@ -73,24 +75,13 @@ const Overview = () => {
   const scoreAvg = media.length > 0 ? scoreTotal / media.length : null;
 
   const erValues = media.map((m) => getComputedNumber(m, 'er')).filter((v): v is number => typeof v === 'number');
-  const reachRateValues = media
-    .map((m) => getComputedNumber(m, 'reach_rate'))
-    .filter((v): v is number => typeof v === 'number');
-  const interactionsPer1000Values = media
-    .map((m) => getComputedNumber(m, 'interactions_per_1000_reach'))
-    .filter((v): v is number => typeof v === 'number');
+  const reachRateValues = media.map((m) => getComputedNumber(m, 'reach_rate')).filter((v): v is number => typeof v === 'number');
+  const interactionsPer1000Values = media.map((m) => getComputedNumber(m, 'interactions_per_1000_reach')).filter((v): v is number => typeof v === 'number');
 
   const avgEr = erValues.length > 0 ? erValues.reduce((s, v) => s + v, 0) / erValues.length : null;
-  const avgReachRate =
-    reachRateValues.length > 0 ? reachRateValues.reduce((s, v) => s + v, 0) / reachRateValues.length : null;
-  const avgViewsRateReels =
-    reelsViewsRateValues.length > 0
-      ? reelsViewsRateValues.reduce((s, v) => s + v, 0) / reelsViewsRateValues.length
-      : null;
-  const avgInteractionsPer1000 =
-    interactionsPer1000Values.length > 0
-      ? interactionsPer1000Values.reduce((s, v) => s + v, 0) / interactionsPer1000Values.length
-      : null;
+  const avgReachRate = reachRateValues.length > 0 ? reachRateValues.reduce((s, v) => s + v, 0) / reachRateValues.length : null;
+  const avgViewsRateReels = reelsViewsRateValues.length > 0 ? reelsViewsRateValues.reduce((s, v) => s + v, 0) / reelsViewsRateValues.length : null;
+  const avgInteractionsPer1000 = interactionsPer1000Values.length > 0 ? interactionsPer1000Values.reduce((s, v) => s + v, 0) / interactionsPer1000Values.length : null;
 
   const bestWindow = (() => {
     const buckets = new Map<string, { sum: number; count: number }>();
@@ -121,27 +112,27 @@ const Overview = () => {
   const engagementData = totalLikes > 0 || totalComments > 0 || (totalSaves ?? 0) > 0 || (totalShares ?? 0) > 0 ? [
     { name: 'Curtidas', value: totalLikes, color: 'hsl(var(--primary))' },
     { name: 'Comentários', value: totalComments, color: 'hsl(var(--muted-foreground))' },
-    ...(totalSaves ? [{ name: 'Salvos', value: totalSaves, color: 'hsl(var(--foreground) / 0.55)' }] : []),
-    ...(totalShares ? [{ name: 'Compart.', value: totalShares, color: 'hsl(var(--foreground) / 0.35)' }] : []),
+    ...(totalSaves ? [{ name: 'Salvos', value: totalSaves, color: 'hsl(var(--accent))' }] : []),
+    ...(totalShares ? [{ name: 'Compart.', value: totalShares, color: 'hsl(var(--foreground) / 0.4)' }] : []),
   ] : [];
 
-  const topByScore = [...media].sort((a, b) => getScore(b) - getScore(a)).slice(0, 6);
+  const topByScore = [...media].sort((a, b) => getScore(b) - getScore(a)).slice(0, 5);
 
-  const recentPostsPerformance = media.slice(0, 7).map((item, index) => ({
-    post: `Post ${index + 1}`,
+  // Performance over time (simplified)
+  const performanceData = media.slice(0, 14).reverse().map((item, index) => ({
+    name: `P${index + 1}`,
     score: getScore(item),
+    reach: getComputedNumber(item, 'reach') || 0,
   }));
 
   if (!hasData) {
     return (
       <div className="space-y-6">
-        <section className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Visão Geral</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Resumo das principais métricas e performance do perfil.
-            </p>
-          </div>
+        <section>
+          <h1 className="text-2xl font-bold tracking-tight">Visão Geral</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Resumo das principais métricas e performance do perfil.
+          </p>
         </section>
 
         <div className="chart-card p-8 flex flex-col items-center justify-center min-h-[300px]">
@@ -150,9 +141,7 @@ const Overview = () => {
           <p className="text-sm text-muted-foreground text-center max-w-md">
             Conecte uma conta do Instagram via Facebook para visualizar as métricas do perfil.
           </p>
-          {error && (
-            <p className="text-sm text-destructive mt-4">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive mt-4">{error}</p>}
         </div>
       </div>
     );
@@ -161,104 +150,123 @@ const Overview = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Visão Geral</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Resumo das principais métricas e performance do perfil.
-          </p>
-        </div>
+      <section>
+        <h1 className="text-2xl font-bold tracking-tight">Visão Geral</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Resumo das principais métricas e performance do perfil.
+        </p>
       </section>
 
-      {/* Main KPIs - Real data only */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+      {/* Top KPIs Row - 4 big cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label="Seguidores"
           value={profile?.followers_count?.toLocaleString() || '--'}
-          icon={<Users className="w-4 h-4" />}
-        />
-        <MetricCard
-          label="Seguindo"
-          value={profile?.follows_count?.toLocaleString() || '--'}
-          icon={<UserPlus className="w-4 h-4" />}
+          icon={<Users className="w-5 h-5" />}
+          size="large"
         />
         <MetricCard
           label="Posts"
           value={profile?.media_count?.toLocaleString() || media.length.toString()}
-          icon={<Grid3X3 className="w-4 h-4" />}
+          icon={<Grid3X3 className="w-5 h-5" />}
+          size="large"
         />
         <MetricCard
-          label="ER médio"
+          label="ER Médio"
           value={formatPercent(avgEr)}
-          icon={<Target className="w-4 h-4" />}
-          tooltip="ER (Engagement Rate) médio. Fórmula: engagement ÷ seguidores × 100. Engagement = likes + comments + saves + shares (quando disponível)."
+          icon={<Target className="w-5 h-5" />}
+          tooltip="Engagement Rate médio: (likes + comments + saves + shares) ÷ seguidores × 100"
+          size="large"
+        />
+        <MetricCard
+          label="Score Total"
+          value={scoreTotal > 0 ? Math.round(scoreTotal).toLocaleString() : '--'}
+          icon={<Trophy className="w-5 h-5" />}
+          tooltip="Score ponderado: likes×1 + comments×2 + saves×3 + shares×4"
+          size="large"
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+      {/* Performance Chart - Full Width */}
+      {performanceData.length > 0 && performanceData.some(p => p.score > 0) && (
+        <ChartCard title="Performance ao Longo do Tempo" subtitle="Score e alcance dos últimos posts">
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={performanceData}>
+                <defs>
+                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} 
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }} 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="score" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  fill="url(#scoreGradient)"
+                  name="Score"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      )}
+
+      {/* Secondary Metrics Row */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          label="Reach rate médio"
+          label="Reach Rate"
           value={formatPercent(avgReachRate)}
           icon={<Eye className="w-4 h-4" />}
-          tooltip="Reach rate médio. Fórmula: reach ÷ seguidores × 100. Útil para comparar eficiência de distribuição."
+          tooltip="Reach ÷ seguidores × 100"
         />
         <MetricCard
-          label="Views rate (reels)"
+          label="Views Rate (Reels)"
           value={formatPercent(avgViewsRateReels)}
           icon={<Eye className="w-4 h-4" />}
-          tooltip="Views rate médio (apenas reels com views e reach). Fórmula: views ÷ reach × 100. Se faltar views/reach, fica indisponível."
+          tooltip="Views ÷ reach × 100 (apenas reels)"
         />
         <MetricCard
-          label="Interações / 1.000 alcance"
+          label="Interações / 1k Alcance"
           value={avgInteractionsPer1000 === null ? '--' : Math.round(avgInteractionsPer1000).toLocaleString()}
           icon={<TrendingUp className="w-4 h-4" />}
-          tooltip="Eficiência de interação por alcance. Fórmula: engagement ÷ reach × 1.000."
+          tooltip="Engagement ÷ reach × 1000"
         />
         <MetricCard
-          label="Score médio/post"
-          value={scoreAvg === null ? '--' : Math.round(scoreAvg).toLocaleString()}
-          icon={<Trophy className="w-4 h-4" />}
-          tooltip="Score ponderado médio. Fórmula: likes×1 + comments×2 + saves×3 + shares×4."
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
-        <MetricCard
-          label="Score total"
-          value={scoreTotal > 0 ? Math.round(scoreTotal).toLocaleString() : '--'}
-          icon={<Trophy className="w-4 h-4" />}
-          tooltip="Score ponderado total do período. Fórmula: likes×1 + comments×2 + saves×3 + shares×4."
-        />
-        <MetricCard
-          label="Salvos (total)"
-          value={formatNumberOrDash(totalSaves)}
-          icon={<Bookmark className="w-4 h-4" />}
-          tooltip="Soma de saves normalizados (saved/saves e variações). Se a API não fornecer, fica indisponível."
-        />
-        <MetricCard
-          label="Compartilhamentos (total)"
-          value={formatNumberOrDash(totalShares)}
-          icon={<Share2 className="w-4 h-4" />}
-          tooltip="Soma de shares. Pode não estar disponível para todo tipo de mídia/conta."
-        />
-        <MetricCard
-          label="Melhor horário (score)"
+          label="Melhor Horário"
           value={bestWindowLabel}
           icon={<Clock className="w-4 h-4" />}
-          tooltip={
-            bestWindow
-              ? `Maior score médio por dia/hora com base nos posts do período (n=${bestWindow.count}, score médio ${bestWindow.avg.toFixed(1)}).`
-              : 'Sem dados suficientes para estimar.'
-          }
+          tooltip={bestWindow ? `Maior score médio (n=${bestWindow.count})` : 'Sem dados'}
         />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Two Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Engagement Distribution */}
-        {engagementData.length > 0 && (
-          <ChartCard title="Distribuição de Engajamento" subtitle="Total de interações">
-            <div className="h-[250px] flex items-center justify-center">
+        {engagementData.length > 0 ? (
+          <ChartCard title="Distribuição de Engajamento" subtitle="Por tipo de interação">
+            <div className="h-[260px] flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -266,8 +274,8 @@ const Overview = () => {
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
+                    outerRadius={95}
+                    paddingAngle={4}
                     dataKey="value"
                   >
                     {engagementData.map((entry, index) => (
@@ -278,67 +286,104 @@ const Overview = () => {
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))', 
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      fontSize: '12px'
                     }} 
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center gap-6 mt-2">
+            <div className="flex flex-wrap justify-center gap-4 mt-2">
               {engagementData.map((entry) => (
                 <div key={entry.name} className="flex items-center gap-2 text-sm">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
                   <span className="text-muted-foreground">{entry.name}</span>
-                  <span className="font-medium">{entry.value.toLocaleString()}</span>
+                  <span className="font-semibold">{entry.value.toLocaleString()}</span>
                 </div>
               ))}
             </div>
           </ChartCard>
-        )}
-
-        {/* Info Card when no engagement data */}
-        {engagementData.length === 0 && (
-          <ChartCard title="Distribuição de Engajamento" subtitle="Total de interações">
-            <div className="h-[250px] flex flex-col items-center justify-center">
+        ) : (
+          <ChartCard title="Distribuição de Engajamento" subtitle="Por tipo de interação">
+            <div className="h-[260px] flex flex-col items-center justify-center">
               <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">Sem dados de engajamento</p>
             </div>
           </ChartCard>
         )}
 
-        {/* Recent Posts Performance */}
-        {recentPostsPerformance.length > 0 && recentPostsPerformance.some(p => p.score > 0) ? (
-          <ChartCard title="Performance dos Posts Recentes" subtitle="Score dos últimos posts">
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={recentPostsPerformance}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="post" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                  <Bar dataKey="score" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Score" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartCard>
-        ) : (
-          <ChartCard title="Performance dos Posts" subtitle="Últimos posts">
-            <div className="h-[250px] flex flex-col items-center justify-center">
-              <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Sem dados de posts</p>
-            </div>
-          </ChartCard>
-        )}
+        {/* Totals */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <MetricCard
+              label="Salvos (Total)"
+              value={formatNumberOrDash(totalSaves)}
+              icon={<Bookmark className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Compartilhamentos"
+              value={formatNumberOrDash(totalShares)}
+              icon={<Share2 className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Score Médio/Post"
+              value={scoreAvg === null ? '--' : Math.round(scoreAvg).toLocaleString()}
+              icon={<Trophy className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Seguindo"
+              value={profile?.follows_count?.toLocaleString() || '--'}
+              icon={<UserPlus className="w-4 h-4" />}
+            />
+          </div>
+        </div>
       </div>
 
+      {/* Top Posts */}
+      {topByScore.length > 0 && (
+        <ChartCard title="Top Posts por Score" subtitle="Melhores performances do período">
+          <div className="grid gap-3">
+            {topByScore.map((item, index) => (
+              <a
+                key={item.id}
+                href={item.permalink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 rounded-lg border border-border/30 bg-background/50 p-3 hover:bg-secondary/30 transition-colors"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                  {index + 1}
+                </div>
+                <div className="w-14 h-14 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+                  {(item.thumbnail_url || item.media_url) ? (
+                    <img
+                      src={item.thumbnail_url || item.media_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Grid3X3 className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{item.caption?.slice(0, 60) || 'Post'}</p>
+                  <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                    <span>Score: <strong className="text-foreground">{getScore(item).toLocaleString()}</strong></span>
+                    <span>ER: <strong className="text-foreground">{formatPercent(getComputedNumber(item, 'er'))}</strong></span>
+                    <span className="tag text-[10px]">{item.media_product_type}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </ChartCard>
+      )}
+
+      {/* Messages */}
       {data?.messages && data.messages.length > 0 && (
-        <div className="p-4 bg-secondary/50 rounded-xl border border-border">
+        <div className="p-4 rounded-xl border border-border bg-secondary/30">
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
             {data.messages.join(' • ')}
@@ -346,11 +391,11 @@ const Overview = () => {
         </div>
       )}
 
-      {/* Recent Posts Preview */}
+      {/* Recent Posts Grid */}
       {media.length > 0 && (
         <ChartCard title="Posts Recentes" subtitle="Últimos posts publicados">
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-            {media.slice(0, 6).map((item) => (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            {media.slice(0, 12).map((item) => (
               <a 
                 key={item.id}
                 href={item.permalink}
@@ -369,43 +414,6 @@ const Overview = () => {
                     <Grid3X3 className="w-6 h-6 text-muted-foreground" />
                   </div>
                 )}
-              </a>
-            ))}
-          </div>
-        </ChartCard>
-      )}
-
-      {topByScore.length > 0 && (
-        <ChartCard title="Melhores Posts" subtitle="Top por score (clique para abrir)">
-          <div className="space-y-2">
-            {topByScore.map((item, index) => (
-              <a
-                key={item.id}
-                href={item.permalink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-border/50 bg-background p-3 hover:bg-secondary/40 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                  {index + 1}
-                </div>
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-secondary">
-                  {(item.thumbnail_url || item.media_url) ? (
-                    <img
-                      src={item.thumbnail_url || item.media_url}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.caption?.slice(0, 70) || 'Post'}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Score {getScore(item).toLocaleString()} • ER {formatPercent(getComputedNumber(item, 'er'))}
-                  </p>
-                </div>
               </a>
             ))}
           </div>

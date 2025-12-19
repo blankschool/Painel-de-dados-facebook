@@ -4,14 +4,16 @@ import { Topbar } from './Topbar';
 
 export function DashboardLayout() {
   return (
-    <div className="app-shell">
+    <div className="app-shell dark">
       <Sidebar />
-      <main className="app-main">
+      <div className="app-main">
         <Topbar />
-        <div className="mx-auto max-w-[1240px]">
-          <Outlet />
+        <div className="app-content">
+          <div className="mx-auto max-w-[1400px]">
+            <Outlet />
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

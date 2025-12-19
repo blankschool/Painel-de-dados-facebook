@@ -4,6 +4,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDateRange } from '@/contexts/DateRangeContext';
 import type { IgMediaItem } from '@/utils/ig';
 
+export type StoriesAggregate = {
+  total_stories: number;
+  total_impressions: number;
+  total_reach: number;
+  total_replies: number;
+  total_exits: number;
+  total_taps_forward: number;
+  total_taps_back: number;
+  avg_completion_rate: number;
+};
+
 export type IgDashboardResponse = {
   success: boolean;
   error?: string;
@@ -28,7 +39,7 @@ export type IgDashboardResponse = {
   top_reels_by_views?: IgMediaItem[];
   top_reels_by_score?: IgMediaItem[];
   stories?: unknown[];
-  stories_aggregate?: unknown;
+  stories_aggregate?: StoriesAggregate;
   demographics?: Record<string, unknown>;
   online_followers?: Record<string, number>;
   messages?: string[];

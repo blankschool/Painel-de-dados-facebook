@@ -1,5 +1,6 @@
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, TrendingUp, TrendingDown } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 export interface MetricCardProps {
   label: string;
@@ -10,6 +11,7 @@ export interface MetricCardProps {
   tag?: string;
   sparkline?: React.ReactNode;
   icon?: React.ReactNode;
+  size?: 'default' | 'large';
 }
 
 export function MetricCard({
@@ -21,43 +23,60 @@ export function MetricCard({
   tag,
   sparkline,
   icon,
+  size = 'default',
 }: MetricCardProps) {
-  // Handle delta as string or object
   const deltaValue = typeof delta === 'object' ? delta.value : delta;
   const computedDeltaType = typeof delta === 'object' 
     ? (delta.positive ? 'good' : 'bad') 
     : deltaType;
 
+  const isLarge = size === 'large';
+
   return (
-    <article className="metric-card animate-slide-up">
+    <article className={cn(
+      "metric-card animate-fade-in",
+      isLarge && "p-6"
+    )}>
       <div className="metric-label">
-        <span className="flex items-center gap-2">
-          {icon && <span className="text-muted-foreground">{icon}</span>}
-          <span>{label}</span>
-          {tooltip && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs font-bold text-muted-foreground hover:bg-secondary">
-                  ?
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-[280px] text-xs">
-                {tooltip}
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </span>
-        {tag && <span className="tag">{tag}</span>}
+        {icon && <span className="text-muted-foreground">{icon}</span>}
+        <span>{label}</span>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className="ml-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+                <HelpCircle className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[280px] text-xs">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {tag && <span className="tag ml-auto">{tag}</span>}
       </div>
-      <div className="metric-value">{value}</div>
+
+      <div className={cn(
+        "metric-value",
+        isLarge && "text-3xl"
+      )}>
+        {value}
+      </div>
+
       {deltaValue && (
         <div className="metric-delta">
-          <span className={`tag ${computedDeltaType === 'good' ? 'tag-good' : computedDeltaType === 'bad' ? 'tag-bad' : ''}`}>
+          {computedDeltaType === 'good' && <TrendingUp className="h-3.5 w-3.5 text-success" />}
+          {computedDeltaType === 'bad' && <TrendingDown className="h-3.5 w-3.5 text-destructive" />}
+          <span className={cn(
+            "font-medium",
+            computedDeltaType === 'good' && "text-success",
+            computedDeltaType === 'bad' && "text-destructive"
+          )}>
             {deltaValue}
           </span>
-          <span>vs período anterior</span>
+          <span className="text-muted-foreground">vs período anterior</span>
         </div>
       )}
+
       {sparkline && <div className="sparkline">{sparkline}</div>}
     </article>
   );
