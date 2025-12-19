@@ -1,128 +1,67 @@
 import { Link, useLocation } from "react-router-dom";
-import {
-  Home,
-  BarChart3,
-  TrendingUp,
-  Activity,
-  Grid3X3,
-  Layers,
-  Users,
-  Clock,
-  Play,
-  User as UserIcon,
-  Instagram,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}
-
-const navItems: NavItem[] = [
-  { label: "Início", href: "/", icon: Home },
-  { label: "Visão Geral", href: "/overview", icon: BarChart3 },
-  { label: "Performance", href: "/performance", icon: Activity },
-  { label: "Posts", href: "/posts", icon: Grid3X3 },
-  { label: "Análise Avançada", href: "/advanced", icon: TrendingUp },
-  { label: "Stories", href: "/stories", icon: Layers },
-  { label: "Reels", href: "/reels", icon: Play },
-  { label: "Demografia", href: "/demographics", icon: Users },
-  { label: "Online", href: "/online", icon: Clock },
-  { label: "Perfil", href: "/profile", icon: UserIcon },
-];
 
 export function Sidebar() {
   const location = useLocation();
-  const [expanded, setExpanded] = useState(false);
+  const navItems = [
+    { label: "Business Overview", href: "/overview" },
+    { label: "Followers", href: "/followers" },
+    { label: "Content", href: "/content" },
+    { label: "Time", href: "/time" },
+  ];
 
   return (
-    <aside className={cn("app-sidebar", expanded && "expanded")}>
-      {/* Logo */}
-      <div className="flex items-center justify-center px-3 mb-6">
-        <Link 
-          to="/" 
-          className={cn(
-            "flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-sidebar-accent",
-            expanded ? "w-full" : "justify-center"
-          )}
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary">
-            <Instagram className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>
-          {expanded && (
-            <span className="font-semibold text-sidebar-foreground whitespace-nowrap">
-              Insta Insights
-            </span>
-          )}
-        </Link>
+    <aside className="sidebar">
+      <div className="logo">
+        <div className="logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+          </svg>
+        </div>
+        <span className="logo-text">databloo</span>
       </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.href;
-          const Icon = item.icon;
-          
-          if (expanded) {
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "nav-link justify-start",
-                  isActive && "bg-sidebar-primary text-sidebar-primary-foreground"
-                )}
-              >
-                <Icon className="nav-icon" />
-                <span className="whitespace-nowrap">{item.label}</span>
-              </Link>
-            );
-          }
-
-          return (
-            <Tooltip key={item.href} delayDuration={0}>
-              <TooltipTrigger asChild>
-                <Link
-                  to={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "nav-link",
-                    isActive && "bg-sidebar-primary text-sidebar-primary-foreground"
-                  )}
-                >
-                  <Icon className="nav-icon" />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="font-medium">
-                {item.label}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+      <nav className="nav-menu">
+        {navItems.map((item) => (
+          <Link
+            key={item.href}
+            to={item.href}
+            className={`nav-item ${location.pathname === item.href ? "active" : ""}`}
+          >
+            {item.label === "Business Overview" && (
+              <svg viewBox="0 0 24 24">
+                <path d="M3 3v18h18" />
+                <path d="M18 9l-5 5-4-4-3 3" />
+              </svg>
+            )}
+            {item.label === "Followers" && (
+              <svg viewBox="0 0 24 24">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75" />
+              </svg>
+            )}
+            {item.label === "Content" && (
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="M21 15l-5-5L5 21" />
+              </svg>
+            )}
+            {item.label === "Time" && (
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            )}
+            <span>{item.label}</span>
+          </Link>
+        ))}
       </nav>
-
-      {/* Expand/Collapse Toggle */}
-      <div className="px-3 pt-4 border-t border-sidebar-border mt-2">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="nav-link w-full"
-        >
-          {expanded ? (
-            <>
-              <ChevronLeft className="nav-icon" />
-              <span className="whitespace-nowrap">Recolher</span>
-            </>
-          ) : (
-            <ChevronRight className="nav-icon" />
-          )}
-        </button>
+      <div className="period-section">
+        <div className="period-toggle" />
+        <span>Year</span>
+        <span style={{ fontWeight: 600, color: "#fff", marginTop: 4 }}>Period</span>
       </div>
     </aside>
   );
