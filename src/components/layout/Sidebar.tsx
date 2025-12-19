@@ -1,8 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
+import { useTheme } from "next-themes";
 import blankLogo from "@/assets/blank-logo.png";
+import blankLogoDark from "@/assets/blank-logo-dark.png";
 
 export function Sidebar() {
   const location = useLocation();
+  const { resolvedTheme } = useTheme();
   const navItems = [{
     label: "Business Overview",
     href: "/overview"
@@ -18,7 +21,7 @@ export function Sidebar() {
   }];
   return <aside className="sidebar">
       <div className="logo">
-        <img src={blankLogo} alt="Blank" className="h-8 w-auto" />
+        <img src={resolvedTheme === "dark" ? blankLogoDark : blankLogo} alt="Blank" className="h-8 w-auto" />
       </div>
       <nav className="nav-menu">
         {navItems.map(item => <Link key={item.href} to={item.href} className={`nav-item ${location.pathname === item.href ? "active" : ""}`}>
