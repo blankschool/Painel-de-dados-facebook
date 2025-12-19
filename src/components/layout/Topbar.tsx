@@ -18,8 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const pageNames: Record<string, string> = {
-  "/": "Business Overview",
-  "/overview": "Business Overview",
+  "/": "Dashboard",
+  "/overview": "Dashboard",
   "/followers": "Followers",
   "/content": "Content",
   "/time": "Time",
