@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { useDateRange } from "@/contexts/DateRangeContext";
+import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { ChartCard } from "@/components/dashboard/ChartCard";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertCircle, Download, Loader2 } from "lucide-react";
 import {
-  filterMediaByDateRange,
   formatNumberOrDash,
   formatPercent,
   getComputedNumber,
@@ -40,14 +39,19 @@ function weekdayShortPt(day: number): string {
 
 export default function AdvancedAnalysis() {
   const { data, loading, error } = useDashboardData();
-  const { dateRange } = useDateRange();
+  const allMedia = data?.media ?? [];
+  
+  // Use the centralized filter hook
+  const media = useFilteredMedia(allMedia);
 
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [orderBy, setOrderBy] = useState<OrderBy>("score");
   const [heatMetric, setHeatMetric] = useState<HeatMetric>("score");
 
   const profile = data?.profile ?? null;
-  const media = useMemo(() => filterMediaByDateRange(data?.media ?? [], dateRange), [data?.media, dateRange]);
+  
+  // Debug logging
+  console.log(`[AdvancedAnalysis] All media: ${allMedia.length}, Filtered: ${media.length}`);
 
   const filtered = useMemo(() => {
     return media.filter((item) => {

@@ -43,6 +43,9 @@ export default function Overview() {
   // Apply filters to media
   const media = useFilteredMedia(allMedia);
 
+  // Debug logging
+  console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
+
   const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
   const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);

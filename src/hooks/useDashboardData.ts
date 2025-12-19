@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useDateRange } from '@/contexts/DateRangeContext';
+import { useFilters } from '@/contexts/FiltersContext';
 import type { IgMediaItem } from '@/utils/ig';
 
 export type StoriesAggregate = {
@@ -50,25 +50,30 @@ function toYmd(date: Date): string {
 }
 
 export function useDashboardData() {
-  const { dateRange } = useDateRange();
+  const { getDateRangeFromPreset, filters } = useFilters();
 
   const body = useMemo(() => {
-    // Keep the payload minimal for now; the edge function can later accept date range.
-    // We still include it for forward compatibility.
-    const since = dateRange?.from ? toYmd(dateRange.from) : undefined;
-    const until = dateRange?.to ? toYmd(dateRange.to) : undefined;
+    // Get date range from the FiltersContext (single source of truth)
+    const dateRange = getDateRangeFromPreset();
+    const since = dateRange.from ? toYmd(dateRange.from) : undefined;
+    const until = dateRange.to ? toYmd(dateRange.to) : undefined;
+    
+    console.log(`[useDashboardData] Preset: ${filters.dateRangePreset}, Since: ${since}, Until: ${until}`);
+    
     const businessId = import.meta.env.VITE_IG_BUSINESS_ID as string | undefined;
     const maxInsightsPostsEnv = Number(import.meta.env.VITE_MAX_INSIGHTS_POSTS ?? '');
     const maxInsightsPosts = Number.isFinite(maxInsightsPostsEnv) && maxInsightsPostsEnv > 0 ? maxInsightsPostsEnv : 500;
     return { since, until, maxInsightsPosts, ...(businessId ? { businessId } : {}) };
-  }, [dateRange?.from, dateRange?.to]);
+  }, [getDateRangeFromPreset, filters.dateRangePreset]);
 
   const query = useQuery({
     queryKey: ['ig-dashboard', body],
     queryFn: async (): Promise<IgDashboardResponse> => {
+      console.log('[useDashboardData] Fetching data with body:', body);
       const { data, error } = await supabase.functions.invoke('ig-dashboard', { body });
       if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || 'Failed to fetch dashboard data');
+      console.log(`[useDashboardData] Received ${data.media?.length ?? 0} media items`);
       return data as IgDashboardResponse;
     },
     staleTime: 30_000,

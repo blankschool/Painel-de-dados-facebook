@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import { subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 
 export type DayFilter = 'all' | 'weekdays' | 'weekends' | 'best';
 export type MediaType = 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS';
@@ -19,6 +21,8 @@ interface FiltersContextType {
   setSearchQuery: (query: string) => void;
   resetFilters: () => void;
   activeFiltersCount: number;
+  // Computed date range based on preset
+  getDateRangeFromPreset: () => DateRange;
 }
 
 const defaultFilters: FiltersState = {
@@ -28,30 +32,76 @@ const defaultFilters: FiltersState = {
   searchQuery: '',
 };
 
+// Helper to compute date range from preset
+function computeDateRangeFromPreset(preset: DateRangePreset): DateRange {
+  const now = new Date();
+  let startDate: Date;
+  
+  switch (preset) {
+    case '7d':
+      startDate = subDays(now, 7);
+      break;
+    case '14d':
+      startDate = subDays(now, 14);
+      break;
+    case '30d':
+      startDate = subDays(now, 30);
+      break;
+    case '60d':
+      startDate = subDays(now, 60);
+      break;
+    case '90d':
+      startDate = subDays(now, 90);
+      break;
+    case '6m':
+      startDate = subMonths(now, 6);
+      break;
+    case '1y':
+      startDate = subYears(now, 1);
+      break;
+    case 'custom':
+    default:
+      startDate = subDays(now, 30);
+  }
+  
+  return {
+    from: startOfDay(startDate),
+    to: endOfDay(now),
+  };
+}
+
 const FiltersContext = createContext<FiltersContextType | undefined>(undefined);
 
 export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
 
-  const setDayFilter = (day: DayFilter) => {
+  const setDayFilter = useCallback((day: DayFilter) => {
+    console.log('[FiltersContext] Setting dayFilter:', day);
     setFilters((prev) => ({ ...prev, dayFilter: day }));
-  };
+  }, []);
 
-  const setMediaType = (type: MediaType) => {
+  const setMediaType = useCallback((type: MediaType) => {
+    console.log('[FiltersContext] Setting mediaType:', type);
     setFilters((prev) => ({ ...prev, mediaType: type }));
-  };
+  }, []);
 
-  const setDateRangePreset = (preset: DateRangePreset) => {
+  const setDateRangePreset = useCallback((preset: DateRangePreset) => {
+    console.log('[FiltersContext] Setting dateRangePreset:', preset);
     setFilters((prev) => ({ ...prev, dateRangePreset: preset }));
-  };
+  }, []);
 
-  const setSearchQuery = (query: string) => {
+  const setSearchQuery = useCallback((query: string) => {
     setFilters((prev) => ({ ...prev, searchQuery: query }));
-  };
+  }, []);
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
+    console.log('[FiltersContext] Resetting filters');
     setFilters(defaultFilters);
-  };
+  }, []);
+
+  const getDateRangeFromPreset = useCallback(() => {
+    return computeDateRangeFromPreset(filters.dateRangePreset);
+  }, [filters.dateRangePreset]);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -72,6 +122,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
         setSearchQuery,
         resetFilters,
         activeFiltersCount,
+        getDateRangeFromPreset,
       }}
     >
       {children}

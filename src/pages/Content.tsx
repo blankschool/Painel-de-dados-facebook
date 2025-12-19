@@ -13,6 +13,9 @@ export default function Content() {
   const media = useFilteredMedia(allMedia);
   const [activeTab, setActiveTab] = useState<ContentTab>("overview");
 
+  // Debug logging
+  console.log(`[Content] All media: ${allMedia.length}, Filtered: ${media.length}`);
+
   const counts = useMemo(() => {
     const posts = media.filter((m) => m.media_type === "IMAGE" || m.media_type === "CAROUSEL_ALBUM");
     const reels = media.filter((m) => m.media_product_type === "REELS" || m.media_product_type === "REEL");

@@ -18,6 +18,9 @@ export default function Time() {
   const allMedia = data?.media ?? [];
   const media = useFilteredMedia(allMedia);
 
+  // Debug logging
+  console.log(`[Time] All media: ${allMedia.length}, Filtered: ${media.length}`);
+
   const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);

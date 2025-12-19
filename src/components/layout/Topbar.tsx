@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useTheme } from "next-themes";
 import { Sun, Moon, User, Settings, LogOut, ChevronDown } from "lucide-react";
-import { useDateRange } from "@/contexts/DateRangeContext";
+import { useFilters } from "@/contexts/FiltersContext";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker";
 
 const pageNames: Record<string, string> = {
   "/": "Dashboard",
@@ -27,13 +28,16 @@ const pageNames: Record<string, string> = {
 
 export function Topbar() {
   const location = useLocation();
-  const { dateRange, setDateRange } = useDateRange();
+  const { getDateRangeFromPreset, setDateRangePreset, filters } = useFilters();
   const { data, refresh } = useDashboardData();
   const { theme, setTheme } = useTheme();
   
   const pageName = pageNames[location.pathname] || "Dashboard";
   const accountName = data?.profile?.username || "Instagram Business";
   const profilePicture = data?.profile?.profile_picture_url;
+  
+  // Get current date range from FiltersContext
+  const dateRange = getDateRangeFromPreset();
   
   const dateLabel = dateRange?.from
     ? dateRange.to
@@ -43,6 +47,14 @@ export function Topbar() {
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  // Handle calendar date selection - for now, just show the date range but don't change filters
+  // To support custom date ranges, we'd need to extend FiltersContext
+  const handleDateSelect = (range: DateRange | undefined) => {
+    // Currently the calendar is view-only - the date range is controlled by the preset buttons
+    // If custom date selection is needed, we can extend FiltersContext to support it
+    console.log('[Topbar] Calendar date selected (read-only mode):', range);
   };
 
   return (
@@ -115,7 +127,7 @@ export function Topbar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Date Range Picker */}
+        {/* Date Range Picker - shows current preset range */}
         <Popover>
           <PopoverTrigger asChild>
             <button type="button" className="date-range hover:bg-accent/50 transition-colors rounded-lg">
@@ -135,11 +147,14 @@ export function Topbar() {
               mode="range"
               defaultMonth={dateRange?.from}
               selected={dateRange}
-              onSelect={setDateRange}
+              onSelect={handleDateSelect}
               numberOfMonths={2}
               locale={ptBR}
               className={cn("p-3 pointer-events-auto")}
             />
+            <div className="p-3 border-t border-border text-xs text-muted-foreground text-center">
+              Use os botões de filtro (7D, 30D, 90D) para alterar o período
+            </div>
           </PopoverContent>
         </Popover>
       </div>
