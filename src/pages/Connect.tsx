@@ -262,17 +262,26 @@ export default function Connect() {
       console.log('[OAuth] Facebook OAuth URL:', authUrl);
       
     } else {
-      // INSTAGRAM OAUTH (api.instagram.com endpoint) - uses separate Instagram App ID
-      const params = new URLSearchParams({
+      // INSTAGRAM BUSINESS LOGIN (instagram.com/consent endpoint)
+      // This endpoint supports Instagram Business API access
+      const paramsJson = {
         client_id: INSTAGRAM_APP_ID,
         redirect_uri: redirectUri,
-        scope: INSTAGRAM_SCOPES,
         response_type: 'code',
-        state: state
+        state: state,
+        scope: INSTAGRAM_SCOPES,
+        logger_id: crypto.randomUUID(),
+        app_id: INSTAGRAM_APP_ID,
+        platform_app_id: INSTAGRAM_APP_ID
+      };
+
+      const params = new URLSearchParams({
+        flow: 'ig_biz_login_oauth',
+        params_json: JSON.stringify(paramsJson)
       });
 
-      authUrl = `https://api.instagram.com/oauth/authorize?${params.toString()}`;
-      console.log('[OAuth] Instagram OAuth URL:', authUrl);
+      authUrl = `https://www.instagram.com/consent/?${params.toString()}&source=oauth_permissions_page_www`;
+      console.log('[OAuth] Instagram Business Login URL:', authUrl);
     }
 
     // Redirect after short delay
