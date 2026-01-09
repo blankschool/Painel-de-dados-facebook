@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('connected_accounts')
         .select('id, provider, provider_account_id, account_username, account_name, profile_picture_url, token_expires_at')
         .eq('user_id', userId)
-        .eq('provider', 'facebook')
+        .in('provider', ['facebook', 'instagram'])  // Fetch both Facebook and Instagram accounts
         .order('created_at', { ascending: false });
 
       if (error) {

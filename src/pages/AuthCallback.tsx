@@ -248,24 +248,28 @@ export default function AuthCallback() {
         }
 
         console.log('11. Success! Account:', data.username);
-        
+
         setAccountInfo({
           username: data.username,
           name: data.name || data.username,
           profile_picture_url: data.profile_picture_url,
         });
         setStatus('success');
-        
+
+        console.log('12. Refreshing connected accounts...');
         await refreshConnectedAccounts();
+        console.log('13. Accounts refreshed');
 
         toast({
           title: 'Conta conectada!',
           description: `@${data.username} foi conectada com sucesso.`,
         });
 
+        console.log('14. Redirecting to overview in 1.5 seconds...');
         setTimeout(() => {
+          console.log('15. Executing redirect to /overview');
           navigate('/overview', { replace: true });
-        }, 3000);
+        }, 1500);
 
       } catch (err) {
         console.error('=== OAuth Error ===');
