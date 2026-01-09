@@ -21,9 +21,11 @@ function clearOAuthState() {
   localStorage.removeItem('oauth_state');
   localStorage.removeItem('oauth_timestamp');
   localStorage.removeItem('oauth_redirect_uri');
+  localStorage.removeItem('oauth_provider');
   sessionStorage.removeItem('oauth_state');
   sessionStorage.removeItem('oauth_timestamp');
   sessionStorage.removeItem('oauth_redirect_uri');
+  sessionStorage.removeItem('oauth_provider');
   // Clear cookies
   document.cookie = 'oauth_state=; path=/; max-age=0';
   document.cookie = 'oauth_timestamp=; path=/; max-age=0';
@@ -123,10 +125,19 @@ export default function AuthCallback() {
 
     const exchangeCode = async () => {
       try {
-        console.log('[AuthCallback] Exchanging code for token...');
+        // Get saved provider from storage
+        const savedProvider = localStorage.getItem('oauth_provider') || 
+                             sessionStorage.getItem('oauth_provider') || 
+                             'facebook';
         
-        // Include the redirect_uri so the edge function uses the correct one for token exchange
-        const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+        console.log('[AuthCallback] Exchanging code for token...');
+        console.log('[AuthCallback] Using provider:', savedProvider);
+        
+        // Call correct edge function based on provider
+        const edgeFunction = savedProvider === 'instagram' ? 'instagram-oauth' : 'facebook-oauth';
+        console.log('[AuthCallback] Calling edge function:', edgeFunction);
+        
+        const { data, error } = await supabase.functions.invoke(edgeFunction, {
           body: { 
             code,
             redirect_uri: `${window.location.origin}/auth/callback`,
@@ -147,7 +158,7 @@ export default function AuthCallback() {
         
         setAccountInfo({
           username: data.username,
-          name: data.name,
+          name: data.name || data.username,
           profile_picture_url: data.profile_picture_url,
         });
         setStatus('success');
@@ -172,7 +183,9 @@ export default function AuthCallback() {
         const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
         
         // Improve common error messages
-        if (errorMsg.includes('No Instagram Business Account')) {
+        if (errorMsg.includes('Only Instagram Business')) {
+          setErrorMessage('Apenas contas Instagram Business ou Creator podem ser conectadas. Converta sua conta nas configurações do Instagram.');
+        } else if (errorMsg.includes('No Instagram Business Account')) {
           setErrorMessage('Nenhuma conta Instagram Business encontrada. Certifique-se de que sua conta é Business ou Creator e está vinculada a uma Página do Facebook.');
         } else if (errorMsg.includes('already connected')) {
           setErrorMessage('Esta conta já está conectada.');

@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.facebook-oauth]
 verify_jwt = true
+
+[functions.instagram-oauth]
+verify_jwt = true

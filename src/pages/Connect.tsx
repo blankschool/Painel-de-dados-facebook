@@ -27,11 +27,14 @@ import {
 } from 'lucide-react';
 
 // ============================================
-// OAUTH CONFIGURATION - CRITICAL SECTION
+// OAUTH CONFIGURATION - SEPARATE APP IDS
 // ============================================
 
-// Main Facebook App ID for "Painel de Dados"
+// Facebook App ID for Facebook OAuth
 const FACEBOOK_APP_ID = '698718192521096';
+
+// Instagram App ID for Instagram OAuth (separate app)
+const INSTAGRAM_APP_ID = '1728352261135208';
 
 // Get redirect URI - MUST match exactly what's configured in Facebook Developer Console
 const getRedirectUri = (): string => {
@@ -219,10 +222,14 @@ export default function Connect() {
     const redirectUri = getRedirectUri();
     const timestamp = Date.now().toString();
 
+    // Determine which App ID to use
+    const appId = usingFacebookOAuth ? FACEBOOK_APP_ID : INSTAGRAM_APP_ID;
+    const provider = usingFacebookOAuth ? 'facebook' : 'instagram';
+
     console.log('=== OAuth Configuration Debug ===');
+    console.log('Provider:', provider);
+    console.log('App ID:', appId);
     console.log('Redirect URI:', redirectUri);
-    console.log('Using:', usingFacebookOAuth ? 'Facebook OAuth' : 'Instagram OAuth');
-    console.log('Facebook App ID:', FACEBOOK_APP_ID);
     console.log('State:', state);
     console.log('================================');
 
@@ -230,9 +237,11 @@ export default function Connect() {
     localStorage.setItem('oauth_state', state);
     localStorage.setItem('oauth_timestamp', timestamp);
     localStorage.setItem('oauth_redirect_uri', redirectUri);
+    localStorage.setItem('oauth_provider', provider);
     sessionStorage.setItem('oauth_state', state);
     sessionStorage.setItem('oauth_timestamp', timestamp);
     sessionStorage.setItem('oauth_redirect_uri', redirectUri);
+    sessionStorage.setItem('oauth_provider', provider);
     
     // Cookie fallback
     document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
@@ -255,9 +264,9 @@ export default function Connect() {
       console.log('[OAuth] Facebook OAuth URL:', authUrl);
       
     } else {
-      // INSTAGRAM OAUTH (api.instagram.com endpoint)
+      // INSTAGRAM OAUTH (api.instagram.com endpoint) - uses separate Instagram App ID
       const params = new URLSearchParams({
-        client_id: FACEBOOK_APP_ID, // Instagram uses the same Facebook App ID
+        client_id: INSTAGRAM_APP_ID,
         redirect_uri: redirectUri,
         scope: INSTAGRAM_SCOPES,
         response_type: 'code',
