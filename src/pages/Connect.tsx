@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -31,71 +31,38 @@ export default function Connect() {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const { isSDKLoaded, isLoading: isSDKLoading, loginStatus, login: fbLogin, checkLoginStatus } = useFacebookSDK();
+  const { isSDKLoaded, isLoading: isSDKLoading, loginStatus, checkLoginStatus } = useFacebookSDK();
 
-  // Check login status when SDK loads
-  useEffect(() => {
-    if (isSDKLoaded) {
-      checkLoginStatus();
-    }
-  }, [isSDKLoaded, checkLoginStatus]);
-
-  const handleConnectFacebook = async () => {
-    if (!isSDKLoaded) {
-      toast({
-        title: 'Aguarde',
-        description: 'O SDK do Facebook ainda está carregando...',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  // Handle login status changes from FB SDK
+  const handleFacebookLogin = useCallback(async (accessToken: string) => {
+    if (isConnecting) return;
+    
     setIsConnecting(true);
+    console.log('[Connect] Facebook login successful, exchanging token...');
     
     try {
-      // Use Facebook SDK login with popup
-      const response = await fbLogin(SCOPES);
-      
-      if (response.status === 'connected' && response.authResponse) {
-        console.log('[Connect] Facebook login successful, exchanging token...');
-        
-        // Call edge function to exchange token and get Instagram data
-        const { data, error } = await supabase.functions.invoke('facebook-oauth', {
-          body: {
-            access_token: response.authResponse.accessToken,
-            user_id: response.authResponse.userID,
-          },
-        });
+      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+        body: {
+          access_token: accessToken,
+        },
+      });
 
-        if (error) {
-          console.error('[Connect] Edge function error:', error);
-          throw new Error(error.message || 'Erro ao processar autenticação');
-        }
-
-        if (data?.error) {
-          console.error('[Connect] Data error:', data.error);
-          throw new Error(data.error);
-        }
-
-        toast({
-          title: 'Sucesso!',
-          description: 'Conta do Instagram conectada com sucesso.',
-        });
-
-        await refreshConnectedAccount();
-      } else if (response.status === 'not_authorized') {
-        toast({
-          title: 'Acesso não autorizado',
-          description: 'Você precisa autorizar o app para continuar.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Login cancelado',
-          description: 'O login foi cancelado ou não foi possível conectar.',
-          variant: 'destructive',
-        });
+      if (error) {
+        console.error('[Connect] Edge function error:', error);
+        throw new Error(error.message || 'Erro ao processar autenticação');
       }
+
+      if (data?.error) {
+        console.error('[Connect] Data error:', data.error);
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: 'Sucesso!',
+        description: 'Conta do Instagram conectada com sucesso.',
+      });
+
+      await refreshConnectedAccount();
     } catch (err) {
       console.error('[Connect] Error:', err);
       toast({
@@ -106,7 +73,40 @@ export default function Connect() {
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, [isConnecting, refreshConnectedAccount, toast]);
+
+  // Setup global callback for FB login button
+  useEffect(() => {
+    // Define global callback that FB button will call
+    (window as any).checkLoginState = () => {
+      if (!window.FB) return;
+      
+      window.FB.getLoginStatus((response) => {
+        console.log('[Connect] FB login status callback:', response.status);
+        if (response.status === 'connected' && response.authResponse) {
+          handleFacebookLogin(response.authResponse.accessToken);
+        } else if (response.status === 'not_authorized') {
+          toast({
+            title: 'Acesso não autorizado',
+            description: 'Você precisa autorizar o app para continuar.',
+            variant: 'destructive',
+          });
+        }
+      });
+    };
+
+    return () => {
+      delete (window as any).checkLoginState;
+    };
+  }, [handleFacebookLogin, toast]);
+
+  // Re-render FB XFBML elements when SDK loads
+  useEffect(() => {
+    if (isSDKLoaded && window.FB && !connectedAccount) {
+      // Parse XFBML to render the login button
+      window.FB.XFBML?.parse();
+    }
+  }, [isSDKLoaded, connectedAccount]);
 
   const handleDisconnect = async () => {
     if (!connectedAccount) return;
@@ -254,24 +254,32 @@ export default function Connect() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button
-                  onClick={handleConnectFacebook}
-                  disabled={isConnecting || !isSDKLoaded}
-                  className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white"
-                  size="lg"
-                >
+                {/* Native Facebook Login Button */}
+                <div className="flex justify-center py-2">
                   {isConnecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Conectando...
-                    </>
+                    <div className="flex items-center gap-2 py-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Conectando...</span>
+                    </div>
+                  ) : isSDKLoaded ? (
+                    <div 
+                      className="fb-login-button" 
+                      data-width=""
+                      data-size="large"
+                      data-button-type="continue_with"
+                      data-layout="rounded"
+                      data-auto-logout-link="false"
+                      data-use-continue-as="true"
+                      data-scope={SCOPES}
+                      data-onlogin="checkLoginState();"
+                    />
                   ) : (
-                    <>
-                      <Facebook className="mr-2 h-5 w-5" />
-                      Conectar com Facebook
-                    </>
+                    <div className="flex items-center gap-2 py-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Carregando...</span>
+                    </div>
                   )}
-                </Button>
+                </div>
 
                 <div className="p-4 rounded-lg bg-secondary/50 border border-border">
                   <div className="flex gap-3">
