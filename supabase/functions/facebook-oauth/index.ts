@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Allowed origins for CORS - dynamically allow any Lovable preview URL
 const allowedOrigins = [
+  'https://painel-de-dados-instagram.lovable.app',
   'https://insta-glow-up-39.lovable.app',
   'http://localhost:5173',
   'http://localhost:8080',
@@ -81,8 +82,16 @@ serve(async (req) => {
     const instagramAppId = Deno.env.get('INSTAGRAM_APP_ID') || facebookClientId;
     const instagramAppSecret = Deno.env.get('INSTAGRAM_APP_SECRET') || facebookClientSecret;
     
-    // Use client-provided redirect URI or fall back to default
-    const redirectUri = clientRedirectUri || origin + '/auth/callback' || 'https://insta-glow-up-39.lovable.app/auth/callback';
+    // Use client-provided redirect URI or construct from origin
+    let redirectUri: string;
+    if (clientRedirectUri) {
+      redirectUri = clientRedirectUri;
+    } else if (origin) {
+      redirectUri = `${origin}/auth/callback`;
+    } else {
+      redirectUri = 'https://painel-de-dados-instagram.lovable.app/auth/callback';
+    }
+    console.log('[facebook-oauth] Constructed redirect URI:', redirectUri);
 
     if (!facebookClientId || !facebookClientSecret) {
       console.error('[facebook-oauth] Missing Facebook credentials');
