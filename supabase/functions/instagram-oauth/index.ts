@@ -35,6 +35,10 @@ serve(async (req) => {
 
   const startTime = Date.now();
   console.log('[instagram-oauth] Request started');
+  console.log('[instagram-oauth] Method:', req.method);
+  console.log('[instagram-oauth] URL:', req.url);
+  console.log('[instagram-oauth] Origin:', origin);
+  console.log('[instagram-oauth] Content-Type:', req.headers.get('content-type'));
 
   try {
     // Step 1: Verify JWT
@@ -60,9 +64,18 @@ serve(async (req) => {
 
     // Step 2: Parse request (same as facebook-oauth)
     console.log('[instagram-oauth] Step 2: Parsing request body...');
-    const body = await req.json();
-    const { code, redirect_uri: clientRedirectUri } = body;
+    let body: any;
+    try {
+      body = await req.json();
+      console.log('[instagram-oauth] Body parsed successfully:', typeof body);
+      console.log('[instagram-oauth] Body keys:', Object.keys(body || {}));
+    } catch (e) {
+      console.error('[instagram-oauth] Failed to parse body with req.json():', e);
+      console.error('[instagram-oauth] Error message:', e instanceof Error ? e.message : String(e));
+      throw new Error(`Failed to parse request body: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
+    const { code, redirect_uri: clientRedirectUri } = body;
     console.log('[instagram-oauth] Request params - code:', code?.substring(0, 20) + '...', 'redirect_uri:', clientRedirectUri);
     
     const instagramAppId = Deno.env.get('INSTAGRAM_APP_ID');
