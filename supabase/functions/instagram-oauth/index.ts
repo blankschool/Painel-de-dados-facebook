@@ -167,20 +167,23 @@ serve(async (req) => {
     }
 
     // Step 5: Fetch Instagram profile using Instagram Business API
+    // Use the user_id we got from token, not /me endpoint
     console.log('[instagram-oauth] Step 5: Fetching Instagram profile...');
     const profileResponse = await fetch(
-      `https://graph.instagram.com/v24.0/me?fields=user_id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${accessToken}`
+      `https://graph.instagram.com/v24.0/${instagramUserId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${accessToken}`
     );
     const profileData = await profileResponse.json();
+
+    console.log('[instagram-oauth] Profile response:', JSON.stringify(profileData, null, 2));
 
     if (profileData.error) {
       console.error('[instagram-oauth] Profile fetch error:', JSON.stringify(profileData.error));
       throw new Error(`Profile fetch error: ${profileData.error.message}`);
     }
 
-    // Extract profile data (Instagram Business API response format)
-    const profileInfo = profileData.data?.[0] || profileData;
-    const finalInstagramUserId = profileInfo.user_id || instagramUserId;
+    // Extract profile data (direct user query, not wrapped in data array)
+    const profileInfo = profileData;
+    const finalInstagramUserId = profileInfo.id || instagramUserId;
 
     console.log('[instagram-oauth] Profile fetched:', {
       user_id: finalInstagramUserId,
