@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useFacebookSDK } from '@/hooks/useFacebookSDK';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   Facebook, 
   Instagram, 
@@ -15,7 +17,13 @@ import {
   ExternalLink,
   AlertCircle,
   Trash2,
-  Check
+  Check,
+  RefreshCw,
+  ChevronDown,
+  Shield,
+  Eye,
+  EyeOff,
+  ArrowRight
 } from 'lucide-react';
 
 const SCOPES = [
@@ -26,10 +34,28 @@ const SCOPES = [
   'business_management',
 ].join(',');
 
+// Instagram OAuth config (for direct Instagram OAuth flow)
+const INSTAGRAM_APP_ID = '1088541086010498';
+const INSTAGRAM_SCOPES = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+
+// Generate secure random state for CSRF protection
+function generateSecureState(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Get redirect URI based on environment
+function getRedirectUri(): string {
+  return `${window.location.origin}/auth/callback`;
+}
+
 export default function Connect() {
   const { user, connectedAccounts, selectedAccount, isLoadingAccounts, signOut, refreshConnectedAccounts, selectAccount } = useAuth();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+  const [showInstructions, setShowInstructions] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -151,6 +177,87 @@ export default function Connect() {
     await signOut();
     navigate('/auth');
   };
+
+  // Handle Instagram OAuth redirect (alternative flow)
+  const handleConnectClick = () => {
+    setShowInstructions(true);
+  };
+
+  const handleProceedToOAuth = () => {
+    setShowInstructions(false);
+    setIsRedirecting(true);
+
+    // Generate and save state for CSRF protection
+    const state = generateSecureState();
+    const redirectUri = getRedirectUri();
+    const timestamp = Date.now().toString();
+
+    // Save to both localStorage AND sessionStorage for redundancy
+    localStorage.setItem('oauth_state', state);
+    localStorage.setItem('oauth_timestamp', timestamp);
+    localStorage.setItem('oauth_redirect_uri', redirectUri);
+    sessionStorage.setItem('oauth_state', state);
+    sessionStorage.setItem('oauth_timestamp', timestamp);
+    sessionStorage.setItem('oauth_redirect_uri', redirectUri);
+
+    // Also save to cookie as additional fallback (expires in 10 minutes)
+    document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
+    document.cookie = `oauth_timestamp=${timestamp}; path=/; max-age=600; SameSite=Lax`;
+
+    console.log('[OAuth] === OAuth State Saved ===');
+    console.log('[OAuth] State:', state);
+    console.log('[OAuth] Redirect URI:', redirectUri);
+    console.log('[OAuth] Current origin:', window.location.origin);
+    console.log('[OAuth] Timestamp:', new Date(parseInt(timestamp)).toISOString());
+    console.log('[OAuth] ============================');
+
+    // Build Instagram OAuth URL
+    const params = new URLSearchParams({
+      client_id: INSTAGRAM_APP_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: INSTAGRAM_SCOPES,
+      state: state
+    });
+
+    const authUrl = `https://www.instagram.com/oauth/authorize?${params.toString()}`;
+    
+    console.log('[OAuth] Redirecting to Instagram OAuth...');
+    
+    // Small delay to ensure storage is written
+    setTimeout(() => {
+      window.location.href = authUrl;
+    }, 100);
+  };
+
+  // Reconnect flow (force re-auth)
+  const handleReconnect = () => {
+    setShowInstructions(true);
+  };
+
+  // Show redirect loading screen
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-8 pb-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center mb-4">
+                <Instagram className="h-8 w-8 text-white animate-pulse" />
+              </div>
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                Redirecionando para Instagram
+              </h2>
+              <p className="text-muted-foreground mb-4">
+                Aguarde enquanto você é redirecionado...
+              </p>
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoadingAccounts || isSDKLoading) {
     return (
@@ -348,6 +455,96 @@ export default function Connect() {
           </Button>
         </div>
       </div>
+
+      {/* Instagram OAuth Instructions Dialog */}
+      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center">
+                <Instagram className="h-5 w-5 text-white" />
+              </div>
+              <DialogTitle>Conectar Instagram Business</DialogTitle>
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <DialogDescription>
+              Você será redirecionado para fazer login no Instagram e autorizar o acesso aos seus dados de analytics.
+            </DialogDescription>
+
+            {/* Step by step */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-foreground">Passo a passo:</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                    1
+                  </span>
+                  <span className="text-sm text-muted-foreground">Faça login com seu usuário e senha do Instagram</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                    2
+                  </span>
+                  <span className="text-sm text-muted-foreground">Revise e autorize as permissões solicitadas</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                    3
+                  </span>
+                  <span className="text-sm text-muted-foreground">Aguarde o redirecionamento automático de volta</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Requirements */}
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div className="flex gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-foreground mb-1">Requisitos importantes:</p>
+                  <ul className="text-muted-foreground space-y-0.5 text-xs">
+                    <li>• Conta do tipo Business ou Creator</li>
+                    <li>• Vinculada a uma Página do Facebook</li>
+                    <li>• Você deve ser administrador da conta</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* What we access */}
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Shield className="h-4 w-4" />
+                O que podemos acessar?
+                <ChevronDown className="h-3 w-3" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 pl-6 text-xs text-muted-foreground space-y-1">
+                <p className="flex items-center gap-1"><Eye className="h-3 w-3 text-green-500" /> Informações do perfil (nome, username, foto)</p>
+                <p className="flex items-center gap-1"><Eye className="h-3 w-3 text-green-500" /> Métricas de posts (curtidas, comentários, alcance)</p>
+                <p className="flex items-center gap-1"><Eye className="h-3 w-3 text-green-500" /> Demografia dos seguidores</p>
+                <p className="flex items-center gap-1"><Eye className="h-3 w-3 text-green-500" /> Insights de stories</p>
+                <p className="flex items-center gap-1 text-muted-foreground/60"><EyeOff className="h-3 w-3" /> Não podemos postar ou modificar seu conteúdo</p>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowInstructions(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleProceedToOAuth} className="flex-1">
+              Continuar para Instagram
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
