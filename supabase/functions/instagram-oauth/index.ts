@@ -111,6 +111,13 @@ serve(async (req) => {
 
     const tokenText = await tokenResponse.text();
     console.log('[instagram-oauth] Token response status:', tokenResponse.status);
+    console.log('[instagram-oauth] Token response body:', tokenText.substring(0, 500));
+
+    if (!tokenResponse.ok) {
+      console.error('[instagram-oauth] Token request failed with status:', tokenResponse.status);
+      console.error('[instagram-oauth] Response body:', tokenText);
+      throw new Error(`Instagram token request failed: ${tokenResponse.status} - ${tokenText.substring(0, 200)}`);
+    }
 
     let tokenData: any;
     try {
@@ -120,9 +127,12 @@ serve(async (req) => {
       throw new Error('Invalid token response from Instagram');
     }
 
-    if (tokenData.error_type || tokenData.error_message) {
+    console.log('[instagram-oauth] Parsed token data:', JSON.stringify(tokenData, null, 2));
+
+    if (tokenData.error_type || tokenData.error_message || tokenData.error) {
       console.error('[instagram-oauth] Token error:', tokenData);
-      throw new Error(`Instagram error: ${tokenData.error_message || tokenData.error_type}`);
+      const errorMsg = tokenData.error_message || tokenData.error?.message || tokenData.error_type || 'Unknown error';
+      throw new Error(`Instagram error: ${errorMsg}`);
     }
 
     const accessToken = tokenData.access_token;
