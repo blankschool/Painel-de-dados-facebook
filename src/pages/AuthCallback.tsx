@@ -125,28 +125,61 @@ export default function AuthCallback() {
 
     const exchangeCode = async () => {
       try {
+        console.log('[AuthCallback] Starting token exchange...');
+        console.log('[AuthCallback] Code length:', code?.length);
+        console.log('[AuthCallback] Window origin:', window.location.origin);
+        
         // Get saved provider from storage
         const savedProvider = localStorage.getItem('oauth_provider') || 
                              sessionStorage.getItem('oauth_provider') || 
                              'facebook';
         
-        console.log('[AuthCallback] Exchanging code for token...');
-        console.log('[AuthCallback] Using provider:', savedProvider);
+        console.log('[AuthCallback] Detected provider:', savedProvider);
         
-        // Call correct edge function based on provider
+        // Determine edge function to call
         const edgeFunction = savedProvider === 'instagram' ? 'instagram-oauth' : 'facebook-oauth';
         console.log('[AuthCallback] Calling edge function:', edgeFunction);
         
+        // Verify session is still valid
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !sessionData.session) {
+          console.error('[AuthCallback] No valid session:', sessionError);
+          throw new Error('Você precisa estar logado para conectar uma conta. Por favor, faça login novamente.');
+        }
+        
+        console.log('[AuthCallback] Session valid, user ID:', sessionData.session.user.id);
+        
+        // Construct request body
+        const requestBody = { 
+          code,
+          redirect_uri: `${window.location.origin}/auth/callback`,
+        };
+        
+        console.log('[AuthCallback] Request body:', JSON.stringify(requestBody, null, 2));
+        console.log('[AuthCallback] Making supabase.functions.invoke call...');
+        
         const { data, error } = await supabase.functions.invoke(edgeFunction, {
-          body: { 
-            code,
-            redirect_uri: `${window.location.origin}/auth/callback`,
-          },
+          body: requestBody,
         });
+        
+        console.log('[AuthCallback] Edge function response received');
+        console.log('[AuthCallback] Error:', error);
+        console.log('[AuthCallback] Data:', data);
 
         if (error) {
-          console.error('[AuthCallback] Function error:', error);
+          console.error('[AuthCallback] Edge function error:', error);
+          
+          if (error.message?.includes('Failed to send a request')) {
+            throw new Error(`Erro de conexão com o servidor. Verifique se as Edge Functions estão deployadas. Detalhes: ${error.message}`);
+          }
+          
           throw new Error(error.message || 'Erro ao processar autorização');
+        }
+
+        if (!data) {
+          console.error('[AuthCallback] No data returned from edge function');
+          throw new Error('Resposta vazia do servidor.');
         }
 
         if (!data.success) {
@@ -154,7 +187,7 @@ export default function AuthCallback() {
           throw new Error(data.error || 'Erro ao conectar conta');
         }
 
-        console.log('[AuthCallback] Success:', data);
+        console.log('[AuthCallback] Success! Account connected:', data);
         
         setAccountInfo({
           username: data.username,
@@ -163,7 +196,6 @@ export default function AuthCallback() {
         });
         setStatus('success');
         
-        // Refresh connected accounts in context
         await refreshConnectedAccounts();
 
         toast({
@@ -171,24 +203,24 @@ export default function AuthCallback() {
           description: `@${data.username} foi conectada com sucesso.`,
         });
 
-        // Redirect to dashboard after 3 seconds
         setTimeout(() => {
           navigate('/overview', { replace: true });
         }, 3000);
 
       } catch (err) {
-        console.error('[AuthCallback] Error:', err);
+        console.error('[AuthCallback] Error in exchangeCode:', err);
         setStatus('error');
         
         const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
         
-        // Improve common error messages
         if (errorMsg.includes('Only Instagram Business')) {
           setErrorMessage('Apenas contas Instagram Business ou Creator podem ser conectadas. Converta sua conta nas configurações do Instagram.');
         } else if (errorMsg.includes('No Instagram Business Account')) {
           setErrorMessage('Nenhuma conta Instagram Business encontrada. Certifique-se de que sua conta é Business ou Creator e está vinculada a uma Página do Facebook.');
         } else if (errorMsg.includes('already connected')) {
           setErrorMessage('Esta conta já está conectada.');
+        } else if (errorMsg.includes('Failed to send a request')) {
+          setErrorMessage(`${errorMsg} | Possíveis causas: 1) Edge functions não deployadas, 2) Problema de rede.`);
         } else {
           setErrorMessage(errorMsg);
         }
