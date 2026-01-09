@@ -50,15 +50,19 @@ function getRedirectUri(): string {
   return `${window.location.origin}/auth/callback`;
 }
 
+// Facebook OAuth config (for Facebook OAuth flow - always works)
+const FACEBOOK_APP_ID = '1728352261135208';
+const FACEBOOK_SCOPES = 'instagram_basic,instagram_manage_insights,instagram_manage_comments,instagram_manage_messages,instagram_content_publish,pages_show_list,business_management';
+
 export default function Connect() {
   const { user, connectedAccounts, selectedAccount, isLoadingAccounts, signOut, refreshConnectedAccounts, selectAccount } = useAuth();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [usingFacebookOAuth, setUsingFacebookOAuth] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  
   const { isSDKLoaded, isLoading: isSDKLoading, loginStatus } = useFacebookSDK();
 
   // Handle login status changes from FB SDK
@@ -178,9 +182,21 @@ export default function Connect() {
     navigate('/auth');
   };
 
-  // Handle Instagram OAuth redirect (alternative flow)
-  const handleConnectClick = () => {
+  // Handler for Instagram OAuth (instagram.com endpoint)
+  const handleInstagramConnect = () => {
+    setUsingFacebookOAuth(false);
     setShowInstructions(true);
+  };
+
+  // Handler for Facebook OAuth (facebook.com endpoint) 
+  const handleFacebookConnect = () => {
+    setUsingFacebookOAuth(true);
+    setShowInstructions(true);
+  };
+
+  const handleCancelInstructions = () => {
+    setShowInstructions(false);
+    setUsingFacebookOAuth(false);
   };
 
   const handleProceedToOAuth = () => {
@@ -204,26 +220,28 @@ export default function Connect() {
     document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
     document.cookie = `oauth_timestamp=${timestamp}; path=/; max-age=600; SameSite=Lax`;
 
-    console.log('[OAuth] === OAuth State Saved ===');
+    console.log('[OAuth] === OAuth Flow Started ===');
+    console.log('[OAuth] Using:', usingFacebookOAuth ? 'Facebook OAuth' : 'Instagram OAuth');
     console.log('[OAuth] State:', state);
     console.log('[OAuth] Redirect URI:', redirectUri);
-    console.log('[OAuth] Current origin:', window.location.origin);
-    console.log('[OAuth] Timestamp:', new Date(parseInt(timestamp)).toISOString());
     console.log('[OAuth] ============================');
 
-    // Build Instagram OAuth URL with force_reauth for multiple accounts
+    // Build OAuth URL based on selected method
     const params = new URLSearchParams({
       force_reauth: 'true',
-      client_id: INSTAGRAM_APP_ID,
+      client_id: usingFacebookOAuth ? FACEBOOK_APP_ID : INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: INSTAGRAM_SCOPES,
+      scope: usingFacebookOAuth ? FACEBOOK_SCOPES : INSTAGRAM_SCOPES,
       state: state
     });
 
-    const authUrl = `https://www.instagram.com/oauth/authorize?${params.toString()}`;
+    // Use different OAuth endpoint based on selection
+    const authUrl = usingFacebookOAuth
+      ? `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
+      : `https://www.instagram.com/oauth/authorize?${params.toString()}`;
     
-    console.log('[OAuth] Redirecting to Instagram OAuth...');
+    console.log('[OAuth] Redirecting to:', usingFacebookOAuth ? 'Facebook' : 'Instagram', 'OAuth...');
     
     // Small delay to ensure storage is written
     setTimeout(() => {
@@ -386,37 +404,75 @@ export default function Connect() {
         {/* Connect New Account Card */}
         <Card>
           <CardHeader>
-            <CardTitle>{hasAccounts ? 'Conectar Outra Conta' : 'Conectar com Facebook'}</CardTitle>
+            <CardTitle>{hasAccounts ? 'Conectar Outra Conta' : 'Conectar Instagram Business'}</CardTitle>
             <CardDescription>
-              Conecte sua conta do Facebook para acessar as métricas do Instagram Business
+              Escolha como deseja conectar sua conta do Instagram Business
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Native Facebook Login Button */}
-            <div className="flex justify-center py-2">
-              {isConnecting ? (
-                <div className="flex items-center gap-2 py-3">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  <span className="text-sm text-muted-foreground">Conectando...</span>
+            {/* Recommendation badge */}
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center mt-0.5">
+                  <Check className="w-3 h-3 text-white" />
                 </div>
-              ) : isSDKLoaded ? (
-                <div 
-                  className="fb-login-button" 
-                  data-width=""
-                  data-size="large"
-                  data-button-type={hasAccounts ? "login_with" : "continue_with"}
-                  data-layout="rounded"
-                  data-auto-logout-link="false"
-                  data-use-continue-as={hasAccounts ? "false" : "true"}
-                  data-scope={SCOPES}
-                  data-onlogin="checkLoginState();"
-                />
-              ) : (
-                <div className="flex items-center gap-2 py-3">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Carregando...</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                    Recomendado: Login com Instagram
+                  </p>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                    Interface nativa do Instagram, mesmos dados de analytics
+                  </p>
                 </div>
-              )}
+              </div>
+            </div>
+
+            {/* OAuth Buttons */}
+            <div className="space-y-3">
+              {/* Primary: Instagram OAuth */}
+              <Button
+                onClick={handleInstagramConnect}
+                className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 text-white font-semibold h-12"
+              >
+                <svg className="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                </svg>
+                Conectar com Instagram
+              </Button>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-card text-muted-foreground">ou</span>
+                </div>
+              </div>
+
+              {/* Secondary: Facebook OAuth (backup) */}
+              <Button
+                onClick={handleFacebookConnect}
+                variant="outline"
+                className="w-full h-12 border-2"
+              >
+                <svg className="mr-2 h-5 w-5 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+                Conectar com Facebook
+              </Button>
+
+              {/* Help text */}
+              <p className="text-xs text-center text-muted-foreground px-4">
+                Ambas as opções fornecem acesso aos mesmos dados do Instagram Business
+              </p>
+            </div>
+
+            {/* Info about Facebook option */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Nota:</strong> A opção Facebook funciona imediatamente e fornece o mesmo acesso aos dados do Instagram Business. Use-a se tiver problemas com o login do Instagram.
+              </p>
             </div>
 
             {!hasAccounts && (
@@ -457,21 +513,32 @@ export default function Connect() {
         </div>
       </div>
 
-      {/* Instagram OAuth Instructions Dialog */}
-      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+      {/* OAuth Instructions Dialog */}
+      <Dialog open={showInstructions} onOpenChange={handleCancelInstructions}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center">
-                <Instagram className="h-5 w-5 text-white" />
-              </div>
-              <DialogTitle>Conectar Instagram Business</DialogTitle>
+              {usingFacebookOAuth ? (
+                <div className="w-10 h-10 rounded-xl bg-[#1877F2] flex items-center justify-center">
+                  <Facebook className="h-5 w-5 text-white" />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center">
+                  <Instagram className="h-5 w-5 text-white" />
+                </div>
+              )}
+              <DialogTitle>
+                Conectar via {usingFacebookOAuth ? 'Facebook' : 'Instagram'}
+              </DialogTitle>
             </div>
           </DialogHeader>
           
           <div className="space-y-4">
             <DialogDescription>
-              Você será redirecionado para fazer login no Instagram e autorizar o acesso aos seus dados de analytics.
+              {usingFacebookOAuth 
+                ? 'Você será redirecionado para fazer login no Facebook. Sua conta do Instagram Business deve estar vinculada ao Facebook.'
+                : 'Você será redirecionado para fazer login no Instagram com seu usuário e senha.'
+              }
             </DialogDescription>
 
             {/* Step by step */}
@@ -479,19 +546,24 @@ export default function Connect() {
               <p className="text-sm font-medium text-foreground">Passo a passo:</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium text-white ${usingFacebookOAuth ? 'bg-[#1877F2]' : 'bg-primary'}`}>
                     1
                   </span>
-                  <span className="text-sm text-muted-foreground">Faça login com seu usuário e senha do Instagram</span>
+                  <span className="text-sm text-muted-foreground">
+                    {usingFacebookOAuth 
+                      ? 'Faça login com seu email e senha do Facebook'
+                      : 'Faça login com seu usuário e senha do Instagram'
+                    }
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium text-white ${usingFacebookOAuth ? 'bg-[#1877F2]' : 'bg-primary'}`}>
                     2
                   </span>
                   <span className="text-sm text-muted-foreground">Revise e autorize as permissões solicitadas</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium text-white ${usingFacebookOAuth ? 'bg-[#1877F2]' : 'bg-primary'}`}>
                     3
                   </span>
                   <span className="text-sm text-muted-foreground">Aguarde o redirecionamento automático de volta</span>
@@ -534,13 +606,16 @@ export default function Connect() {
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowInstructions(false)}
+              onClick={handleCancelInstructions}
               className="flex-1"
             >
               Cancelar
             </Button>
-            <Button onClick={handleProceedToOAuth} className="flex-1">
-              Continuar para Instagram
+            <Button 
+              onClick={handleProceedToOAuth} 
+              className={`flex-1 ${usingFacebookOAuth ? 'bg-[#1877F2] hover:bg-[#1877F2]/90' : ''}`}
+            >
+              Continuar para {usingFacebookOAuth ? 'Facebook' : 'Instagram'}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </DialogFooter>
