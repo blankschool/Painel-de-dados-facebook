@@ -26,17 +26,37 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-const SCOPES = [
+// ============================================
+// OAUTH CONFIGURATION - CRITICAL SECTION
+// ============================================
+
+// Your Facebook App ID (same for both Instagram and Facebook OAuth)
+const FACEBOOK_APP_ID = '1728352261135208';
+
+// Get redirect URI - MUST match exactly what's configured in Facebook Developer Console
+const getRedirectUri = (): string => {
+  return `${window.location.origin}/auth/callback`;
+};
+
+// Facebook OAuth scopes (Facebook login endpoint)
+const FACEBOOK_SCOPES = [
   'instagram_basic',
-  'instagram_manage_insights',
+  'instagram_manage_insights', 
+  'instagram_manage_comments',
+  'instagram_manage_messages',
+  'instagram_content_publish',
   'pages_show_list',
-  'pages_read_engagement',
-  'business_management',
+  'business_management'
 ].join(',');
 
-// Instagram OAuth config (for direct Instagram OAuth flow)
-const INSTAGRAM_APP_ID = '1728352261135208';
-const INSTAGRAM_SCOPES = 'instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+// Instagram OAuth scopes (Instagram login endpoint)
+const INSTAGRAM_SCOPES = [
+  'instagram_business_basic',
+  'instagram_business_manage_insights',
+  'instagram_business_manage_comments',
+  'instagram_business_manage_messages',
+  'instagram_business_content_publish'
+].join(',');
 
 // Generate secure random state for CSRF protection
 function generateSecureState(): string {
@@ -44,15 +64,6 @@ function generateSecureState(): string {
   crypto.getRandomValues(array);
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
-
-// Get redirect URI based on environment
-function getRedirectUri(): string {
-  return `${window.location.origin}/auth/callback`;
-}
-
-// Facebook OAuth config (for Facebook OAuth flow - always works)
-const FACEBOOK_APP_ID = '1728352261135208';
-const FACEBOOK_SCOPES = 'instagram_basic,instagram_manage_insights,instagram_manage_comments,instagram_manage_messages,instagram_content_publish,pages_show_list,business_management';
 
 export default function Connect() {
   const { user, connectedAccounts, selectedAccount, isLoadingAccounts, signOut, refreshConnectedAccounts, selectAccount } = useAuth();
@@ -208,43 +219,58 @@ export default function Connect() {
     const redirectUri = getRedirectUri();
     const timestamp = Date.now().toString();
 
-    // Save to both localStorage AND sessionStorage for redundancy
+    console.log('=== OAuth Configuration Debug ===');
+    console.log('Redirect URI:', redirectUri);
+    console.log('Using:', usingFacebookOAuth ? 'Facebook OAuth' : 'Instagram OAuth');
+    console.log('Facebook App ID:', FACEBOOK_APP_ID);
+    console.log('State:', state);
+    console.log('================================');
+
+    // Save to multiple storage locations for redundancy
     localStorage.setItem('oauth_state', state);
     localStorage.setItem('oauth_timestamp', timestamp);
     localStorage.setItem('oauth_redirect_uri', redirectUri);
     sessionStorage.setItem('oauth_state', state);
     sessionStorage.setItem('oauth_timestamp', timestamp);
     sessionStorage.setItem('oauth_redirect_uri', redirectUri);
-
-    // Also save to cookie as additional fallback (expires in 10 minutes)
+    
+    // Cookie fallback
     document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
     document.cookie = `oauth_timestamp=${timestamp}; path=/; max-age=600; SameSite=Lax`;
 
-    console.log('[OAuth] === OAuth Flow Started ===');
-    console.log('[OAuth] Using:', usingFacebookOAuth ? 'Facebook OAuth' : 'Instagram OAuth');
-    console.log('[OAuth] State:', state);
-    console.log('[OAuth] Redirect URI:', redirectUri);
-    console.log('[OAuth] ============================');
+    // Build OAuth URL based on selected provider
+    let authUrl: string;
 
-    // Build OAuth URL based on selected method
-    const params = new URLSearchParams({
-      force_reauth: 'true',
-      client_id: usingFacebookOAuth ? FACEBOOK_APP_ID : INSTAGRAM_APP_ID,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: usingFacebookOAuth ? FACEBOOK_SCOPES : INSTAGRAM_SCOPES,
-      state: state
-    });
+    if (usingFacebookOAuth) {
+      // FACEBOOK OAUTH (facebook.com endpoint)
+      const params = new URLSearchParams({
+        client_id: FACEBOOK_APP_ID,
+        redirect_uri: redirectUri,
+        scope: FACEBOOK_SCOPES,
+        response_type: 'code',
+        state: state,
+      });
 
-    // Use different OAuth endpoint based on selection
-    const authUrl = usingFacebookOAuth
-      ? `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`
-      : `https://www.instagram.com/oauth/authorize?${params.toString()}`;
-    
-    console.log('[OAuth] Redirecting to:', usingFacebookOAuth ? 'Facebook' : 'Instagram', 'OAuth...');
-    
-    // Small delay to ensure storage is written
+      authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
+      console.log('[OAuth] Facebook OAuth URL:', authUrl);
+      
+    } else {
+      // INSTAGRAM OAUTH (api.instagram.com endpoint)
+      const params = new URLSearchParams({
+        client_id: FACEBOOK_APP_ID, // Instagram uses the same Facebook App ID
+        redirect_uri: redirectUri,
+        scope: INSTAGRAM_SCOPES,
+        response_type: 'code',
+        state: state
+      });
+
+      authUrl = `https://api.instagram.com/oauth/authorize?${params.toString()}`;
+      console.log('[OAuth] Instagram OAuth URL:', authUrl);
+    }
+
+    // Redirect after short delay
     setTimeout(() => {
+      console.log('[OAuth] Redirecting to OAuth provider...');
       window.location.href = authUrl;
     }, 100);
   };
