@@ -129,13 +129,18 @@ export default function AuthCallback() {
         console.log('1. Code received:', code?.substring(0, 20) + '...');
         console.log('2. Origin:', window.location.origin);
         
-        // Get provider
-        const savedProvider = localStorage.getItem('oauth_provider') || 
-                             sessionStorage.getItem('oauth_provider') || 
-                             'facebook';
-        
+        // Get provider - try to determine from URL if not in storage
+        let savedProvider = localStorage.getItem('oauth_provider') ||
+                           sessionStorage.getItem('oauth_provider');
+
+        // If no provider saved, try to detect from URL patterns or default to instagram
+        if (!savedProvider) {
+          console.warn('[AuthCallback] No provider in storage, defaulting to instagram');
+          savedProvider = 'instagram';
+        }
+
         console.log('3. Provider:', savedProvider);
-        
+
         const edgeFunction = savedProvider === 'instagram' ? 'instagram-oauth' : 'facebook-oauth';
         console.log('4. Edge function:', edgeFunction);
         
@@ -168,14 +173,19 @@ export default function AuthCallback() {
         }
         
         console.log('8. Supabase connection OK');
-        
-        // Prepare request
-        const requestBody = { 
+
+        // Prepare request - use saved redirect_uri if available, otherwise construct it
+        const savedRedirectUri = localStorage.getItem('oauth_redirect_uri') ||
+                                sessionStorage.getItem('oauth_redirect_uri');
+        const redirectUri = savedRedirectUri || `${window.location.origin}/auth/callback`;
+
+        const requestBody = {
           code,
-          redirect_uri: `${window.location.origin}/auth/callback`,
+          redirect_uri: redirectUri,
         };
-        
-        console.log('9. Calling edge function with body:', requestBody);
+
+        console.log('9. Calling edge function:', edgeFunction);
+        console.log('   Request body:', JSON.stringify(requestBody));
         
         // Make the request with explicit headers
         const { data, error } = await supabase.functions.invoke(edgeFunction, {

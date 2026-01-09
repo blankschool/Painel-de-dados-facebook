@@ -53,13 +53,11 @@ const FACEBOOK_SCOPES = [
 ].join(',');
 
 // Instagram OAuth scopes (Instagram login endpoint)
+// ONLY request essential permissions to match working reference
 const INSTAGRAM_SCOPES = [
   'instagram_business_basic',
-  'instagram_business_manage_insights',
-  'instagram_business_manage_comments',
-  'instagram_business_manage_messages',
-  'instagram_business_content_publish'
-].join(',');
+  'instagram_business_manage_insights'
+].join('-'); // Note: Instagram uses hyphen separator, not comma
 
 // Generate secure random state for CSRF protection
 function generateSecureState(): string {
