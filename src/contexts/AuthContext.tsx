@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ConnectedAccount {
+export interface ConnectedAccount {
   id: string;
   provider: string;
   provider_account_id: string;
@@ -16,13 +16,17 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
-  connectedAccount: ConnectedAccount | null;
-  isLoadingAccount: boolean;
+  connectedAccounts: ConnectedAccount[];
+  selectedAccount: ConnectedAccount | null;
+  isLoadingAccounts: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  refreshConnectedAccount: () => Promise<void>;
+  refreshConnectedAccounts: () => Promise<void>;
+  selectAccount: (accountId: string) => void;
 }
+
+const SELECTED_ACCOUNT_KEY = 'selected_account_id';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -30,36 +34,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectedAccount, setConnectedAccount] = useState<ConnectedAccount | null>(null);
-  const [isLoadingAccount, setIsLoadingAccount] = useState(false);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<ConnectedAccount | null>(null);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
 
-  const fetchConnectedAccount = async (userId: string) => {
-    setIsLoadingAccount(true);
+  const fetchConnectedAccounts = async (userId: string) => {
+    setIsLoadingAccounts(true);
     try {
       const { data, error } = await supabase
         .from('connected_accounts')
         .select('id, provider, provider_account_id, account_username, account_name, profile_picture_url, token_expires_at')
         .eq('user_id', userId)
         .eq('provider', 'facebook')
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching connected account:', error);
-        setConnectedAccount(null);
+        console.error('Error fetching connected accounts:', error);
+        setConnectedAccounts([]);
+        setSelectedAccount(null);
       } else {
-        setConnectedAccount(data);
+        const accounts = data || [];
+        setConnectedAccounts(accounts);
+        
+        // Restore previously selected account or select first one
+        const savedAccountId = localStorage.getItem(SELECTED_ACCOUNT_KEY);
+        const savedAccount = accounts.find(acc => acc.id === savedAccountId);
+        
+        if (savedAccount) {
+          setSelectedAccount(savedAccount);
+        } else if (accounts.length > 0) {
+          setSelectedAccount(accounts[0]);
+          localStorage.setItem(SELECTED_ACCOUNT_KEY, accounts[0].id);
+        } else {
+          setSelectedAccount(null);
+          localStorage.removeItem(SELECTED_ACCOUNT_KEY);
+        }
       }
     } catch (err) {
-      console.error('Error fetching connected account:', err);
-      setConnectedAccount(null);
+      console.error('Error fetching connected accounts:', err);
+      setConnectedAccounts([]);
+      setSelectedAccount(null);
     } finally {
-      setIsLoadingAccount(false);
+      setIsLoadingAccounts(false);
     }
   };
 
-  const refreshConnectedAccount = async () => {
+  const refreshConnectedAccounts = async () => {
     if (user) {
-      await fetchConnectedAccount(user.id);
+      await fetchConnectedAccounts(user.id);
+    }
+  };
+
+  const selectAccount = (accountId: string) => {
+    const account = connectedAccounts.find(acc => acc.id === accountId);
+    if (account) {
+      setSelectedAccount(account);
+      localStorage.setItem(SELECTED_ACCOUNT_KEY, accountId);
     }
   };
 
@@ -71,13 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         setIsLoading(false);
 
-        // Fetch connected account when user signs in
+        // Fetch connected accounts when user signs in
         if (session?.user) {
           setTimeout(() => {
-            fetchConnectedAccount(session.user.id);
+            fetchConnectedAccounts(session.user.id);
           }, 0);
         } else {
-          setConnectedAccount(null);
+          setConnectedAccounts([]);
+          setSelectedAccount(null);
+          localStorage.removeItem(SELECTED_ACCOUNT_KEY);
         }
       }
     );
@@ -89,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
 
       if (session?.user) {
-        fetchConnectedAccount(session.user.id);
+        fetchConnectedAccounts(session.user.id);
       }
     });
 
@@ -120,7 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setConnectedAccount(null);
+    setConnectedAccounts([]);
+    setSelectedAccount(null);
+    localStorage.removeItem(SELECTED_ACCOUNT_KEY);
   };
 
   return (
@@ -129,12 +163,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         isLoading,
-        connectedAccount,
-        isLoadingAccount,
+        connectedAccounts,
+        selectedAccount,
+        isLoadingAccounts,
         signIn,
         signUp,
         signOut,
-        refreshConnectedAccount,
+        refreshConnectedAccounts,
+        selectAccount,
       }}
     >
       {children}

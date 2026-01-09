@@ -15,7 +15,7 @@ export default function AuthCallback() {
   const [errorMessage, setErrorMessage] = useState('');
   const [accountInfo, setAccountInfo] = useState<{ username?: string; name?: string } | null>(null);
   
-  const { user, session, refreshConnectedAccount } = useAuth();
+  const { user, session, refreshConnectedAccounts } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -78,7 +78,7 @@ export default function AuthCallback() {
         setStatus('success');
         
         // Refresh connected account in context
-        await refreshConnectedAccount();
+        await refreshConnectedAccounts();
 
         toast({
           title: 'Conta conectada!',
@@ -98,7 +98,7 @@ export default function AuthCallback() {
     };
 
     exchangeCode();
-  }, [searchParams, user, session, navigate, toast, refreshConnectedAccount]);
+  }, [searchParams, user, session, navigate, toast, refreshConnectedAccounts]);
 
   const handleRetry = () => {
     navigate('/connect');
