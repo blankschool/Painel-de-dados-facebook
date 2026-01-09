@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useFacebookSDK } from '@/hooks/useFacebookSDK';
 import { 
   Facebook, 
   Instagram, 
@@ -15,8 +16,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const FACEBOOK_APP_ID = '698718192521096';
-const REDIRECT_URI = 'https://insta-glow-up-39.lovable.app/auth/callback';
 const SCOPES = [
   'instagram_basic',
   'instagram_manage_insights',
@@ -27,13 +26,86 @@ const SCOPES = [
 
 export default function Connect() {
   const { user, connectedAccount, isLoadingAccount, signOut, refreshConnectedAccount } = useAuth();
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const { isSDKLoaded, isLoading: isSDKLoading, loginStatus, login: fbLogin, checkLoginStatus } = useFacebookSDK();
 
-  const handleConnectFacebook = () => {
-    const authUrl = `https://www.facebook.com/v24.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${SCOPES}&response_type=code`;
-    window.location.href = authUrl;
+  // Check login status when SDK loads
+  useEffect(() => {
+    if (isSDKLoaded) {
+      checkLoginStatus();
+    }
+  }, [isSDKLoaded, checkLoginStatus]);
+
+  const handleConnectFacebook = async () => {
+    if (!isSDKLoaded) {
+      toast({
+        title: 'Aguarde',
+        description: 'O SDK do Facebook ainda está carregando...',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+    
+    try {
+      // Use Facebook SDK login with popup
+      const response = await fbLogin(SCOPES);
+      
+      if (response.status === 'connected' && response.authResponse) {
+        console.log('[Connect] Facebook login successful, exchanging token...');
+        
+        // Call edge function to exchange token and get Instagram data
+        const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+          body: {
+            access_token: response.authResponse.accessToken,
+            user_id: response.authResponse.userID,
+          },
+        });
+
+        if (error) {
+          console.error('[Connect] Edge function error:', error);
+          throw new Error(error.message || 'Erro ao processar autenticação');
+        }
+
+        if (data?.error) {
+          console.error('[Connect] Data error:', data.error);
+          throw new Error(data.error);
+        }
+
+        toast({
+          title: 'Sucesso!',
+          description: 'Conta do Instagram conectada com sucesso.',
+        });
+
+        await refreshConnectedAccount();
+      } else if (response.status === 'not_authorized') {
+        toast({
+          title: 'Acesso não autorizado',
+          description: 'Você precisa autorizar o app para continuar.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Login cancelado',
+          description: 'O login foi cancelado ou não foi possível conectar.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('[Connect] Error:', err);
+      toast({
+        title: 'Erro na conexão',
+        description: err instanceof Error ? err.message : 'Não foi possível conectar ao Facebook.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleDisconnect = async () => {
@@ -74,12 +146,14 @@ export default function Connect() {
     navigate('/auth');
   };
 
-  if (isLoadingAccount) {
+  if (isLoadingAccount || isSDKLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground text-sm">Verificando conta conectada...</p>
+          <p className="text-muted-foreground text-sm">
+            {isSDKLoading ? 'Carregando SDK do Facebook...' : 'Verificando conta conectada...'}
+          </p>
         </div>
       </div>
     );
@@ -100,6 +174,16 @@ export default function Connect() {
             Conecte sua conta do Instagram Business para visualizar suas métricas
           </p>
         </div>
+
+        {/* Facebook Login Status Indicator */}
+        {loginStatus && loginStatus.status === 'connected' && !connectedAccount && (
+          <div className="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center gap-2">
+            <Facebook className="h-4 w-4 text-blue-500" />
+            <span className="text-sm text-blue-600 dark:text-blue-400">
+              Você está logado no Facebook. Clique para conectar o Instagram.
+            </span>
+          </div>
+        )}
 
         {/* Connected Account Card */}
         {connectedAccount ? (
@@ -172,11 +256,21 @@ export default function Connect() {
               <CardContent className="space-y-4">
                 <Button
                   onClick={handleConnectFacebook}
+                  disabled={isConnecting || !isSDKLoaded}
                   className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white"
                   size="lg"
                 >
-                  <Facebook className="mr-2 h-5 w-5" />
-                  Conectar com Facebook
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Conectando...
+                    </>
+                  ) : (
+                    <>
+                      <Facebook className="mr-2 h-5 w-5" />
+                      Conectar com Facebook
+                    </>
+                  )}
                 </Button>
 
                 <div className="p-4 rounded-lg bg-secondary/50 border border-border">

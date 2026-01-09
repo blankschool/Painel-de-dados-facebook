@@ -18,6 +18,10 @@ const getCorsHeaders = (origin: string | null) => {
 };
 
 // Input validation
+const isValidToken = (token: unknown): boolean => {
+  return typeof token === 'string' && token.length >= 10 && token.length <= 2000;
+};
+
 const isValidCode = (code: unknown): boolean => {
   return typeof code === 'string' && code.length >= 10 && code.length <= 1000;
 };
@@ -60,16 +64,8 @@ serve(async (req) => {
     // Step 2: Parse and validate request body
     console.log('[facebook-oauth] Step 2: Parsing request body...');
     const body = await req.json();
-    const { code } = body;
+    const { code, access_token: directAccessToken } = body;
     
-    if (!isValidCode(code)) {
-      console.error('[facebook-oauth] Invalid code format');
-      throw new Error('Invalid authorization code format');
-    }
-    console.log('[facebook-oauth] Code received, length:', code.length);
-
-    // Step 3: Exchange code for short-lived access token
-    console.log('[facebook-oauth] Step 3: Exchanging code for access token...');
     const facebookClientId = Deno.env.get('FACEBOOK_APP_ID');
     const facebookClientSecret = Deno.env.get('FACEBOOK_APP_SECRET');
     const redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
@@ -79,33 +75,66 @@ serve(async (req) => {
       throw new Error('Facebook app credentials not configured');
     }
 
-    const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${facebookClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${facebookClientSecret}&code=${code}`;
-    console.log('[facebook-oauth] Requesting token from Facebook...');
-    
-    const tokenResponse = await fetch(tokenUrl);
-    const tokenData = await tokenResponse.json();
+    let accessToken: string;
+    let expiresIn: number;
 
-    if (tokenData.error) {
-      console.error('[facebook-oauth] Token exchange error:', JSON.stringify(tokenData.error));
-      throw new Error(`Facebook token error: ${tokenData.error.message || tokenData.error.type}`);
+    // Check if we received a direct access_token (from SDK popup) or a code (from redirect)
+    if (directAccessToken && isValidToken(directAccessToken)) {
+      console.log('[facebook-oauth] Using direct access token from SDK');
+      
+      // Exchange short-lived token for long-lived token
+      console.log('[facebook-oauth] Exchanging for long-lived token...');
+      const longLivedUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${facebookClientId}&client_secret=${facebookClientSecret}&fb_exchange_token=${directAccessToken}`;
+      
+      const longLivedResponse = await fetch(longLivedUrl);
+      const longLivedData = await longLivedResponse.json();
+
+      if (longLivedData.error) {
+        console.error('[facebook-oauth] Long-lived token error:', JSON.stringify(longLivedData.error));
+        throw new Error(`Long-lived token error: ${longLivedData.error.message || longLivedData.error.type}`);
+      }
+
+      accessToken = longLivedData.access_token;
+      expiresIn = longLivedData.expires_in || 5184000; // 60 days default
+      console.log('[facebook-oauth] Long-lived token received, expires in:', expiresIn, 'seconds');
+      
+    } else if (code && isValidCode(code)) {
+      console.log('[facebook-oauth] Using authorization code from redirect, length:', code.length);
+      
+      // Step 3: Exchange code for short-lived access token
+      console.log('[facebook-oauth] Step 3: Exchanging code for access token...');
+      const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${facebookClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${facebookClientSecret}&code=${code}`;
+      console.log('[facebook-oauth] Requesting token from Facebook...');
+      
+      const tokenResponse = await fetch(tokenUrl);
+      const tokenData = await tokenResponse.json();
+
+      if (tokenData.error) {
+        console.error('[facebook-oauth] Token exchange error:', JSON.stringify(tokenData.error));
+        throw new Error(`Facebook token error: ${tokenData.error.message || tokenData.error.type}`);
+      }
+      console.log('[facebook-oauth] Short-lived token received');
+
+      // Step 4: Exchange for long-lived token
+      console.log('[facebook-oauth] Step 4: Getting long-lived token...');
+      const longLivedUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${facebookClientId}&client_secret=${facebookClientSecret}&fb_exchange_token=${tokenData.access_token}`;
+      
+      const longLivedResponse = await fetch(longLivedUrl);
+      const longLivedData = await longLivedResponse.json();
+
+      if (longLivedData.error) {
+        console.error('[facebook-oauth] Long-lived token error:', JSON.stringify(longLivedData.error));
+        throw new Error(`Long-lived token error: ${longLivedData.error.message || longLivedData.error.type}`);
+      }
+
+      accessToken = longLivedData.access_token;
+      expiresIn = longLivedData.expires_in || 5184000; // 60 days default
+      console.log('[facebook-oauth] Long-lived token received, expires in:', expiresIn, 'seconds');
+      
+    } else {
+      console.error('[facebook-oauth] Neither valid code nor access_token provided');
+      throw new Error('Invalid request: must provide either code or access_token');
     }
-    console.log('[facebook-oauth] Short-lived token received');
-
-    // Step 4: Exchange for long-lived token
-    console.log('[facebook-oauth] Step 4: Getting long-lived token...');
-    const longLivedUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${facebookClientId}&client_secret=${facebookClientSecret}&fb_exchange_token=${tokenData.access_token}`;
-    
-    const longLivedResponse = await fetch(longLivedUrl);
-    const longLivedData = await longLivedResponse.json();
-
-    if (longLivedData.error) {
-      console.error('[facebook-oauth] Long-lived token error:', JSON.stringify(longLivedData.error));
-      throw new Error(`Long-lived token error: ${longLivedData.error.message || longLivedData.error.type}`);
-    }
-
-    const accessToken = longLivedData.access_token;
-    const expiresIn = longLivedData.expires_in || 5184000; // 60 days default
-    console.log('[facebook-oauth] Long-lived token received, expires in:', expiresIn, 'seconds');
 
     // Step 5: Get Facebook Pages
     console.log('[facebook-oauth] Step 5: Fetching Facebook Pages...');
