@@ -59,8 +59,18 @@ serve(async (req) => {
     console.log('[instagram-oauth] User authenticated:', user.id);
 
     // Step 2: Parse request
-    const body = await req.json();
+    let body: any;
+    try {
+      const text = await req.text();
+      console.log('[instagram-oauth] Raw request body:', text);
+      body = JSON.parse(text);
+    } catch (e) {
+      console.error('[instagram-oauth] Failed to parse request body:', e);
+      throw new Error('Invalid request body format');
+    }
+
     const { code, redirect_uri: clientRedirectUri } = body;
+    console.log('[instagram-oauth] Request params - code:', code?.substring(0, 20) + '...', 'redirect_uri:', clientRedirectUri);
     
     const instagramAppId = Deno.env.get('INSTAGRAM_APP_ID');
     const instagramAppSecret = Deno.env.get('INSTAGRAM_APP_SECRET');
