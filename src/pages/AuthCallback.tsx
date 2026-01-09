@@ -125,69 +125,108 @@ export default function AuthCallback() {
 
     const exchangeCode = async () => {
       try {
-        console.log('[AuthCallback] Starting token exchange...');
-        console.log('[AuthCallback] Code length:', code?.length);
-        console.log('[AuthCallback] Window origin:', window.location.origin);
+        console.log('=== OAuth Callback Debug ===');
+        console.log('1. Code received:', code?.substring(0, 20) + '...');
+        console.log('2. Origin:', window.location.origin);
         
-        // Get saved provider from storage
+        // Get provider
         const savedProvider = localStorage.getItem('oauth_provider') || 
                              sessionStorage.getItem('oauth_provider') || 
                              'facebook';
         
-        console.log('[AuthCallback] Detected provider:', savedProvider);
+        console.log('3. Provider:', savedProvider);
         
-        // Determine edge function to call
         const edgeFunction = savedProvider === 'instagram' ? 'instagram-oauth' : 'facebook-oauth';
-        console.log('[AuthCallback] Calling edge function:', edgeFunction);
+        console.log('4. Edge function:', edgeFunction);
         
-        // Verify session is still valid
+        // CRITICAL: Get fresh session
+        console.log('5. Getting fresh session...');
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError || !sessionData.session) {
-          console.error('[AuthCallback] No valid session:', sessionError);
-          throw new Error('Você precisa estar logado para conectar uma conta. Por favor, faça login novamente.');
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw new Error('Erro de autenticação. Por favor, faça login novamente.');
         }
         
-        console.log('[AuthCallback] Session valid, user ID:', sessionData.session.user.id);
+        if (!sessionData?.session) {
+          console.error('No session found');
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
         
-        // Construct request body
+        console.log('6. Session valid, user:', sessionData.session.user.id);
+        
+        // CRITICAL: Verify we can make authenticated requests
+        console.log('7. Testing Supabase connection...');
+        const { error: testError } = await supabase
+          .from('connected_accounts')
+          .select('id')
+          .limit(1);
+        
+        if (testError && !testError.message.includes('no rows')) {
+          console.error('Supabase connection test failed:', testError);
+          throw new Error('Erro de conexão com o banco de dados. Tente novamente.');
+        }
+        
+        console.log('8. Supabase connection OK');
+        
+        // Prepare request
         const requestBody = { 
           code,
           redirect_uri: `${window.location.origin}/auth/callback`,
         };
         
-        console.log('[AuthCallback] Request body:', JSON.stringify(requestBody, null, 2));
-        console.log('[AuthCallback] Making supabase.functions.invoke call...');
+        console.log('9. Calling edge function with body:', requestBody);
         
+        // Make the request with explicit headers
         const { data, error } = await supabase.functions.invoke(edgeFunction, {
           body: requestBody,
+          headers: {
+            'Content-Type': 'application/json',
+          },
         });
         
-        console.log('[AuthCallback] Edge function response received');
-        console.log('[AuthCallback] Error:', error);
-        console.log('[AuthCallback] Data:', data);
+        console.log('10. Edge function responded');
+        console.log('Error:', error);
+        console.log('Data:', data);
 
+        // Clear provider
+        localStorage.removeItem('oauth_provider');
+        sessionStorage.removeItem('oauth_provider');
+
+        // Handle errors
         if (error) {
-          console.error('[AuthCallback] Edge function error:', error);
+          console.error('Edge function error details:', {
+            message: error.message,
+            context: error.context,
+          });
           
-          if (error.message?.includes('Failed to send a request')) {
-            throw new Error(`Erro de conexão com o servidor. Verifique se as Edge Functions estão deployadas. Detalhes: ${error.message}`);
+          if (error.message?.includes('Failed to send')) {
+            throw new Error('Erro de rede. Verifique sua conexão e tente novamente.');
           }
           
           throw new Error(error.message || 'Erro ao processar autorização');
         }
 
         if (!data) {
-          console.error('[AuthCallback] No data returned from edge function');
-          throw new Error('Resposta vazia do servidor.');
+          console.error('No data returned');
+          throw new Error('Resposta vazia do servidor');
         }
 
         if (!data.success) {
-          console.error('[AuthCallback] API error:', data.error);
+          console.error('API returned error:', data.error);
+          
+          if (data.error?.includes('Business')) {
+            throw new Error('Apenas contas Instagram Business ou Creator podem ser conectadas.');
+          }
+          
+          if (data.error?.includes('Page')) {
+            throw new Error('Sua conta Instagram deve estar vinculada a uma Página do Facebook.');
+          }
+          
           throw new Error(data.error || 'Erro ao conectar conta');
         }
 
-        console.log('[AuthCallback] Success! Account connected:', data);
+        console.log('11. Success! Account:', data.username);
         
         setAccountInfo({
           username: data.username,
@@ -208,19 +247,21 @@ export default function AuthCallback() {
         }, 3000);
 
       } catch (err) {
-        console.error('[AuthCallback] Error in exchangeCode:', err);
+        console.error('=== OAuth Error ===');
+        console.error('Error object:', err);
+        
         setStatus('error');
         
         const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
         
-        if (errorMsg.includes('Only Instagram Business')) {
+        if (errorMsg.includes('Sessão') || errorMsg.includes('autenticação')) {
+          setErrorMessage('Sua sessão expirou. Por favor, volte para a página de login e tente novamente.');
+        } else if (errorMsg.includes('Business')) {
           setErrorMessage('Apenas contas Instagram Business ou Creator podem ser conectadas. Converta sua conta nas configurações do Instagram.');
-        } else if (errorMsg.includes('No Instagram Business Account')) {
-          setErrorMessage('Nenhuma conta Instagram Business encontrada. Certifique-se de que sua conta é Business ou Creator e está vinculada a uma Página do Facebook.');
-        } else if (errorMsg.includes('already connected')) {
-          setErrorMessage('Esta conta já está conectada.');
-        } else if (errorMsg.includes('Failed to send a request')) {
-          setErrorMessage(`${errorMsg} | Possíveis causas: 1) Edge functions não deployadas, 2) Problema de rede.`);
+        } else if (errorMsg.includes('Page') || errorMsg.includes('Facebook')) {
+          setErrorMessage('Sua conta Instagram deve estar vinculada a uma Página do Facebook. Configure isso nas configurações do Instagram.');
+        } else if (errorMsg.includes('rede') || errorMsg.includes('conexão')) {
+          setErrorMessage('Erro de conexão. Verifique sua internet e tente novamente.');
         } else {
           setErrorMessage(errorMsg);
         }
