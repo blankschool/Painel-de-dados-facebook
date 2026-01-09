@@ -27,37 +27,28 @@ import {
 } from 'lucide-react';
 
 // ============================================
-// OAUTH CONFIGURATION - SEPARATE APP IDS
+// OAUTH CONFIGURATION
 // ============================================
 
-// Facebook App ID for Facebook OAuth
+// Facebook App ID - used for BOTH Instagram and Facebook OAuth
+// Instagram Business API requires Facebook OAuth (Pages → Business Account flow)
 const FACEBOOK_APP_ID = '698718192521096';
-
-// Instagram App ID for Instagram OAuth (separate app)
-const INSTAGRAM_APP_ID = '1728352261135208';
 
 // Get redirect URI - MUST match exactly what's configured in Facebook Developer Console
 const getRedirectUri = (): string => {
   return `${window.location.origin}/auth/callback`;
 };
 
-// Facebook OAuth scopes (Facebook login endpoint)
+// Facebook OAuth scopes (used for both Instagram and Facebook buttons)
 const FACEBOOK_SCOPES = [
   'instagram_basic',
-  'instagram_manage_insights', 
+  'instagram_manage_insights',
   'instagram_manage_comments',
   'instagram_manage_messages',
   'instagram_content_publish',
   'pages_show_list',
   'business_management'
 ].join(',');
-
-// Instagram OAuth scopes (Instagram login endpoint)
-// ONLY request essential permissions to match working reference
-const INSTAGRAM_SCOPES = [
-  'instagram_business_basic',
-  'instagram_business_manage_insights'
-].join('-'); // Note: Instagram uses hyphen separator, not comma
 
 // Generate secure random state for CSRF protection
 function generateSecureState(): string {
@@ -194,15 +185,19 @@ export default function Connect() {
     navigate('/auth');
   };
 
-  // Handler for Instagram OAuth (instagram.com endpoint)
+  // IMPORTANT: Both Instagram and Facebook buttons now use Facebook OAuth!
+  // This is because Instagram Business API requires Facebook Pages → Business Account flow.
+  // The only difference is which edge function processes the result (for provider labeling).
+
+  // Handler for Instagram button (uses Facebook OAuth, calls instagram-oauth function)
   const handleInstagramConnect = () => {
-    setUsingFacebookOAuth(false);
+    setUsingFacebookOAuth(false); // Save provider='instagram', will call instagram-oauth edge function
     setShowInstructions(true);
   };
 
-  // Handler for Facebook OAuth (facebook.com endpoint) 
+  // Handler for Facebook button (uses Facebook OAuth, calls facebook-oauth function)
   const handleFacebookConnect = () => {
-    setUsingFacebookOAuth(true);
+    setUsingFacebookOAuth(true); // Save provider='facebook', will call facebook-oauth edge function
     setShowInstructions(true);
   };
 
@@ -220,13 +215,12 @@ export default function Connect() {
     const redirectUri = getRedirectUri();
     const timestamp = Date.now().toString();
 
-    // Determine which App ID to use
-    const appId = usingFacebookOAuth ? FACEBOOK_APP_ID : INSTAGRAM_APP_ID;
+    // Determine provider (both use Facebook OAuth, but different edge functions)
     const provider = usingFacebookOAuth ? 'facebook' : 'instagram';
 
     console.log('=== OAuth Configuration Debug ===');
     console.log('Provider:', provider);
-    console.log('App ID:', appId);
+    console.log('App ID:', FACEBOOK_APP_ID);
     console.log('Redirect URI:', redirectUri);
     console.log('State:', state);
     console.log('================================');
@@ -245,44 +239,19 @@ export default function Connect() {
     document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
     document.cookie = `oauth_timestamp=${timestamp}; path=/; max-age=600; SameSite=Lax`;
 
-    // Build OAuth URL based on selected provider
-    let authUrl: string;
+    // Build OAuth URL - BOTH buttons now use Facebook OAuth!
+    // Instagram Business API requires Facebook Pages flow
+    const params = new URLSearchParams({
+      client_id: FACEBOOK_APP_ID,
+      redirect_uri: redirectUri,
+      scope: FACEBOOK_SCOPES,
+      response_type: 'code',
+      state: state,
+    });
 
-    if (usingFacebookOAuth) {
-      // FACEBOOK OAUTH (facebook.com endpoint)
-      const params = new URLSearchParams({
-        client_id: FACEBOOK_APP_ID,
-        redirect_uri: redirectUri,
-        scope: FACEBOOK_SCOPES,
-        response_type: 'code',
-        state: state,
-      });
-
-      authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
-      console.log('[OAuth] Facebook OAuth URL:', authUrl);
-      
-    } else {
-      // INSTAGRAM BUSINESS LOGIN (instagram.com/consent endpoint)
-      // This endpoint supports Instagram Business API access
-      const paramsJson = {
-        client_id: INSTAGRAM_APP_ID,
-        redirect_uri: redirectUri,
-        response_type: 'code',
-        state: state,
-        scope: INSTAGRAM_SCOPES,
-        logger_id: crypto.randomUUID(),
-        app_id: INSTAGRAM_APP_ID,
-        platform_app_id: INSTAGRAM_APP_ID
-      };
-
-      const params = new URLSearchParams({
-        flow: 'ig_biz_login_oauth',
-        params_json: JSON.stringify(paramsJson)
-      });
-
-      authUrl = `https://www.instagram.com/consent/?${params.toString()}&source=oauth_permissions_page_www`;
-      console.log('[OAuth] Instagram Business Login URL:', authUrl);
-    }
+    const authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
+    console.log('[OAuth] Using Facebook OAuth for', provider, 'provider');
+    console.log('[OAuth] OAuth URL:', authUrl);
 
     // Redirect after short delay
     setTimeout(() => {
