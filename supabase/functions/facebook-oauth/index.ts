@@ -82,16 +82,20 @@ serve(async (req) => {
     const instagramAppId = Deno.env.get('INSTAGRAM_APP_ID') || facebookClientId;
     const instagramAppSecret = Deno.env.get('INSTAGRAM_APP_SECRET') || facebookClientSecret;
     
-    // Use client-provided redirect URI or construct from origin
+    // CRITICAL: Use the EXACT redirect_uri provided by client
+    // This MUST match what was used when initiating OAuth
     let redirectUri: string;
     if (clientRedirectUri) {
       redirectUri = clientRedirectUri;
+      console.log('[facebook-oauth] Using client-provided redirect URI:', redirectUri);
     } else if (origin) {
       redirectUri = `${origin}/auth/callback`;
+      console.log('[facebook-oauth] Constructed redirect URI from origin:', redirectUri);
     } else {
-      redirectUri = 'https://painel-de-dados-instagram.lovable.app/auth/callback';
+      // Fallback - this should never happen
+      redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
+      console.warn('[facebook-oauth] Using fallback redirect URI:', redirectUri);
     }
-    console.log('[facebook-oauth] Constructed redirect URI:', redirectUri);
 
     if (!facebookClientId || !facebookClientSecret) {
       console.error('[facebook-oauth] Missing Facebook credentials');
