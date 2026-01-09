@@ -30,8 +30,8 @@ import {
 // OAUTH CONFIGURATION - CRITICAL SECTION
 // ============================================
 
-// Your Facebook App ID (same for both Instagram and Facebook OAuth)
-const FACEBOOK_APP_ID = '1728352261135208';
+// Main Facebook App ID for "Painel de Dados"
+const FACEBOOK_APP_ID = '698718192521096';
 
 // Get redirect URI - MUST match exactly what's configured in Facebook Developer Console
 const getRedirectUri = (): string => {
