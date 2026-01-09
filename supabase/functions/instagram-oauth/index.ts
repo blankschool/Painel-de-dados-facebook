@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = [
   'https://painel-de-dados-instagram.lovable.app',
+  'https://insta-glow-up-39.lovable.app',
   'http://localhost:5173',
   'http://localhost:8080',
 ];
@@ -62,19 +63,9 @@ serve(async (req) => {
     }
     console.log('[instagram-oauth] User authenticated:', user.id);
 
-    // Step 2: Parse request (same as facebook-oauth)
+    // Step 2: Parse and validate request body (same as facebook-oauth)
     console.log('[instagram-oauth] Step 2: Parsing request body...');
-    let body: any;
-    try {
-      body = await req.json();
-      console.log('[instagram-oauth] Body parsed successfully:', typeof body);
-      console.log('[instagram-oauth] Body keys:', Object.keys(body || {}));
-    } catch (e) {
-      console.error('[instagram-oauth] Failed to parse body with req.json():', e);
-      console.error('[instagram-oauth] Error message:', e instanceof Error ? e.message : String(e));
-      throw new Error(`Failed to parse request body: ${e instanceof Error ? e.message : String(e)}`);
-    }
-
+    const body = await req.json();
     const { code, redirect_uri: clientRedirectUri } = body;
     console.log('[instagram-oauth] Request params - code:', code?.substring(0, 20) + '...', 'redirect_uri:', clientRedirectUri);
     

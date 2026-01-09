@@ -186,13 +186,11 @@ export default function AuthCallback() {
 
         console.log('9. Calling edge function:', edgeFunction);
         console.log('   Request body:', JSON.stringify(requestBody));
-        
-        // Make the request with explicit headers
+
+        // Make the request - Supabase SDK handles JSON serialization automatically
+        // Remove explicit headers as the SDK sets them correctly
         const { data, error } = await supabase.functions.invoke(edgeFunction, {
           body: requestBody,
-          headers: {
-            'Content-Type': 'application/json',
-          },
         });
         
         console.log('10. Edge function responded');
