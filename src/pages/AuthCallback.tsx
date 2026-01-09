@@ -86,12 +86,20 @@ export default function AuthCallback() {
     hasProcessedRef.current = true;
 
     // State verification (lenient mode)
-    const savedState = localStorage.getItem('oauth_state') || 
-                       sessionStorage.getItem('oauth_state') || 
+    const savedState = localStorage.getItem('oauth_state') ||
+                       sessionStorage.getItem('oauth_state') ||
                        getCookie('oauth_state');
+
+    // IMPORTANT: Read these BEFORE clearOAuthState() is called
+    const savedRedirectUri = localStorage.getItem('oauth_redirect_uri') ||
+                            sessionStorage.getItem('oauth_redirect_uri');
+    const savedProvider = localStorage.getItem('oauth_provider') ||
+                         sessionStorage.getItem('oauth_provider');
     
     console.log('[AuthCallback] === OAuth Callback Debug Info ===');
     console.log('[AuthCallback] URL:', window.location.href);
+    console.log('[AuthCallback] Saved redirect_uri:', savedRedirectUri);
+    console.log('[AuthCallback] Saved provider:', savedProvider);
     console.log('[AuthCallback] Received state:', state);
     console.log('[AuthCallback] Saved state (localStorage):', localStorage.getItem('oauth_state'));
     console.log('[AuthCallback] Saved state (sessionStorage):', sessionStorage.getItem('oauth_state'));
@@ -129,19 +137,15 @@ export default function AuthCallback() {
         console.log('1. Code received:', code?.substring(0, 20) + '...');
         console.log('2. Origin:', window.location.origin);
         
-        // Get provider - try to determine from URL if not in storage
-        let savedProvider = localStorage.getItem('oauth_provider') ||
-                           sessionStorage.getItem('oauth_provider');
-
-        // If no provider saved, try to detect from URL patterns or default to instagram
+        // Use the provider we saved BEFORE clearOAuthState() was called
+        const provider = savedProvider || 'instagram';
         if (!savedProvider) {
           console.warn('[AuthCallback] No provider in storage, defaulting to instagram');
-          savedProvider = 'instagram';
         }
 
-        console.log('3. Provider:', savedProvider);
+        console.log('3. Provider:', provider);
 
-        const edgeFunction = savedProvider === 'instagram' ? 'instagram-oauth' : 'facebook-oauth';
+        const edgeFunction = provider === 'instagram' ? 'instagram-oauth' : 'facebook-oauth';
         console.log('4. Edge function:', edgeFunction);
         
         // CRITICAL: Get fresh session
@@ -174,10 +178,10 @@ export default function AuthCallback() {
         
         console.log('8. Supabase connection OK');
 
-        // Prepare request - use saved redirect_uri if available, otherwise construct it
-        const savedRedirectUri = localStorage.getItem('oauth_redirect_uri') ||
-                                sessionStorage.getItem('oauth_redirect_uri');
+        // Use the redirect_uri we saved BEFORE clearOAuthState() was called
+        // This MUST match EXACTLY what was sent during authorization
         const redirectUri = savedRedirectUri || `${window.location.origin}/auth/callback`;
+        console.log('8.5. Using redirect_uri:', redirectUri);
 
         const requestBody = {
           code,
