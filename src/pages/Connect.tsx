@@ -102,8 +102,8 @@ export default function Connect() {
 
   // Re-render FB XFBML elements when SDK loads
   useEffect(() => {
-    if (isSDKLoaded && window.FB && !connectedAccount) {
-      // Parse XFBML to render the login button
+    if (isSDKLoaded && window.FB) {
+      // Parse XFBML to render the login button (even when connected, for switching accounts)
       window.FB.XFBML?.parse();
     }
   }, [isSDKLoaded, connectedAccount]);
@@ -240,6 +240,33 @@ export default function Connect() {
                     'Desconectar'
                   )}
                 </Button>
+              </div>
+
+              {/* Option to connect a different account */}
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-3">Conectar outra conta:</p>
+                <div className="flex justify-center">
+                  {isConnecting ? (
+                    <div className="flex items-center gap-2 py-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Conectando...</span>
+                    </div>
+                  ) : isSDKLoaded ? (
+                    <div 
+                      className="fb-login-button" 
+                      data-width=""
+                      data-size="medium"
+                      data-button-type="login_with"
+                      data-layout="rounded"
+                      data-auto-logout-link="false"
+                      data-use-continue-as="false"
+                      data-scope={SCOPES}
+                      data-onlogin="checkLoginState();"
+                    />
+                  ) : (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
