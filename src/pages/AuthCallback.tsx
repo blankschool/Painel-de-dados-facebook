@@ -185,13 +185,25 @@ export default function AuthCallback() {
         };
 
         console.log('9. Calling edge function:', edgeFunction);
-        console.log('   Request body:', JSON.stringify(requestBody));
+        const bodyJson = JSON.stringify(requestBody);
+        console.log('   Request body:', bodyJson);
 
-        // Make the request - Supabase SDK handles JSON serialization automatically
-        // Remove explicit headers as the SDK sets them correctly
-        const { data, error } = await supabase.functions.invoke(edgeFunction, {
-          body: requestBody,
-        });
+        // Make the request using fetch directly to avoid Supabase SDK issues
+        const response = await fetch(
+          `https://phbwmfjrgadzybqpjnoi.supabase.co/functions/v1/${edgeFunction}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionData.session.access_token}`,
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoYndtZmpyZ2FkenlicXBqbm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNTA2MDAsImV4cCI6MjA4MTYyNjYwMH0.iF3hnIAToWo58kfWkFTHiT1uqj0VkFr5XbmADWDJ6fY',
+            },
+            body: bodyJson,
+          }
+        );
+
+        const data = await response.json();
+        const error = !response.ok ? { message: data.error || 'Request failed' } : null;
         
         console.log('10. Edge function responded');
         console.log('Error:', error);
@@ -203,15 +215,12 @@ export default function AuthCallback() {
 
         // Handle errors
         if (error) {
-          console.error('Edge function error details:', {
-            message: error.message,
-            context: error.context,
-          });
-          
+          console.error('Edge function error details:', error);
+
           if (error.message?.includes('Failed to send')) {
             throw new Error('Erro de rede. Verifique sua conexão e tente novamente.');
           }
-          
+
           throw new Error(error.message || 'Erro ao processar autorização');
         }
 
