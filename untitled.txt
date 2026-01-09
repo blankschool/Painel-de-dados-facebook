@@ -1,0 +1,1297 @@
+Business Login for Instagram
+Business Login is a custom login flow that allows your app to ask for permissions to access your app user's Instagram professional account data and to get an access token to use in your app's API requests.
+
+To ensure consistency between scope values and permission names, we are introducing new scope values for the Instagram API with Instagram login. The new scope values are:
+
+instagram_business_basic
+instagram_business_content_publish
+instagram_business_manage_messages
+instagram_business_manage_comments
+These will replace the existing business_basic, business_content_publish, business_manage_comments and business_manage_messages scope values, respectively.
+
+Please note that the old scope values will be deprecated on January 27, 2025. It is essential to update your code before this date to avoid any disruption in your app's functionality. Failure to do so will result in your app being unable to call the Instagram endpoints.
+
+How it works
+Your app user launches the login flow on your app or website by clicking your embed URL link or button. This embed URL, that you set up in the App Dashboard with the permissions you are requesting from your app users, opens an authorization window. Your app user uses this window to grant your app permissions. When the user submits the login flow, Meta redirects your app user to your redirect URI and sends an authorization code. Your app can then exchange this authorization code for a short-lived Instagram User access token, an Instagram-scoped user ID for your app user, and a list of permissions the app user granted your app. Your app can exchanged this short-lived access token for a long-lived Instagram user access token that is valid for 60 days.
+
+Before you start
+If you haven't already, add the Instagram product to your app and configure your Business login settings in the Meta App Dashboard.
+
+Embed the business login URL
+You should have completed this step during Instagram app setup in the App Dashboard, but if not, complete the following steps.
+
+Copy the Embed URL from the Set up business login in the App Dashboard.
+Paste the URL in an anchor tag or button on your app or website to launch the login flow.
+Requirements
+This guide assumes you have read the Instagram Platform Overview and implemented the needed components for using this API, such as a Meta login flow and a webhooks server to receive notifications.
+
+You will need the following:
+
+Access Level
+Advanced Access if your app serves Instagram professional accounts you don't own or manage
+Standard Access if your app serves Instagram professional accounts you own or manage and have added to your app in the App Dashboard
+Endpoints
+https://www.instagram.com/oauth/authorize – To get an authorization code from your app user
+https://api.instagram.com/oauth/access_token – To exchange an authorization code for a short-lived access token
+https://graph.instagram.com/access_token – To exchange a valid short-lived access token for a long-lived access token
+https://graph.instagram.com/refresh_access_token – To refresh a valid long-lived access token for another 60 days
+IDs from the Meta App Dashboard
+In the App Dashboard > Instagram > API setup with Instagram login > 3. Set up Instagram business login > Business login settings, you will need:
+
+Your app's Instagram App ID
+Your app's Instagram App Secret
+Step 1. Get authorization
+When a person clicks your embed URL link or button to log in to your app, they are directed to an authorization window. This window allows your app users to grant your app permissions and short-lived Instagram User access tokens.
+
+Example embed URL
+Formatted for readability.
+
+https://www.instagram.com/oauth/authorize
+  ?client_id=990602627938098
+  &redirect_uri=https://my.m.redirect.net/
+  &response_type=code
+  &scope=
+    instagram_business_basic,
+    instagram_business_manage_messages,
+    instagram_business_manage_comments,
+    instagram_business_content_publish
+Query string parameters
+Parameter	Description
+client_id
+Required
+Numeric string
+
+Your app's Instagram App ID displayed in App Dashboard > Instagram > API setup with Instagram login > 3. Set up Instagram business login > Business login settings > Instagram App ID.
+
+force_reauth
+boolean
+
+Value can be true or false. When set to true it forces an app user to use their Instagram professional account credentials to log into your app even if the user is logged into Instagram.
+
+redirect_uri
+Required
+String
+
+A URI where we will redirect users after they allow or deny permission request. Make sure this exactly matches one of the base URIs in your list of valid OAuth URIs you set during API setup in the App Dashboard. Keep in mind that the App Dashboard might have added a trailing slash to your URIs, so we recommend that you verify by checking the list. App Dashboard > Instagram > API setup with Instagram login > 3. Set up Instagram business login > Business login settings> OAuth redirect URIs.
+
+response_type
+Required
+String
+
+Set this value to code.
+
+scope
+Required
+List
+
+A comma-separated or URL-encoded space-separated list of permissions to request from the app user.
+
+state
+String
+
+An optional value indicating a server-specific state. For example, you can use this to protect against CSRF issues. We will include this parameter and value when redirecting the user back to you.
+
+Successful authorization
+If authorization is successful, we will redirect your app user to your redirect_uri and pass you an Authorization Code through the code query string parameter. This code is valid for 1 hour and can only be used once.
+
+Capture the code so your app can exchange it for a short-lived Instagram User access token.
+
+Example redirect URI response
+https://my.m.redirect.net/?code=abcdefghijklmnopqrstuvwxyz#_
+NOTE: The #_ appended to the end of the redirect URI is not part of the code itself, so strip it out.
+
+Canceled authorization
+If the user cancels the authorization flow, we will redirect the user to your redirect_uri and attach the following error parameters. It is your responsibility to fail gracefully in these situations and display an appropriate message to your app users.
+
+Parameter	Value
+error
+
+access_denied
+
+error_reason
+
+user_denied
+
+error_description
+
+The+user+denied+your+request
+
+Sample Canceled Authorization Redirect
+Formatted for readability.
+
+https://my.m.redirect.net/auth/
+  ?error=access_denied
+  &error_reason=user_denied
+  &error_description=The+user+denied+your+request
+Step 2. Exchange the Code For a Token
+To get the access token, send a POST request to the https://api.instagram.com/oauth/access_token endpoint with the following parameters:
+
+client_id set to your app's Instagram app ID from the App Dashboard
+client_secret set to your app's Instagram App Secret from the App Dashboard
+grant_type set to authorization_code
+redirect_uri set to your redirect URI
+code set to the code value from the redirect URI response
+Sample request
+Formatted for readability.
+
+curl -X POST https://api.instagram.com/oauth/access_token \
+  -F 'client_id=990602627938098' \
+  -F 'client_secret=a1b2C3D4' \
+  -F 'grant_type=authorization_code' \
+  -F 'redirect_uri=https://my.m.redirect.net/' \
+  -F 'code=AQBx-hBsH3...'
+On success, your app receives a JSON response containing the app user's short-lived access token, their Instagram App-scoped User ID, and a list of the permissions granted by the app user.
+
+{
+  "data": [
+    {
+      "access_token": "EAACEdEose0...", 
+      "user_id": "1020...",                // Your app user's Instagram-scoped user ID
+      "permissions": "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish"
+    }
+  ]
+}         
+Capture the access_token value. This is the user’s short-lived Instagram User access token which your app can use to access Instagram API with Instagram Login endpoints.
+
+Parameter reference
+Parameter	Sample Value	Description
+client_id
+Required
+Numeric string
+
+990602627938098
+
+Your app's Instagram App ID displayed in App Dashboard > Instagram > API setup with Instagram login > 3. Set up Instagram business login > Business login settings > Instagram App ID.
+
+client_secret
+Required
+String
+
+a1b2C3D4
+
+Your Instagram App Secret displayed in App Dashboard > Instagram > API setup with Instagram login > 3. Set up Instagram business login > Business login settings > Instagram app secret.
+
+code
+Required
+String
+
+AQBx-hBsH3...
+
+The authorization code we passed you in the code parameter when redirecting the user to your redirect_uri.
+
+grant_type
+Required
+String
+
+authorization_code
+
+Set this value to authorization_code.
+
+redirect_uri
+Required
+String
+
+https://my.m.redirect.net/
+
+The redirect URI you passed us when you directed the user to our Authorization Window. This must be the same URI or we will reject the request. App Dashboard > Instagram > API setup with Instagram login > 3. Set up Instagram business login > Business login settings> OAuth redirect URIs.
+
+Sample Rejected Response
+If the request is malformed in some way, the API will return an error.
+
+{
+  "error_type": "OAuthException",
+  "code": 400,
+  "error_message": "Matching code was not found or was already used"
+}
+Step 3. Get a long-lived access token
+You can exchange your app user's short-lived access token for a long-lived access token that is valid for 60 days.
+
+Requirements
+The short-lived access token must be valid (not expired)
+Requests for long-lived tokens must be made in server-side code. These requesting include your app secret which you never want to expose in client-side code or in an app binary that could be decompiled. Do not share your app secret with anyone, expose it in code, send it to a client, or store it in a device.
+To get a long-lived access token, send a GET request to the /access_token endpoint with the following parameters:
+
+grant_type set to ig_exchange_token
+client_secret set to your Instagram app secret
+Your app user's valid (unexpired) short-lived Instagram user access token
+Sample Requests
+Formatted for readability.
+
+curl -i -X GET "https://graph.instagram.com/access_token
+  ?grant_type=ig_exchange_token
+  &client_secret=a1b2C3D4
+  &access_token=EAACEdEose0..."
+On success, your app receives a JSON response with your app user's long-lived access token, the token type, and the expiration.
+
+{
+  "access_token":"EAACEdEose0...",
+  "token_type": "bearer",
+  "expires_in": 5183944  // Number of seconds until token expires
+}
+Refresh a long-lived token
+Your app user's long-lived access token can be refreshed for another 60 days as long as the existing conditions are true:
+
+The existing long-lived access token is at least 24 hours old
+The existing long-lived access token is valide (not expired)
+The app user has granted your app the instagram_business_basic permission
+Tokens that have not been refreshed in 60 days will expire and can no longer be refreshed.
+
+To exchange your app user's long-lived token that is set to expire, send a GET request to the /refresh_access_token endpoint with the following parameters:
+
+grant_type set to ig_refresh_token
+access_token set to the long-lived access token that is about to expire
+Sample Requests
+Formatted for readability.
+
+curl -i -X GET "https://graph.instagram.com/refresh_access_token
+  ?grant_type=ig_refresh_token
+  &access_token=EAACEdEose0..."
+On success, your app receives a JSON response with your app user's long-lived access token, the token type, and the expiration.
+
+{
+  "access_token":"EAACEdEose0...",
+  "token_type": "bearer",
+  "expires_in": 5183944  // Number of seconds until token expires
+}
+
+Get Started
+This document explains how to make your first call using the Instagram API with Instagram Login to obtain information about your Instagram professional account, including your User ID, username, and media objects.
+
+Before You Start
+This guide assumes you have read the Instagram Platform Overview and implemented the needed components for using this API, such as a Meta login flow and a webhooks server to receive notifications.
+
+If your current Meta app type is not a Business type app you will need to create a new app and select Business during the creation process. If this new app needs Advanced Access, App Review is required.
+
+Get an access token
+An access token contains information about the app making the request, the token's expiration date, the app user's Instagram User ID and the permissions the user has granted the app. You can get an Instagram user access token using one of the following methods:
+
+Business Login for Instagram 
+If you have implemented Business Login for Instagram into your app, log in to your app.
+
+App Dashboard 
+If you have not implemented Business Login for Instagram, Get an access token via the App Dashboard.
+
+In your app dashboard, click Instagram > API setup with Instagram business login in the left side menu.
+Click Generate token next to the Instagram account you want to access.
+Log into Instagram.
+Copy the access token.
+Access tokens from the business login flow are short-lived and valid for 1 hour. Access tokens from the App Dashboard are long-lived and are valid for 60 days. Learn how to extend the expiry of any access token.
+
+Get the app user ID & username
+To obtain your app user's Instagram professional account user ID and username, send a GET request to the /me endpoint with the following parameters:
+
+fields set to a comma-separated list with user_id and username
+access_token set to the access token from the app dashboard
+Note: The /me endpoint represents the app user's ID received from the access token, in this example, your user ID.
+
+Example request
+Formatted for readability.
+
+curl -i -X GET \
+ "https://graph.instagram.com/v24.0/me
+      ?fields=user_id,username
+      &access_token=Ealkdfj..."
+On success, your app receives a JSON object with the app user's Instagram user ID and the username of the Instagram professional account.
+
+{
+  "data": [
+    {
+      "user_id": "<IG_ID>"
+      "username": "<IG_USERNAME>"
+    }
+  ]
+}         
+Fields
+You can use the fields query string parameter to request the following fields on a User.
+
+Field Name	Description
+id
+
+The app user's app-scoped ID
+
+user_id
+
+The Instagram professional acount ID, <IG_ID>, for your app user. This ID is value of the id field received in webhook notifications for this account.
+
+username
+
+The app user's Instagram username.
+
+name
+
+The app user's name
+
+account_type
+
+The app user's account type. Can be Business or Media_Creator.
+
+profile_picture_url
+
+The URL for the app user's profile picture.
+
+followers_count
+
+The number of followers of the app user's Instagram professional account
+
+follows_count
+
+The number of Instagram accounts the app user's Instagram professional account follows
+
+media_count
+
+The number of Media object on the User
+
+Get an app user's media objects
+To get media objects, send a GET request to the /<IG_ID>/media endpoint.
+
+Example request
+Formatted for readability.
+
+curl -i -X GET \
+ "https://graph.instagram.com/v24.0/<IG_ID>/media?access_token=<INSTAGRAM_USER_ACCESS_TOKEN>"
+On success your app receives a JSON object with the IDs of all the IG Media objects on the IG User:
+
+{
+  "data": [
+    {
+      "id": "17918195224117851"
+    },
+    {
+      "id": "17895695668004550"
+    },
+    {
+      "id": "17899305451014820"
+    },
+    {
+      "id": "17896450804038745"
+    },
+    {
+      "id": "17881042411086627"
+    },
+    {
+      "id": "17869102915168123"
+    }
+  ],
+  "paging": {
+    "cursors": {
+      "before": "QVFIUkdGRXA2eHNNTUs4T1ZAXNGFxQTAtd3U4QjBLd1B2NXRMM1NkcnhqRFdBcEUzSDVJZATFoLWtXMWZAGU2VrRTk2RHVtTVlDckI2NjN0UERFa2JrUk4yMW13",
+      "after": "QVFIUmlwbnFsM3N2cV9lZAFdCa0hDeV9qMVliT0VuMmJyNENxZA180c0t6VjFQVEJaTE9XV085aU92OUFLNFB6Szd2amo5aV9rTlVBcnNlWmEtMzYxcE1HSFR3"
+    }
+  }
+}
+If you are able to perform this final query successfully, you should be able to perform queries using any of the Instagram API with Instagram Login endpoints — just see our various guides and references to learn what each endpoint can do and what permissions they require.
+
+Get Conversations
+This document explains how to get information about conversations between your app user and an Instagram user interested in your app user's Instagram media. You can get:
+
+A list of conversations for your app user's Instagram professional account
+A list of messages within each conversation
+Details about each message including when the message was sent and from who
+Requirements
+This guide assumes you have read the Instagram Platform Overview and implemented the needed components for using this API, such as a Meta login flow and a webhooks server to receive notifications.
+
+You will need the following:
+
+Access Level
+Advanced Access if your app serves Instagram professional accounts you don't own or manage
+Standard Access if your app serves Instagram professional accounts you own or manage and have added to your app in the App Dashboard
+Access tokens
+An Instagram User access token requested from a person who can manage messages on the Instagram professional account
+Base URL
+All endpoints can be accessed via the graph.instagram.com host.
+
+Endpoints
+/<IG_ID>/conversations or /me/conversations
+IDs
+The ID for the Instagram professional account (<IG_ID>)
+The Instagram-scoped ID for the Instagram user in the conversation
+Permissions
+instagram_business_basic
+instagram_business_manage_messages
+Limitations
+Only the image or video URL for a share will be included in the data returned in a call to the API or in the webhooks notification.
+
+Conversations that are within the Requests folder that have not been active for 30 days will not be returned in API calls.
+
+Get a List of Conversations
+To get a list of your app user's conversations for an Instagram professional account, send a GET request to the /<IG_ID>/conversations endpoint.
+
+Sample Request
+Formatted for readability
+curl -i -X GET "https://graph.instagram.com/v24.0/me/conversations
+    ?platform=instagram
+    &access_token=<INSTAGRAM_ACCESS_TOKEN>"
+On success, your app will receive a JSON object with a list of IDs for the conversations between you and a person and the most recent time a message was sent.
+
+{
+  "data": 
+    {
+      "id": "<CONVERSATION_ID_1",  
+      "updated_time": "<UNIX_TIMESTAMP>"
+    },
+    {
+      "id": "<CONVERSATION_ID_2",   
+      "updated_time": "<UNIX_TIMESTAMP>"
+    }
+    ...
+  ]
+} 
+Find a conversation with a specific person
+To get a conversation between your app user's Instagram professional account and a specific Instagram user, send a GET request to the /<IG_ID>/conversations endpoint with the following parameters:
+
+user_id parameter set to the Instagram-scoped ID for the Instagram user in the conversation
+Sample Request
+Formatted for readability
+curl -i -X GET "https://graph.instagram.com/v24.0/me/conversations
+    ?user_id=<IGSID>
+    &access_token=<INSTAGRAM_ACCESS_TOKEN>"
+On success, your app will receive the ID for the conversation.
+
+{
+  "data": [
+      {
+        "id": "<CONVERSATION_ID>
+      },
+  ]
+} 
+Get a List of Messages in a Conversation
+To get a list of messages in a conversations, send a GET request to the /<CONVERSATION_ID> endpoint with the fields parameter set to messages.
+
+Sample Request
+Formatted for readability
+curl -i -X GET "https://graph.instagram.com/v24.0/<CONVERSATION_ID>
+    &fields=messages
+    &access_token=<INSTAGRAM_ACCESS_TOKEN>"
+On success, your app will receive a list of message IDs and the time each message was created.
+
+{
+  "messages": {
+    "data": [
+      {
+        "id": "<MESSAGE_1_ID>",      
+        "created_time": "<UNIX_TIMESTAMP_MOST_RECENT_MESSAGE>"  
+      },
+      {
+        "id": "<MESSAGE_2_ID>",
+        "created_time": "<UNIX_TIMESTAMP>"
+      },
+      {
+        "id": "<MESSAGE_3_ID>",
+        "created_time": "<UNIX_TIMESTAMP>"
+      },
+...
+    ]
+  },
+  "id": "<CONVERSATION_ID>", 
+}
+Get information about a message
+To get information about a message, such as the sender, receiver, and message content, send a GET request to the /<MESSAGE_ID> endpoint with the fields parameter set to a comma separated list of fields you are interested in.
+
+Default fields are id and created_time.
+
+Note: Queries to the /<CONVERSATION_ID> endpoint will return all message IDs in a conversation. However, you can only get details about the 20 most recent messages in the conversation. If you query a message that is older than the last 20, you will see an error that the message has been deleted.
+
+Sample request
+Formatted for readability
+curl -i -X GET "https://graph.instagram.com/v24.0/<MESSAGE_ID>
+    &fields=id,created_time,from,to,message
+    &access_token=<INSTAGRAM_ACCESS_TOKEN>"
+On success, your app will receive a JSON response with a list of fields that you requested and values for each.
+
+Example reponse
+{
+  "id": "aWdGGiblWZ...",
+  "created_time": "2022-07-12T19:11:07+0000",
+  "to": {
+    "data": [
+      {
+        "username": "<IG_ID_USERNAME>",
+        "id": "<IG_ID>"
+      }
+    ]
+  },
+  "from": {
+    "username": "<IGSID_USERNAME>",
+    "id": "<IGSID>"
+  },
+  "message": "Hi Kitty!"
+}
+
+Insights de mídia do Instagram
+Representa as métricas de interação social no objeto de mídia do usuário do seu app no Instagram.
+
+Instagram Insights are now available for Instagram API with Instagram Login. Learn more.
+
+Estamos lançando a métrica views para os tipos de produto de mídia FEED, STORY e REELS.
+
+As seguintes métricas foram descontinuadas na versão 22.0 e ficarão obsoletas em todas as versões a partir do dia 21 de abril de 2025:
+
+plays
+clips_replays_count
+ig_reels_aggregated_all_plays_count
+impressions
+Observação: solicitações de API com a métrica impressions continuarão a retornar dados para mídias criadas no dia 1º de julho de 2024 ou antes na versão 21.0 e em versões anteriores. Solicitações de API feitas após 21 de abril de 2025 para mídias criadas no dia 2 de julho de 2024 ou depois retornarão um erro.
+
+A métrica video_views ficou obsoleta.
+
+Consulte o Registro de alterações da plataforma do Instagram para ver mais informações.
+
+Criação
+Esta operação não é compatível.
+
+Leitura
+GET /<INSTAGRAM_MEDIA_ID>/insights
+
+Obtenha dados de insights sobre um objeto de mídia do Instagram.
+
+Limitações
+Caso os dados de análise solicitados não existam ou estejam indisponíveis, a API retornará um conjunto vazio, em vez de 0 para as métricas individuais.
+Pode haver um atraso de até 48 horas nos dados usados para calcular as métricas.
+Os dados de métricas são armazenados por até 2 anos.
+A API lista somente métricas de interação orgânica. Não serão contabilizadas as interações em anúncios com um objeto de mídia.
+Métricas de álbum
+Não serão disponibilizados dados de análise sobre mídias que pertencem a um álbum de mídia do Instagram.
+Métricas de mídia de stories
+As métricas de mídia de story só ficam disponíveis por 24 horas.
+Configure webhooks do Instagram e assine o campo story_insights para receber insights sobre stories antes da expiração. Você poderá receber dados depois da expiração caso o story seja adicionado a um destaque. Os resultados podem ser diferentes em chamadas de API, notificações de API e interfaces do usuário.
+As métricas de mídia de stories com valores menores que 5 retornam o código de erro 10 com a mensagem (#10) Not enough viewers for the media to show insights.
+Para stories criados por usuários na Europa e no Japão, a métrica replies agora retorna o valor 0.
+Respostas publicadas por usuários na Europa e no Japão não são incluídas nos cálculos de replies para métricas de mídia de stories.
+Webhooks
+Não há compatibilidade com o webhook de insights para a API do Instagram com Login do Instagram.
+Requisitos
+Instagram API with Instagram Login	Instagram API with Facebook Login
+Access Tokens
+
+Instagram User access token
+Facebook User access token
+Host URL
+
+graph.instagram.com
+
+graph.facebook.com
+
+Login Type
+
+Business Login for Instagram
+
+Facebook Login for Business
+
+Permissions	
+instagram_business_basic
+instagram_business_manage_insights
+instagram_basic
+instagram_manage_insights
+pages_read_engagement
+If the app user was granted a role on the Page connected to your app user's Instagram professional account via the Business Manager, your app will also need:
+
+ads_management
+ads_read
+Sintaxe da solicitação
+GET "https://<HOST_URL>/<API_VERSION>/<INSTAGRAM_MEDIA_ID>/insights ?metric=<LIST_OF_METRICS> &period=<LIST_OF_TIME_PERIODS> &breakdown=<LIST_OF_BREAKDOWNS> &access_token=<ACCESS_TOKEN>"
+Parâmetros de caminho
+
+Espaço reservado	Valor
+<API_VERSION>
+
+A versão mais recente é:v24.0	
+A versão da API que seu app está usando. Caso não esteja especificado nas chamadas de API, esta será a versão mais recente no momento da criação do seu app da Meta; se essa opção não for mais válida, será a versão mais antiga disponível. Saiba mais sobre o controle de versões.
+
+<HOST_URL>
+
+O URL de hospedagem que seu app está usando para consultar o ponto de extremidade.
+
+<INSTAGRAM_MEDIA_ID>
+
+Obrigatório. A identificação da mídia do Instagram.
+
+Parâmetros da string de consulta
+
+Chave	Espaço reservado	Valor
+access_token
+
+<ACCESS_TOKEN>
+
+Obrigatório. O token de acesso do usuário do app no Facebook ou Instagram.
+
+breakdown
+
+<LIST_OF_BREAKDOWNS>
+
+Determina como detalhar os resultados em subconjuntos.
+
+metric
+
+<LIST_OF_METRICS>
+
+Obrigatório. Uma lista separada por vírgula das métricas que devem ser retornadas.
+
+period
+
+<LIST_OF_TIME_PERIODS>
+
+Uma lista separada por vírgula dos períodos que devem ser retornados. Os valores podem ser os seguintes:
+
+day
+week
+days_28
+month
+lifetime
+total_over_range
+Métricas
+A tabela a seguir mostra as métricas e os tipos de objeto de mídia nos quais elas estão disponíveis.
+
+Metric	Media Product Type
+clips_replays_count
+
+Deprecated for v22.0 and for all versions on April 21, 2025.
+
+The number of times your reel starts to play again after an initial play of your video. This is defined as replays of 1ms or more in the same reel session.
+
+REELS
+
+comments
+
+
+Number of comments on the media object.
+
+FEED (posts)
+REELS
+
+follows
+
+
+The number of Instagram users following your app user's Instagram professional account.
+
+FEED (posts)
+STORY
+
+ig_reels_aggregated_all_plays_count
+
+Deprecated for v22.0 and for all versions on April 21, 2025.
+
+The number of times your reel starts to play or replay after an impression is already counted. This is defined as plays of 1ms or more. Replays are counted after the initial play in the same reel session.
+
+Note that this count may be greater than the sum of clips_replays_count and plays. This is because clips_replays_count and plays only count plays in the Instagram app, while ig_reels_aggregated_all_plays_count also includes plays in the Facebook app through Cross App Recommendation (XAR).
+
+REELS
+
+ig_reels_avg_watch_time
+
+
+The average amount of time spent playing the reel.
+
+REELS
+
+ig_reels_video_view_total_time
+
+
+The total amount of time the reel was played, including any time spent replaying the reel. Metric in development.
+
+REELS
+
+impressions
+
+For media created after July 2, 2024, this metric is deprecated for v22.0+ and will be deprecated for all versions on April 21, 2025. For media created before July 2, 2024, this metric will still be available.
+
+Total number of times your app user's Instagram Media object has been seen.
+
+FEED (posts)
+STORY
+
+likes
+
+
+Number of likes on the media object.
+
+FEED (posts)
+REELS
+
+navigation
+
+
+This is the total number of actions taken from your story. These are made up of metrics like exited, forward, back and next story.
+
+
+Available breakdown: story_navigation_action_type
+
+STORY
+
+plays
+
+Deprecated for v22.0 and for all versions on April 21, 2025.
+
+Number of times the reels starts to play after an impression is already counted. This is defined as video sessions with 1 ms or more of playback and excludes replays.
+
+REELS
+
+profile_activity
+
+
+The number of actions people take when they visit your profile after engaging with your post.
+
+
+Available breakdown: action_type (Available for media created after October 26, 2017.)
+
+FEED (posts)
+STORY
+
+profile_visits
+
+
+The number of times your profile was visited.
+
+FEED (posts)
+STORY
+
+reach
+
+
+Number of unique Instagram users that have seen the reel at least once. Reach is different from impressions, which can include multiple views of a reel by the same account. Metric is estimated.
+
+FEED (posts)
+REELS STORY
+
+replies
+
+
+Total number of replies (IG Comments) on the story IG Media object. Value does not include replies made by users in some regions. These regions include: Europe starting December 1, 2020 and Japan starting April 14, 2021. If the Story was created by a user in one of these regions, returns a value of 0.
+
+STORY
+
+saved
+
+
+Number of time your app user's Instagram media was saved by an Instagram user.
+
+FEED (posts)
+REELS
+
+shares
+
+
+Number of shares of the reel.
+
+FEED (posts)
+REELS STORY
+
+total_interactions
+
+
+Number of likes, saves, comments, and shares on the reel, minus the number of unlikes, unsaves, and deleted comments. Metric in development.
+
+FEED (posts)
+REELS STORY
+
+views
+
+
+Total number of times the video IG Media has been seen.
+
+Metric in development.
+
+FEED (posts)
+REELS STORY
+
+Detalhamentos
+Você também pode incluir o parâmetro breakdown em métricas específicas para dividir dados em conjuntos menores com base no valor de detalhamento especificado. Os valores podem ser os seguintes:
+
+Valor do breakdown	Valores de resposta
+action_type
+
+Compatível apenas com a métrica profile_activity.
+
+Detalha os resultados pelo componente de perfil no app nativo em que os visualizadores tocaram ou clicaram depois de ver o perfil do usuário do app.
+
+BIO_LINK_CLICKED
+CALL
+DIRECTION
+EMAIL
+OTHER
+TEXT
+story_navigation_action_type
+
+Compatível apenas com a métrica navigation.
+
+Detalha os resultados por ação de navegação executada pelo visualizador após ver a mídia dentro do app nativo. Ao adicionar todos esses tipos de ação, você obterá insights completos sobre a navegação.
+
+SWIPE_FORWARD significa "Próximo story"
+TAP_BACK significa "Voltar"
+TAP_EXIT significa "Sair"
+TAP_FORWARD significa "Avançar"
+OBSERVAÇÃO: se você solicitar uma métrica que não seja compatível com um detalhamento, a API retornará um erro ("An unknown error has occurred."). Por isso, tenha cuidado ao solicitar várias métricas em uma única consulta.
+
+Sintaxe da resposta
+Em caso de sucesso, o app receberá um objeto JSON contendo os resultados da sua consulta. Os resultados podem incluir os seguintes dados, com base nas especificações da consulta:
+
+{ "data": [ { "name": "<NAME>", "period": "<PERIOD>", "values": [ { "value": <VALUE> } ], "title": "<TITLE>", "description": "<DESCRIPTION>", "total_value": { "value":<VALUE>, "breakdowns": [ { "dimension_keys": [ "<DIMENSION_KEY_1>", "<DIMENSION_KEY_2>" ... ], "results": [ { "dimension_values": [ "<DIMENSION_VALUE_1>", "<DIMENSION_VALUE_2>" ... ], "value": <VALUE> }, ... ] } ] }, "id": "<ID>" } ] }
+Conteúdo da resposta
+Propriedade	Tipo de valor	Descrição
+data
+
+Matriz
+
+Uma matriz contendo um objeto que descreve os resultados das suas solicitações.
+
+name
+
+String
+
+Nome da métrica.
+
+period
+
+String
+
+Período solicitado. O período é automaticamente definido como lifetime na solicitação, e não é possível alterá-lo. Assim, esse valor será sempre lifetime.
+
+values
+
+Matriz
+
+Uma matriz contendo um objeto que descreve os valores solicitados da métrica.
+
+value
+
+Número inteiro
+
+Para data.values.value, a soma dos valores solicitados da métrica.
+
+
+Para data.total_value.value, a soma dos valores solicitados de detalhamento.
+
+
+Para data.total_value.breakdowns.results.value, a soma dos valores de conjunto de detalhamento.
+
+title
+
+String
+
+Título da métrica.
+
+description
+
+String
+
+Descrição da métrica.
+
+id
+
+String
+
+Uma string que descreve os parâmetros do caminho da consulta.
+
+total_value
+
+Objeto
+
+Objeto que descreve os valores solicitados de detalhamento (caso tenham sido solicitados detalhamentos).
+
+breakdowns
+
+Matriz
+
+Uma matriz de objetos que descreve os detalhamentos solicitados e os respectivos resultados.
+
+dimension_keys
+
+Matriz
+
+Matriz de strings que descreve os detalhamentos solicitados.
+
+results
+
+Matriz
+
+Uma matriz de objetos que descreve cada conjunto de detalhamentos.
+
+dimension_values
+
+String
+
+Uma matriz de strings que descreve valores do conjunto de detalhamentos. É possível mapear os valores para dimension_keys.
+
+paging
+
+Objeto
+
+Um objeto que contém URLs usados para solicitar o próximo conjunto de resultados. Consulte Resultados paginados para mais informações.
+
+previous
+
+String
+
+URL para recuperar a página de resultados anterior. Consulte Resultados paginados para mais informações.
+
+next
+
+String
+
+URL para recuperar a próxima página de resultados. Consulte Resultados paginados para mais informações.
+
+Exemplos
+Exemplo de solicitação para métrica de publicação
+Veja a seguir a solicitação de um app que usa o Login do Facebook.
+
+curl -i -X GET \
+ "https://graph.facebook.com/v24.0/17932174733377207/insights?metric=profile_activity&breakdown=action_type&access_token=EAAOc..."
+Exemplo de resposta para métrica de publicação
+{
+  "data": [
+    {
+      "name": "profile_activity",
+      "period": "lifetime",
+      "values": [
+        {
+          "value": 4
+        }
+      ],
+      "title": "Profile activity",
+      "description": "[IG Insights] This header is the name of a metric that appears on an educational info sheet for a particular post, story, video or promotion. This metric is the sum of all profile actions people take when they engage with this content.",
+      "total_value": {
+        "value": 4,
+        "breakdowns": [
+          {
+            "dimension_keys": [
+              "action_type"
+            ],
+            "results": [
+              {
+                "dimension_values": [
+                  "email"
+                ],
+                "value": 1
+              },
+              {
+                "dimension_values": [
+                  "text"
+                ],
+                "value": 1
+              },
+              {
+                "dimension_values": [
+                  "direction"
+                ],
+                "value": 1
+              },
+              {
+                "dimension_values": [
+                  "bio_link_clicked"
+                ],
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "id": "17932174733377207/insights/profile_activity/lifetime"
+    }
+  ]
+}
+Exemplo de solicitação para métrica de story
+Veja a seguir a solicitação de um app que usa o Login do Instagram.
+
+curl -i -X GET \
+ "https://graph.instagram.com/v24.0/17969782069736348/insights?metric=navigation&breakdown=story_navigation_action_type&access_token=EAAOc..."
+Exemplo de resposta para métrica de story
+{
+  "data": [
+    {
+      "name": "navigation",
+      "period": "lifetime",
+      "values": [
+        {
+          "value": 25
+        }
+      ],
+      "title": "Navigation",
+      "description": "This is the total number of actions taken from your story. These are made up of metrics like exited, forward, back and next story.",
+      "total_value": {
+        "value": 25,
+        "breakdowns": [
+          {
+            "dimension_keys": [
+              "story_navigation_action_type"
+            ],
+            "results": [
+              {
+                "dimension_values": [
+                  "tap_forward"
+                ],
+                "value": 19
+              },
+              {
+                "dimension_values": [
+                  "tap_back"
+                ],
+                "value": 4
+              },
+              {
+                "dimension_values": [
+                  "tap_exit"
+                ],
+                "value": 1
+              },
+              {
+                "dimension_values": [
+                  "swipe_forward"
+                ],
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "id": "17969782069736348/insights/navigation/lifetime"
+    }
+  ]
+}
+
+Usuário do Instagram
+Representa uma conta comercial ou uma conta de criador de conteúdo do Instagram.
+
+Em toda nossa documentação, mencionamos "usuário do Instagram" e "conta do Instagram" de forma intercambiável. Ambos representam a conta profissional do Instagram do usuário do seu app.
+
+Requirements
+Instagram API with Instagram Login	Instagram API with Facebook Login
+Access Tokens
+
+Instagram User user access token
+Facebook User access token
+Host URL
+
+graph.instagram.com
+
+graph.facebook.com
+
+Login Type
+
+Business Login for Instagram
+
+Facebook Login for Business
+
+Permissions	
+instagram_business_basic
+instagram_basic
+pages_read_engagement
+If the app user was granted a role via the Business Manager on the Page connected to the targeted IG User, you will also need one of:
+
+ads_management
+ads_read
+If you are requesting the shopping_product_tag_eligibility field for product tagging, you will also need:
+
+catalog_management
+instagram_shopping_tag_products
+Business Roles
+
+Not applicable.
+
+If you are requesting the shopping_product_tag_eligibility field for product tagging, the app user must have an admin role on the Business Manager that owns the IG User's Instagram Shop.
+
+Instagram Shop
+
+Not applicable.
+
+If you are requesting the shopping_product_tag_eligibility field for product tagging, the IG User must have an approved Instagram Shop with a product catalog containing products.
+
+Criação
+Esta operação não é compatível.
+
+Leitura
+GET /<IG_USER_ID>
+
+Consulta campos e bordas em uma conta comercial ou em uma conta de criador de conteúdo do Instagram.
+
+If you are migrating from Marketing API Instagram Ads endpoints to Instagram Platform endpoints, be aware that some field names are different.
+
+Sintaxe da solicitação
+GET https://graph.facebook.com/<API_VERSION>/<IG_USER_ID>
+  ?fields=<LIST_OF_FIELDS>
+  &access_token=<ACCESS_TOKEN>
+Parâmetros de caminho
+Espaço reservado	Valor
+<API_VERSION>
+
+A versão da API.
+
+<IG_USER_ID>
+
+Obrigatório. Número de identificação do usuário do Instagram.
+
+Parâmetros da string de consulta
+Chave	Espaço reservado	Valor
+access_token
+
+<ACCESS_TOKEN>
+
+Obrigatório. O token de acesso do usuário do app.
+
+fields
+
+<LIST_OF_FIELDS>
+
+Lista separada por vírgulas dos campos de usuário do Instagram que você quer retornar para cada usuário no conjunto de resultados.
+
+Campos
+Os campos públicos podem ser retornados por uma borda usando a expansão de campo. Apenas alguns campos estarão disponíveis para acessar as contas do Instagram associadas à Página.
+
+Nome do campo	Descrição
+alt_text
+Público
+
+Texto que descreve as imagens para fins de acessibilidade.
+
+biography
+Público
+
+Texto da biografia do perfil.
+
+followers_count
+Público
+
+Número total de seguidores do Instagram do usuário.
+
+follows_count
+
+Número total de usuários do Instagram que o usuário segue.
+
+has_profile_pic
+
+Indica se a conta profissional do Instagram do usuário do seu app tem foto do perfil.
+
+id
+Público
+
+É o número de identificação do usuário no escopo do app. Disponível para contas do Instagram associadas à Página.
+
+is_published
+
+Indica se a conta do Instagram do usuário do app foi publicada. Disponível para contas do Instagram associadas à Página.
+
+legacy_instagram_user_id
+
+O ID do Instagram do usuário do app que foi criado para pontos de extremidade da API de Marketing na versão 21.0 e em versões anteriores. Disponível para contas do Instagram associadas à Página.
+
+media_count
+Público
+
+O número total de mídias do Instagram publicados na conta do usuário do seu app.
+
+name
+
+O nome do perfil no Instagram do usuário do seu app.
+
+profile_picture_url
+
+O URL da foto de perfil no Instagram do usuário do seu app.
+
+shopping_product_tag_eligibility
+
+Retorna true se o usuário do app estiver qualificado para a marcação de produtos após ter configurado uma Loja do Instagram. Caso contrário, retorna false.
+
+username
+Público
+
+O nome de usuário do perfil no Instagram do usuário do seu app.
+
+website
+Público
+
+O URL do site do usuário do seu app.
+
+Bordas
+Borda	Descrição
+agencies
+
+Uma lista de empresas que podem anunciar na conta profissional do Instagram.
+
+authorized_adaccounts
+
+Contas de anúncios que podem anunciar na conta profissional do Instagram.
+
+business_discovery
+
+Consulta dados sobre outros usuários do Instagram com uma conta comercial ou de criador de conteúdo.
+
+connected_threads_user
+
+Representa a conta do Threads conectada a uma conta do Instagram.
+
+content_publishing_limit
+
+Representa o uso atual da publicação de conteúdo de um usuário do Instagram.
+
+insights
+
+Representa as métricas de interação social sobre um usuário do Instagram.
+
+instagram_backed_threads_user
+
+Representa a conta do Threads associada a uma conta do Instagram.
+
+live_media
+
+Representa uma coleção de mídia do Instagram de vídeo ao vivo em um usuário da plataforma.
+
+media
+
+Representa uma coleção de mídias em um usuário do Instagram.
+
+media_publish
+
+Publica um contêiner do Instagram em um usuário do Instagram para Empresas.
+
+mentions
+
+Cria um comentário do Instagram em um comentário ou mídia do Instagram com legenda em que um usuário tenha sido @mencionado por outro.
+
+mentioned_comment
+
+Consulta dados sobre um comentário do Instagram em que um usuário foi @mencionado por outro.
+
+mentioned_media
+
+Consulta dados sobre uma mídia do Instagram em que um usuário foi @mencionado em uma legenda por outro.
+
+recently_searched_hashtags
+
+Consulta as hashtags do Instagram pesquisadas por um usuário nos últimos 7 dias.
+
+stories
+
+Representa uma coleção de objetos de mídia de story do Instagram em um usuário do Instagram.
+
+tags
+
+Representa uma coleção de mídias do Instagram em que um usuário foi marcado por outro.
+
+upcoming_events
+
+Uma lista de eventos que essa conta profissional do Instagram está organizando.
+
+Resposta
+Um objeto formatado por JSON contendo os campos e as bordas solicitadas e padrão.
+
+{
+  "<FIELD>":"<VALUE>",
+  ...
+}
+Exemplo de cURL
+Solicitação
+curl -X GET \
+  'https://graph.facebook.com/v24.0/17841405822304914?fields=biography%2Cid%2Cusername%2Cwebsite&access_token=EAACwX...'
+Resposta
+{
+  "biography": "Dino data crunching app",
+  "id": "17841405822304914",
+  "username": "metricsaurus",
+  "website": "http://www.metricsaurus.com/"
+}
+
+
+No seu app, redirecione o usuário para a URL de autorização do Instagram. A URL incluirá seu client_id, a redirect_uri e as permissões (scopes) necessárias (ex: instagram_basic).
+O usuário fará login no Instagram e aprovará as permissões solicitadas.
+Trocar o Código de Autorização por um Token de Acesso:
+Após a aprovação do usuário, o Instagram o redirecionará de volta para a sua redirect_uri com um código de autorização na string de consulta (query string).
+Seu app deve, então, fazer uma requisição POST para o endpoint de token do Instagram, trocando esse código por um token de acesso.
+O token inicial é de curta duração, mas pode ser trocado por um de longa duração (válido por até 60 dias).

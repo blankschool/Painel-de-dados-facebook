@@ -69,16 +69,15 @@ serve(async (req) => {
     const { code, redirect_uri: clientRedirectUri } = body;
     console.log('[instagram-oauth] Request params - code:', code?.substring(0, 20) + '...', 'redirect_uri:', clientRedirectUri);
 
-    // NOTE: Instagram Business API requires Facebook app credentials
-    // Instagram Basic Display API does NOT support Business features
-    const facebookClientId = Deno.env.get('FACEBOOK_APP_ID') || Deno.env.get('INSTAGRAM_APP_ID');
-    const facebookClientSecret = Deno.env.get('FACEBOOK_APP_SECRET') || Deno.env.get('INSTAGRAM_APP_SECRET');
+    // Instagram Business Login API uses Instagram app credentials
+    const instagramAppId = Deno.env.get('INSTAGRAM_APP_ID');
+    const instagramAppSecret = Deno.env.get('INSTAGRAM_APP_SECRET');
 
-    if (!facebookClientId || !facebookClientSecret) {
-      throw new Error('Facebook OAuth credentials not configured');
+    if (!instagramAppId || !instagramAppSecret) {
+      throw new Error('Instagram OAuth credentials not configured');
     }
 
-    console.log('[instagram-oauth] Using Facebook App ID:', facebookClientId);
+    console.log('[instagram-oauth] Using Instagram App ID:', instagramAppId);
 
     // CRITICAL: Use the EXACT redirect_uri provided by client
     let redirectUri: string;
@@ -97,96 +96,80 @@ serve(async (req) => {
       throw new Error('Missing authorization code');
     }
 
-    // Step 3: Exchange code for User Access Token (Facebook Graph API)
+    // Step 3: Exchange code for short-lived access token (Instagram API)
     console.log('[instagram-oauth] Step 3: Exchanging code for access token...');
-    const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${facebookClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${facebookClientSecret}&code=${code}`;
 
-    const tokenResponse = await fetch(tokenUrl);
-    const tokenData = await tokenResponse.json();
+    const tokenFormData = new URLSearchParams({
+      client_id: instagramAppId,
+      client_secret: instagramAppSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code: code,
+    });
 
-    if (tokenData.error) {
-      console.error('[instagram-oauth] Token exchange error:', JSON.stringify(tokenData.error));
-      throw new Error(`Facebook token error: ${tokenData.error.message || tokenData.error.type}`);
+    const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: tokenFormData.toString(),
+    });
+
+    const tokenText = await tokenResponse.text();
+    console.log('[instagram-oauth] Token response status:', tokenResponse.status);
+
+    if (!tokenResponse.ok) {
+      console.error('[instagram-oauth] Token request failed:', tokenText);
+      throw new Error(`Instagram token request failed: ${tokenResponse.status}`);
     }
-    console.log('[instagram-oauth] Short-lived token received');
 
-    // Step 4: Exchange for long-lived token
+    let tokenData: any;
+    try {
+      tokenData = JSON.parse(tokenText);
+    } catch (e) {
+      console.error('[instagram-oauth] Failed to parse token response:', tokenText);
+      throw new Error('Invalid token response from Instagram');
+    }
+
+    // Check for errors in response
+    if (tokenData.error_type || tokenData.error_message) {
+      const errorMsg = tokenData.error_message || tokenData.error_type || 'Unknown error';
+      console.error('[instagram-oauth] Token error:', tokenData);
+      throw new Error(`Instagram error: ${errorMsg}`);
+    }
+
+    // Instagram Business Login returns data array
+    const tokenInfo = tokenData.data?.[0] || tokenData;
+    const shortLivedToken = tokenInfo.access_token;
+    const instagramUserId = tokenInfo.user_id;
+
+    if (!shortLivedToken || !instagramUserId) {
+      console.error('[instagram-oauth] Missing token or user_id:', tokenData);
+      throw new Error('Invalid token response: missing access_token or user_id');
+    }
+
+    console.log('[instagram-oauth] Short-lived token received for user:', instagramUserId);
+
+    // Step 4: Exchange for long-lived token (60 days)
     console.log('[instagram-oauth] Step 4: Getting long-lived token...');
-    const longLivedUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${facebookClientId}&client_secret=${facebookClientSecret}&fb_exchange_token=${tokenData.access_token}`;
+    const longLivedUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${instagramAppSecret}&access_token=${shortLivedToken}`;
 
     const longLivedResponse = await fetch(longLivedUrl);
     const longLivedData = await longLivedResponse.json();
 
-    if (longLivedData.error) {
-      console.error('[instagram-oauth] Long-lived token error:', JSON.stringify(longLivedData.error));
-      throw new Error(`Long-lived token error: ${longLivedData.error.message || longLivedData.error.type}`);
+    const accessToken = longLivedData.access_token || shortLivedToken;
+    const expiresIn = longLivedData.expires_in || 3600;
+
+    if (longLivedData.access_token) {
+      console.log('[instagram-oauth] Long-lived token received, expires in:', expiresIn, 'seconds');
+    } else {
+      console.warn('[instagram-oauth] Using short-lived token, long-lived exchange failed:', longLivedData.error);
     }
 
-    const accessToken = longLivedData.access_token;
-    const expiresIn = longLivedData.expires_in || 5184000; // 60 days default
-    console.log('[instagram-oauth] Long-lived token received, expires in:', expiresIn, 'seconds');
-
-    // Step 5: Get Facebook Pages (CRITICAL for Instagram Business API)
-    console.log('[instagram-oauth] Step 5: Fetching Facebook Pages...');
-    const pagesResponse = await fetch(
-      `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${accessToken}`
-    );
-    const pagesData = await pagesResponse.json();
-
-    if (pagesData.error) {
-      console.error('[instagram-oauth] Pages fetch error:', JSON.stringify(pagesData.error));
-      throw new Error(`Pages fetch error: ${pagesData.error.message}`);
-    }
-
-    console.log('[instagram-oauth] Pages found:', pagesData.data?.length || 0);
-
-    if (!pagesData.data || pagesData.data.length === 0) {
-      console.error('[instagram-oauth] No Facebook Pages found');
-      throw new Error('No Facebook Pages found. Please create a Facebook Page and link it to your Instagram Business account.');
-    }
-
-    // Step 6: Find Instagram Business Account
-    console.log('[instagram-oauth] Step 6: Looking for Instagram Business Account...');
-    let instagramUserId: string | null = null;
-    let pageAccessToken: string = accessToken;
-    let selectedPage: { id: string; name: string } | null = null;
-
-    for (const page of pagesData.data) {
-      console.log('[instagram-oauth] Checking page:', page.name, '(ID:', page.id, ')');
-
-      if (page.instagram_business_account) {
-        instagramUserId = page.instagram_business_account.id;
-        pageAccessToken = page.access_token || accessToken;
-        selectedPage = { id: page.id, name: page.name };
-        console.log('[instagram-oauth] Found Instagram Business Account:', instagramUserId, 'on page:', page.name);
-        break;
-      }
-
-      // If not returned in initial query, fetch separately
-      const igResponse = await fetch(
-        `https://graph.facebook.com/v24.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`
-      );
-      const igData = await igResponse.json();
-
-      if (igData.instagram_business_account) {
-        instagramUserId = igData.instagram_business_account.id;
-        pageAccessToken = page.access_token || accessToken;
-        selectedPage = { id: page.id, name: page.name };
-        console.log('[instagram-oauth] Found Instagram Business Account (separate query):', instagramUserId);
-        break;
-      }
-    }
-
-    if (!instagramUserId) {
-      console.error('[instagram-oauth] No Instagram Business Account linked to any Facebook Page');
-      const pageNames = pagesData.data.map((p: { name: string }) => p.name).join(', ');
-      throw new Error(`No Instagram Business Account found. Your Facebook Pages (${pageNames}) are not linked to an Instagram Business account. Please link your Instagram Business/Creator account to a Facebook Page.`);
-    }
-
-    // Step 7: Fetch Instagram profile data (using Page Access Token + Business Account ID)
-    console.log('[instagram-oauth] Step 7: Fetching Instagram profile...');
+    // Step 5: Fetch Instagram profile using Instagram Business API
+    console.log('[instagram-oauth] Step 5: Fetching Instagram profile...');
     const profileResponse = await fetch(
-      `https://graph.facebook.com/v24.0/${instagramUserId}?fields=id,username,name,profile_picture_url,followers_count,follows_count,media_count&access_token=${pageAccessToken}`
+      `https://graph.instagram.com/v24.0/me?fields=user_id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${accessToken}`
     );
     const profileData = await profileResponse.json();
 
@@ -195,14 +178,25 @@ serve(async (req) => {
       throw new Error(`Profile fetch error: ${profileData.error.message}`);
     }
 
+    // Extract profile data (Instagram Business API response format)
+    const profileInfo = profileData.data?.[0] || profileData;
+    const finalInstagramUserId = profileInfo.user_id || instagramUserId;
+
     console.log('[instagram-oauth] Profile fetched:', {
-      username: profileData.username,
-      name: profileData.name,
-      followers: profileData.followers_count,
+      user_id: finalInstagramUserId,
+      username: profileInfo.username,
+      name: profileInfo.name,
+      account_type: profileInfo.account_type,
+      followers: profileInfo.followers_count,
     });
 
-    // Step 8: Save to database
-    console.log('[instagram-oauth] Step 8: Saving to database...');
+    // Verify Business/Creator account
+    if (profileInfo.account_type && profileInfo.account_type !== 'BUSINESS' && profileInfo.account_type !== 'MEDIA_CREATOR') {
+      throw new Error('Only Instagram Business or Creator accounts can be connected. Please convert your account in Instagram app settings.');
+    }
+
+    // Step 6: Save to database
+    console.log('[instagram-oauth] Step 6: Saving to database...');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -212,12 +206,12 @@ serve(async (req) => {
       .upsert({
         user_id: user.id,
         provider: 'instagram',
-        provider_account_id: instagramUserId,
-        access_token: pageAccessToken, // Use page access token for API calls
+        provider_account_id: finalInstagramUserId,
+        access_token: accessToken,
         token_expires_at: tokenExpiresAt,
-        account_username: profileData.username || null,
-        account_name: profileData.name || null,
-        profile_picture_url: profileData.profile_picture_url || null,
+        account_username: profileInfo.username || null,
+        account_name: profileInfo.name || null,
+        profile_picture_url: profileInfo.profile_picture_url || null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,provider,provider_account_id',
@@ -234,11 +228,11 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       provider: 'instagram',
-      instagram_user_id: instagramUserId,
-      username: profileData.username,
-      name: profileData.name,
-      profile_picture_url: profileData.profile_picture_url,
-      page_name: selectedPage?.name,
+      instagram_user_id: finalInstagramUserId,
+      username: profileInfo.username,
+      name: profileInfo.name,
+      account_type: profileInfo.account_type,
+      profile_picture_url: profileInfo.profile_picture_url,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

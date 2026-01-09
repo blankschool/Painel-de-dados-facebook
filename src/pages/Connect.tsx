@@ -30,16 +30,18 @@ import {
 // OAUTH CONFIGURATION
 // ============================================
 
-// Facebook App ID - used for BOTH Instagram and Facebook OAuth
-// Instagram Business API requires Facebook OAuth (Pages → Business Account flow)
+// Facebook App ID for Facebook OAuth
 const FACEBOOK_APP_ID = '698718192521096';
 
-// Get redirect URI - MUST match exactly what's configured in Facebook Developer Console
+// Instagram App ID for Instagram Business Login
+const INSTAGRAM_APP_ID = '1728352261135208';
+
+// Get redirect URI - MUST match exactly what's configured in Developer Console
 const getRedirectUri = (): string => {
   return `${window.location.origin}/auth/callback`;
 };
 
-// Facebook OAuth scopes (used for both Instagram and Facebook buttons)
+// Facebook OAuth scopes (Facebook login endpoint)
 const FACEBOOK_SCOPES = [
   'instagram_basic',
   'instagram_manage_insights',
@@ -48,6 +50,16 @@ const FACEBOOK_SCOPES = [
   'instagram_content_publish',
   'pages_show_list',
   'business_management'
+].join(',');
+
+// Instagram Business Login scopes (new Instagram API with Instagram Login)
+// These are the NEW scope names as per Instagram Business Login documentation
+const INSTAGRAM_BUSINESS_SCOPES = [
+  'instagram_business_basic',
+  'instagram_business_manage_insights',
+  'instagram_business_manage_messages',
+  'instagram_business_manage_comments',
+  'instagram_business_content_publish'
 ].join(',');
 
 // Generate secure random state for CSRF protection
@@ -185,17 +197,14 @@ export default function Connect() {
     navigate('/auth');
   };
 
-  // IMPORTANT: Both Instagram and Facebook buttons now use Facebook OAuth!
-  // This is because Instagram Business API requires Facebook Pages → Business Account flow.
-  // The only difference is which edge function processes the result (for provider labeling).
-
-  // Handler for Instagram button (uses Facebook OAuth, calls instagram-oauth function)
+  // Handler for Instagram Business Login (instagram.com/oauth/authorize)
+  // Uses NEW Instagram API with Instagram Login - direct Instagram OAuth
   const handleInstagramConnect = () => {
     setUsingFacebookOAuth(false); // Save provider='instagram', will call instagram-oauth edge function
     setShowInstructions(true);
   };
 
-  // Handler for Facebook button (uses Facebook OAuth, calls facebook-oauth function)
+  // Handler for Facebook OAuth (facebook.com endpoint)
   const handleFacebookConnect = () => {
     setUsingFacebookOAuth(true); // Save provider='facebook', will call facebook-oauth edge function
     setShowInstructions(true);
@@ -239,19 +248,36 @@ export default function Connect() {
     document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
     document.cookie = `oauth_timestamp=${timestamp}; path=/; max-age=600; SameSite=Lax`;
 
-    // Build OAuth URL - BOTH buttons now use Facebook OAuth!
-    // Instagram Business API requires Facebook Pages flow
-    const params = new URLSearchParams({
-      client_id: FACEBOOK_APP_ID,
-      redirect_uri: redirectUri,
-      scope: FACEBOOK_SCOPES,
-      response_type: 'code',
-      state: state,
-    });
+    // Build OAuth URL based on provider
+    let authUrl: string;
 
-    const authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
-    console.log('[OAuth] Using Facebook OAuth for', provider, 'provider');
-    console.log('[OAuth] OAuth URL:', authUrl);
+    if (usingFacebookOAuth) {
+      // FACEBOOK OAUTH (facebook.com endpoint)
+      const params = new URLSearchParams({
+        client_id: FACEBOOK_APP_ID,
+        redirect_uri: redirectUri,
+        scope: FACEBOOK_SCOPES,
+        response_type: 'code',
+        state: state,
+      });
+
+      authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
+      console.log('[OAuth] Facebook OAuth URL:', authUrl);
+
+    } else {
+      // INSTAGRAM BUSINESS LOGIN (instagram.com/oauth/authorize)
+      // Uses NEW Instagram API with Instagram Login
+      const params = new URLSearchParams({
+        client_id: INSTAGRAM_APP_ID,
+        redirect_uri: redirectUri,
+        scope: INSTAGRAM_BUSINESS_SCOPES,
+        response_type: 'code',
+        state: state,
+      });
+
+      authUrl = `https://www.instagram.com/oauth/authorize?${params.toString()}`;
+      console.log('[OAuth] Instagram Business Login URL:', authUrl);
+    }
 
     // Redirect after short delay
     setTimeout(() => {
