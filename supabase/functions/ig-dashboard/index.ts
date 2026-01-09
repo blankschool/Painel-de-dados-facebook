@@ -430,11 +430,12 @@ serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as DashboardRequest;
 
     // Build query for connected account
+    // Support both 'facebook' and 'instagram' providers since OAuth can save as either
     let accountQuery = supabaseAuth
       .from('connected_accounts')
       .select('id, provider_account_id, access_token, account_username')
       .eq('user_id', user.id)
-      .eq('provider', 'facebook');
+      .in('provider', ['facebook', 'instagram']);
 
     // If accountId is provided, fetch that specific account
     if (body.accountId) {
