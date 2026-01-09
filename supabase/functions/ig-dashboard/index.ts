@@ -54,6 +54,7 @@ const getCorsHeaders = (origin: string | null) => {
 };
 
 type DashboardRequest = {
+  accountId?: string;
   businessId?: string;
   maxPosts?: number;
   maxStories?: number;
@@ -426,13 +427,21 @@ serve(async (req) => {
     }
     console.log('[ig-dashboard] User authenticated:', user.id);
 
-    // Fetch connected account from database
-    const { data: connectedAccount, error: accountError } = await supabaseAuth
+    const body = (await req.json().catch(() => ({}))) as DashboardRequest;
+
+    // Build query for connected account
+    let accountQuery = supabaseAuth
       .from('connected_accounts')
-      .select('provider_account_id, access_token')
+      .select('id, provider_account_id, access_token, account_username')
       .eq('user_id', user.id)
-      .eq('provider', 'facebook')
-      .maybeSingle();
+      .eq('provider', 'facebook');
+
+    // If accountId is provided, fetch that specific account
+    if (body.accountId) {
+      accountQuery = accountQuery.eq('id', body.accountId);
+    }
+
+    const { data: connectedAccount, error: accountError } = await accountQuery.maybeSingle();
 
     if (accountError) {
       console.error('[ig-dashboard] Error fetching connected account:', accountError);
@@ -440,16 +449,14 @@ serve(async (req) => {
     }
 
     if (!connectedAccount) {
-      console.error('[ig-dashboard] No connected account found for user:', user.id);
+      console.error('[ig-dashboard] No connected account found for user:', user.id, 'accountId:', body.accountId);
       throw new Error('No Instagram account connected. Please connect your account first.');
     }
-
-    const body = (await req.json().catch(() => ({}))) as DashboardRequest;
 
     const businessId = connectedAccount.provider_account_id;
     const accessToken = connectedAccount.access_token;
 
-    console.log(`[ig-dashboard] Fetching data for businessId=${businessId} (user=${user.id})`);
+    console.log(`[ig-dashboard] Fetching data for @${connectedAccount.account_username} businessId=${businessId} (user=${user.id}, accountId=${connectedAccount.id})`);
 
     const maxPosts = typeof body.maxPosts === "number" ? Math.max(1, Math.min(2000, body.maxPosts)) : 500;
     const maxStories = typeof body.maxStories === "number" ? Math.max(1, Math.min(50, body.maxStories)) : 25;

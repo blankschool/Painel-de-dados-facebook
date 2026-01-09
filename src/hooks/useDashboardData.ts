@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useFilters } from '@/contexts/FiltersContext';
+import { useAuth } from '@/contexts/AuthContext';
 import type { IgMediaItem } from '@/utils/ig';
 
 export type StoriesAggregate = {
@@ -51,20 +52,25 @@ function toYmd(date: Date): string {
 
 export function useDashboardData() {
   const { getDateRangeFromPreset, filters } = useFilters();
+  const { selectedAccount } = useAuth();
 
   const body = useMemo(() => {
-    // Get date range from the FiltersContext (single source of truth)
     const dateRange = getDateRangeFromPreset();
     const since = dateRange.from ? toYmd(dateRange.from) : undefined;
     const until = dateRange.to ? toYmd(dateRange.to) : undefined;
     
-    console.log(`[useDashboardData] Preset: ${filters.dateRangePreset}, Since: ${since}, Until: ${until}`);
+    console.log(`[useDashboardData] Preset: ${filters.dateRangePreset}, Since: ${since}, Until: ${until}, Account: ${selectedAccount?.account_username}`);
     
-    const businessId = import.meta.env.VITE_IG_BUSINESS_ID as string | undefined;
     const maxInsightsPostsEnv = Number(import.meta.env.VITE_MAX_INSIGHTS_POSTS ?? '');
     const maxInsightsPosts = Number.isFinite(maxInsightsPostsEnv) && maxInsightsPostsEnv > 0 ? maxInsightsPostsEnv : 500;
-    return { since, until, maxInsightsPosts, ...(businessId ? { businessId } : {}) };
-  }, [getDateRangeFromPreset, filters.dateRangePreset]);
+    
+    return { 
+      since, 
+      until, 
+      maxInsightsPosts,
+      accountId: selectedAccount?.id,
+    };
+  }, [getDateRangeFromPreset, filters.dateRangePreset, selectedAccount?.id, selectedAccount?.account_username]);
 
   const query = useQuery({
     queryKey: ['ig-dashboard', body],
@@ -76,6 +82,7 @@ export function useDashboardData() {
       console.log(`[useDashboardData] Received ${data.media?.length ?? 0} media items`);
       return data as IgDashboardResponse;
     },
+    enabled: !!selectedAccount?.id,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     retry: 1,
