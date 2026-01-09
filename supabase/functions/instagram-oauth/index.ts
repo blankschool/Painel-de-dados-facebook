@@ -177,13 +177,42 @@ serve(async (req) => {
       console.warn('[instagram-oauth] Using short-lived token, long-lived exchange failed:', longLivedData.error);
     }
 
-    // Step 5: Fetch Instagram profile using Instagram Business API
-    // Use the user_id we got from token, not /me endpoint
-    console.log('[instagram-oauth] Step 5: Fetching Instagram profile...');
-    console.log('[instagram-oauth] Profile URL:', `https://graph.instagram.com/v24.0/${instagramUserId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count`);
+    // Step 5: Get Instagram Business Account ID via Facebook Pages
+    // The user_id from Instagram OAuth is a personal ID, not the Business Account ID
+    // We need to query Facebook Pages to get the instagram_business_account ID
+    console.log('[instagram-oauth] Step 5: Fetching Facebook Pages to get Instagram Business Account...');
+
+    const pagesResponse = await fetch(
+      `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`
+    );
+
+    console.log('[instagram-oauth] Pages response status:', pagesResponse.status);
+    const pagesData = await pagesResponse.json();
+    console.log('[instagram-oauth] FULL PAGES RESPONSE:', JSON.stringify(pagesData, null, 2));
+
+    if (pagesData.error) {
+      console.error('[instagram-oauth] Pages fetch error:', pagesData.error);
+      throw new Error(`Failed to fetch Facebook Pages: ${pagesData.error.message}`);
+    }
+
+    // Find a page with an Instagram Business Account
+    const pageWithInstagram = pagesData.data?.find((page: any) => page.instagram_business_account);
+
+    if (!pageWithInstagram || !pageWithInstagram.instagram_business_account) {
+      console.error('[instagram-oauth] No Instagram Business Account found in pages:', pagesData);
+      throw new Error('No Instagram Business Account found. Please ensure your Instagram account is connected to a Facebook Page and converted to a Business or Creator account.');
+    }
+
+    const businessAccountId = pageWithInstagram.instagram_business_account.id;
+    console.log('[instagram-oauth] Found Instagram Business Account ID:', businessAccountId);
+    console.log('[instagram-oauth] Connected to Facebook Page:', pageWithInstagram.name);
+
+    // Step 6: Fetch Instagram profile using the Business Account ID
+    console.log('[instagram-oauth] Step 6: Fetching Instagram profile...');
+    console.log('[instagram-oauth] Profile URL:', `https://graph.instagram.com/v24.0/${businessAccountId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count`);
 
     const profileResponse = await fetch(
-      `https://graph.instagram.com/v24.0/${instagramUserId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${accessToken}`
+      `https://graph.instagram.com/v24.0/${businessAccountId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${accessToken}`
     );
 
     console.log('[instagram-oauth] Profile response status:', profileResponse.status);
@@ -214,7 +243,7 @@ serve(async (req) => {
 
     // Extract profile data (direct user query, not wrapped in data array)
     const profileInfo = profileData;
-    const finalInstagramUserId = profileInfo.id || instagramUserId;
+    const finalInstagramUserId = profileInfo.id || businessAccountId;
 
     console.log('[instagram-oauth] Profile fetched successfully:', {
       user_id: finalInstagramUserId,
@@ -236,8 +265,8 @@ serve(async (req) => {
       console.warn('[instagram-oauth] WARNING: Account has no username or name - may be incomplete profile');
     }
 
-    // Step 6: Save to database
-    console.log('[instagram-oauth] Step 6: Saving to database...');
+    // Step 7: Save to database
+    console.log('[instagram-oauth] Step 7: Saving to database...');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();

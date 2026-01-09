@@ -54,12 +54,15 @@ const FACEBOOK_SCOPES = [
 
 // Instagram Business Login scopes (new Instagram API with Instagram Login)
 // These are the NEW scope names as per Instagram Business Login documentation
+// NOTE: We also need pages_show_list to access Facebook Pages for Business Account ID
 const INSTAGRAM_BUSINESS_SCOPES = [
   'instagram_business_basic',
   'instagram_business_manage_insights',
   'instagram_business_manage_messages',
   'instagram_business_manage_comments',
-  'instagram_business_content_publish'
+  'instagram_business_content_publish',
+  'pages_show_list',  // Required to get Instagram Business Account ID via Facebook Pages
+  'pages_read_engagement'
 ].join(',');
 
 // Generate secure random state for CSRF protection
