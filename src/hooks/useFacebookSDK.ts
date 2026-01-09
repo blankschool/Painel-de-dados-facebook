@@ -35,6 +35,9 @@ declare global {
         options?: { scope: string; return_scopes?: boolean }
       ) => void;
       logout: (callback: () => void) => void;
+      XFBML?: {
+        parse: (element?: HTMLElement) => void;
+      };
       AppEvents: {
         logPageView: () => void;
       };
