@@ -2,17 +2,27 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Allowed origins for CORS
+// Allowed origins for CORS - dynamically allow any Lovable preview URL
 const allowedOrigins = [
   'https://insta-glow-up-39.lovable.app',
   'http://localhost:5173',
   'http://localhost:8080',
 ];
 
+// Also allow any *.lovableproject.com origin for previews
+const isAllowedOrigin = (origin: string | null): boolean => {
+  if (!origin) return false;
+  if (allowedOrigins.includes(origin)) return true;
+  // Allow Lovable preview URLs
+  if (origin.match(/^https:\/\/[a-z0-9-]+\.lovableproject\.com$/)) return true;
+  if (origin.match(/^https:\/\/[a-z0-9-]+\.lovable\.app$/)) return true;
+  return false;
+};
+
 const getCorsHeaders = (origin: string | null) => {
-  const isAllowed = origin && allowedOrigins.includes(origin);
+  const allowed = isAllowedOrigin(origin);
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Origin': allowed && origin ? origin : allowedOrigins[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   };
 };
@@ -64,16 +74,22 @@ serve(async (req) => {
     // Step 2: Parse and validate request body
     console.log('[facebook-oauth] Step 2: Parsing request body...');
     const body = await req.json();
-    const { code, access_token: directAccessToken } = body;
+    const { code, access_token: directAccessToken, redirect_uri: clientRedirectUri } = body;
     
     const facebookClientId = Deno.env.get('FACEBOOK_APP_ID');
     const facebookClientSecret = Deno.env.get('FACEBOOK_APP_SECRET');
-    const redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
+    const instagramAppId = Deno.env.get('INSTAGRAM_APP_ID') || facebookClientId;
+    const instagramAppSecret = Deno.env.get('INSTAGRAM_APP_SECRET') || facebookClientSecret;
+    
+    // Use client-provided redirect URI or fall back to default
+    const redirectUri = clientRedirectUri || origin + '/auth/callback' || 'https://insta-glow-up-39.lovable.app/auth/callback';
 
     if (!facebookClientId || !facebookClientSecret) {
       console.error('[facebook-oauth] Missing Facebook credentials');
       throw new Error('Facebook app credentials not configured');
     }
+    
+    console.log('[facebook-oauth] Using redirect URI:', redirectUri);
 
     let accessToken: string;
     let expiresIn: number;
