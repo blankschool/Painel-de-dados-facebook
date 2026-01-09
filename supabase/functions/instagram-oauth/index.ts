@@ -71,17 +71,20 @@ serve(async (req) => {
     
     console.log('[instagram-oauth] Using Instagram App ID:', instagramAppId);
     
+    // CRITICAL: Use the EXACT redirect_uri provided by client
+    // This MUST match what was used when initiating OAuth
     let redirectUri: string;
     if (clientRedirectUri) {
       redirectUri = clientRedirectUri;
+      console.log('[instagram-oauth] Using client-provided redirect URI:', redirectUri);
     } else if (origin) {
-      const originUrl = new URL(origin);
-      redirectUri = `${originUrl.protocol}//${originUrl.host}/auth/callback`;
+      redirectUri = `${origin}/auth/callback`;
+      console.log('[instagram-oauth] Constructed redirect URI from origin:', redirectUri);
     } else {
-      redirectUri = 'https://painel-de-dados-instagram.lovable.app/auth/callback';
+      // Fallback - this should never happen
+      redirectUri = 'https://insta-glow-up-39.lovable.app/auth/callback';
+      console.warn('[instagram-oauth] Using fallback redirect URI:', redirectUri);
     }
-    
-    console.log('[instagram-oauth] Redirect URI:', redirectUri);
 
     if (!code) {
       throw new Error('Missing authorization code');
