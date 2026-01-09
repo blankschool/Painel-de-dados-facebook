@@ -177,35 +177,77 @@ serve(async (req) => {
       console.warn('[instagram-oauth] Using short-lived token, long-lived exchange failed:', longLivedData.error);
     }
 
-    // Step 5: Get Instagram Business Account ID via Facebook Pages
-    // The user_id from Instagram OAuth is a personal ID, not the Business Account ID
-    // We need to query Facebook Pages to get the instagram_business_account ID
-    console.log('[instagram-oauth] Step 5: Fetching Facebook Pages to get Instagram Business Account...');
+    // Step 5: Get Instagram Business Account ID
+    // Try multiple methods to get the correct Business Account ID
+    console.log('[instagram-oauth] Step 5: Finding Instagram Business Account ID...');
 
-    const pagesResponse = await fetch(
-      `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`
+    let businessAccountId: string | null = null;
+    let discoveryMethod: string = 'unknown';
+
+    // METHOD 1: Try using the instagramUserId directly with Business Discovery
+    // This works if the user_id is already a Business Account ID
+    console.log('[instagram-oauth] Method 1: Testing if user_id is already a Business Account ID...');
+    const testResponse = await fetch(
+      `https://graph.instagram.com/v24.0/${instagramUserId}?fields=id,username,account_type&access_token=${accessToken}`
     );
+    const testData = await testResponse.json();
+    console.log('[instagram-oauth] Test response:', JSON.stringify(testData, null, 2));
 
-    console.log('[instagram-oauth] Pages response status:', pagesResponse.status);
-    const pagesData = await pagesResponse.json();
-    console.log('[instagram-oauth] FULL PAGES RESPONSE:', JSON.stringify(pagesData, null, 2));
+    if (!testData.error && testData.id) {
+      businessAccountId = testData.id;
+      discoveryMethod = 'direct_user_id';
+      console.log('[instagram-oauth] ✓ Method 1 SUCCESS: user_id is a valid Business Account ID:', businessAccountId);
+    } else {
+      console.log('[instagram-oauth] ✗ Method 1 FAILED:', testData.error?.message || 'No error details');
 
-    if (pagesData.error) {
-      console.error('[instagram-oauth] Pages fetch error:', pagesData.error);
-      throw new Error(`Failed to fetch Facebook Pages: ${pagesData.error.message}`);
+      // METHOD 2: Try Instagram Business Discovery via /me endpoint
+      console.log('[instagram-oauth] Method 2: Trying Instagram Business Discovery via /me...');
+      const meResponse = await fetch(
+        `https://graph.instagram.com/v24.0/me?fields=id,username,account_type&access_token=${accessToken}`
+      );
+      const meData = await meResponse.json();
+      console.log('[instagram-oauth] /me response:', JSON.stringify(meData, null, 2));
+
+      if (!meData.error && meData.id) {
+        businessAccountId = meData.id;
+        discoveryMethod = 'me_endpoint';
+        console.log('[instagram-oauth] ✓ Method 2 SUCCESS: Found Business Account via /me:', businessAccountId);
+      } else {
+        console.log('[instagram-oauth] ✗ Method 2 FAILED:', meData.error?.message || 'No error details');
+
+        // METHOD 3: Fallback to Facebook Pages
+        console.log('[instagram-oauth] Method 3: Falling back to Facebook Pages...');
+        const pagesResponse = await fetch(
+          `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`
+        );
+        const pagesData = await pagesResponse.json();
+        console.log('[instagram-oauth] Pages response:', JSON.stringify(pagesData, null, 2));
+
+        if (pagesData.error) {
+          console.error('[instagram-oauth] ✗ Method 3 FAILED:', pagesData.error.message);
+          throw new Error(`Failed to fetch Facebook Pages: ${pagesData.error.message}`);
+        }
+
+        const pageWithInstagram = pagesData.data?.find((page: any) => page.instagram_business_account);
+
+        if (pageWithInstagram?.instagram_business_account) {
+          businessAccountId = pageWithInstagram.instagram_business_account.id;
+          discoveryMethod = 'facebook_pages';
+          console.log('[instagram-oauth] ✓ Method 3 SUCCESS: Found via Facebook Page:', pageWithInstagram.name);
+          console.log('[instagram-oauth] Business Account ID:', businessAccountId);
+        } else {
+          console.error('[instagram-oauth] ✗ Method 3 FAILED: No Instagram Business Account found');
+          throw new Error('No Instagram Business Account found. Please ensure your Instagram account is converted to a Business or Creator account.');
+        }
+      }
     }
 
-    // Find a page with an Instagram Business Account
-    const pageWithInstagram = pagesData.data?.find((page: any) => page.instagram_business_account);
-
-    if (!pageWithInstagram || !pageWithInstagram.instagram_business_account) {
-      console.error('[instagram-oauth] No Instagram Business Account found in pages:', pagesData);
-      throw new Error('No Instagram Business Account found. Please ensure your Instagram account is connected to a Facebook Page and converted to a Business or Creator account.');
+    if (!businessAccountId) {
+      throw new Error('Could not determine Instagram Business Account ID. All methods failed.');
     }
 
-    const businessAccountId = pageWithInstagram.instagram_business_account.id;
-    console.log('[instagram-oauth] Found Instagram Business Account ID:', businessAccountId);
-    console.log('[instagram-oauth] Connected to Facebook Page:', pageWithInstagram.name);
+    console.log('[instagram-oauth] ✓ Final Business Account ID:', businessAccountId);
+    console.log('[instagram-oauth] ✓ Discovery method:', discoveryMethod);
 
     // Step 6: Fetch Instagram profile using the Business Account ID
     console.log('[instagram-oauth] Step 6: Fetching Instagram profile...');
