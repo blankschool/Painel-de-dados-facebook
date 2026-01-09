@@ -138,6 +138,9 @@ serve(async (req) => {
       throw new Error(`Instagram error: ${errorMsg}`);
     }
 
+    // DIAGNOSTIC: Log full token response structure
+    console.log('[instagram-oauth] FULL TOKEN RESPONSE:', JSON.stringify(tokenData, null, 2));
+
     // Instagram Business Login returns data array
     const tokenInfo = tokenData.data?.[0] || tokenData;
     const shortLivedToken = tokenInfo.access_token;
@@ -149,6 +152,12 @@ serve(async (req) => {
     }
 
     console.log('[instagram-oauth] Short-lived token received for user:', instagramUserId);
+    console.log('[instagram-oauth] Token info structure:', {
+      has_data_array: !!tokenData.data,
+      permissions: tokenInfo.permissions,
+      user_id: instagramUserId,
+      token_prefix: shortLivedToken.substring(0, 20) + '...'
+    });
 
     // Step 4: Exchange for long-lived token (60 days)
     console.log('[instagram-oauth] Step 4: Getting long-lived token...');
@@ -156,6 +165,8 @@ serve(async (req) => {
 
     const longLivedResponse = await fetch(longLivedUrl);
     const longLivedData = await longLivedResponse.json();
+
+    console.log('[instagram-oauth] Long-lived token response:', JSON.stringify(longLivedData, null, 2));
 
     const accessToken = longLivedData.access_token || shortLivedToken;
     const expiresIn = longLivedData.expires_in || 3600;
@@ -169,33 +180,60 @@ serve(async (req) => {
     // Step 5: Fetch Instagram profile using Instagram Business API
     // Use the user_id we got from token, not /me endpoint
     console.log('[instagram-oauth] Step 5: Fetching Instagram profile...');
+    console.log('[instagram-oauth] Profile URL:', `https://graph.instagram.com/v24.0/${instagramUserId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count`);
+
     const profileResponse = await fetch(
       `https://graph.instagram.com/v24.0/${instagramUserId}?fields=id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${accessToken}`
     );
+
+    console.log('[instagram-oauth] Profile response status:', profileResponse.status);
     const profileData = await profileResponse.json();
 
-    console.log('[instagram-oauth] Profile response:', JSON.stringify(profileData, null, 2));
+    console.log('[instagram-oauth] FULL PROFILE RESPONSE:', JSON.stringify(profileData, null, 2));
 
     if (profileData.error) {
-      console.error('[instagram-oauth] Profile fetch error:', JSON.stringify(profileData.error));
-      throw new Error(`Profile fetch error: ${profileData.error.message}`);
+      console.error('[instagram-oauth] Profile fetch error details:', {
+        message: profileData.error.message,
+        type: profileData.error.type,
+        code: profileData.error.code,
+        error_subcode: profileData.error.error_subcode,
+        fbtrace_id: profileData.error.fbtrace_id,
+        user_id_used: instagramUserId,
+        token_type: longLivedData.access_token ? 'long-lived' : 'short-lived'
+      });
+
+      // Provide helpful error messages based on the error
+      if (profileData.error.code === 190 || profileData.error.code === 10) {
+        throw new Error('Instagram account access denied. Please ensure your account is a Business or Creator account and has granted all required permissions.');
+      } else if (profileData.error.message.includes('does not exist')) {
+        throw new Error('Instagram account not found. This may indicate a personal account that needs to be converted to Business or Creator type. Please convert your account in the Instagram app settings.');
+      } else {
+        throw new Error(`Profile fetch error: ${profileData.error.message}`);
+      }
     }
 
     // Extract profile data (direct user query, not wrapped in data array)
     const profileInfo = profileData;
     const finalInstagramUserId = profileInfo.id || instagramUserId;
 
-    console.log('[instagram-oauth] Profile fetched:', {
+    console.log('[instagram-oauth] Profile fetched successfully:', {
       user_id: finalInstagramUserId,
       username: profileInfo.username,
       name: profileInfo.name,
       account_type: profileInfo.account_type,
       followers: profileInfo.followers_count,
+      has_username: !!profileInfo.username,
+      has_name: !!profileInfo.name,
     });
 
     // Verify Business/Creator account
     if (profileInfo.account_type && profileInfo.account_type !== 'BUSINESS' && profileInfo.account_type !== 'MEDIA_CREATOR') {
       throw new Error('Only Instagram Business or Creator accounts can be connected. Please convert your account in Instagram app settings.');
+    }
+
+    // Warn if account seems incomplete
+    if (!profileInfo.username && !profileInfo.name) {
+      console.warn('[instagram-oauth] WARNING: Account has no username or name - may be incomplete profile');
     }
 
     // Step 6: Save to database
