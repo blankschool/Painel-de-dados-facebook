@@ -35,8 +35,8 @@ const SCOPES = [
 ].join(',');
 
 // Instagram OAuth config (for direct Instagram OAuth flow)
-const INSTAGRAM_APP_ID = '1088541086010498';
-const INSTAGRAM_SCOPES = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+const INSTAGRAM_APP_ID = '1728352261135208';
+const INSTAGRAM_SCOPES = 'instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
 
 // Generate secure random state for CSRF protection
 function generateSecureState(): string {
@@ -211,8 +211,9 @@ export default function Connect() {
     console.log('[OAuth] Timestamp:', new Date(parseInt(timestamp)).toISOString());
     console.log('[OAuth] ============================');
 
-    // Build Instagram OAuth URL
+    // Build Instagram OAuth URL with force_reauth for multiple accounts
     const params = new URLSearchParams({
+      force_reauth: 'true',
       client_id: INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
       response_type: 'code',
