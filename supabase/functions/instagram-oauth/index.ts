@@ -144,12 +144,14 @@ serve(async (req) => {
 
     const accessToken = tokenData.access_token;
     const userId = tokenData.user_id;
-    
+
     if (!accessToken || !userId) {
       throw new Error('Invalid token response: missing required fields');
     }
 
     console.log('[instagram-oauth] Access token received for user:', userId);
+    console.log('[instagram-oauth] Token data keys:', Object.keys(tokenData));
+    console.log('[instagram-oauth] Full token data:', JSON.stringify(tokenData, null, 2));
 
     // Step 4: Get long-lived token
     console.log('[instagram-oauth] Step 4: Getting long-lived token...');
@@ -159,25 +161,33 @@ serve(async (req) => {
     const longLivedResponse = await fetch(longLivedUrl);
     const longLivedData = await longLivedResponse.json();
 
+    console.log('[instagram-oauth] Long-lived response:', JSON.stringify(longLivedData, null, 2));
+
     const finalAccessToken = longLivedData.access_token || accessToken;
     const expiresIn = longLivedData.expires_in || 3600;
 
     if (longLivedData.access_token) {
       console.log('[instagram-oauth] Long-lived token received, expires in:', expiresIn);
     } else {
-      console.warn('[instagram-oauth] Using short-lived token');
+      console.warn('[instagram-oauth] Using short-lived token, may have errors:', longLivedData.error);
     }
 
     // Step 5: Fetch profile
     console.log('[instagram-oauth] Step 5: Fetching Instagram profile...');
-    
+    console.log('[instagram-oauth] Profile URL:', `https://graph.instagram.com/${userId}?fields=id,username,account_type,media_count`);
+
     const profileResponse = await fetch(
       `https://graph.instagram.com/${userId}?fields=id,username,account_type,media_count&access_token=${finalAccessToken}`
     );
-    
+
     const profileData = await profileResponse.json();
+    console.log('[instagram-oauth] Profile response:', JSON.stringify(profileData, null, 2));
 
     if (profileData.error) {
+      console.error('[instagram-oauth] Profile fetch failed. This may be because:');
+      console.error('[instagram-oauth] 1. The account is not a Business/Creator account');
+      console.error('[instagram-oauth] 2. The account is not linked to a Facebook Page');
+      console.error('[instagram-oauth] 3. The user_id from token is a personal account ID, not Business ID');
       throw new Error(`Profile error: ${profileData.error.message}`);
     }
 
