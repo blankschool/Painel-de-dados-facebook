@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ requiresConnection = false }: ProtectedRouteProps) {
-  const { user, isLoading, connectedAccount, isLoadingAccount } = useAuth();
+  const { user, isLoading, selectedAccount, isLoadingAccounts } = useAuth();
   const location = useLocation();
 
   // Show loading state while checking auth
@@ -30,7 +30,7 @@ export function ProtectedRoute({ requiresConnection = false }: ProtectedRoutePro
   // If route requires connection, check for connected account
   if (requiresConnection) {
     // Still loading account info
-    if (isLoadingAccount) {
+    if (isLoadingAccounts) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="flex flex-col items-center gap-4">
@@ -42,7 +42,7 @@ export function ProtectedRoute({ requiresConnection = false }: ProtectedRoutePro
     }
 
     // No connected account - redirect to connect page
-    if (!connectedAccount) {
+    if (!selectedAccount) {
       return <Navigate to="/connect" state={{ from: location }} replace />;
     }
   }

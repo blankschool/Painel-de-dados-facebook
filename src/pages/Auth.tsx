@@ -22,7 +22,7 @@ export default function Auth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string }>({});
   
-  const { user, signIn, signUp, connectedAccount, isLoading } = useAuth();
+  const { user, signIn, signUp, selectedAccount, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -30,13 +30,13 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (!isLoading && user) {
-      if (connectedAccount) {
+      if (selectedAccount) {
         navigate('/overview', { replace: true });
       } else {
         navigate('/connect', { replace: true });
       }
     }
-  }, [user, connectedAccount, isLoading, navigate]);
+  }, [user, selectedAccount, isLoading, navigate]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string; name?: string } = {};
