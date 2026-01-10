@@ -3,52 +3,73 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
-// Decryption function for access tokens
+// Normalize / decrypt stored access tokens.
+// Historical formats in this project:
+// 1) Raw token (current fallback when ENCRYPTION_KEY is not set)
+// 2) "ENCRYPTED:" + base64(iv + ciphertext)
+// 3) Legacy base64(token) (older fallback when ENCRYPTION_KEY was not set)
 async function decryptToken(storedToken: string): Promise<string> {
-  // Check if token is encrypted (has ENCRYPTED: prefix)
-  if (!storedToken.startsWith('ENCRYPTED:')) {
-    // Token is not encrypted, return as-is
-    console.log('[ig-dashboard] Token is not encrypted, using as-is');
+  // Case 1: Encrypted token
+  if (storedToken.startsWith('ENCRYPTED:')) {
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    if (!encryptionKey) {
+      console.error('[ig-dashboard] No ENCRYPTION_KEY set but token is encrypted!');
+      throw new Error('Cannot decrypt token: ENCRYPTION_KEY not configured');
+    }
+
+    try {
+      // Remove ENCRYPTED: prefix and decode base64
+      const encryptedData = decodeBase64(storedToken.substring('ENCRYPTED:'.length));
+
+      // Extract IV (first 12 bytes) and encrypted content
+      const iv = encryptedData.slice(0, 12);
+      const encryptedContent = encryptedData.slice(12);
+
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(encryptionKey.padEnd(32, '0').substring(0, 32)),
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt'],
+      );
+
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        keyMaterial,
+        encryptedContent,
+      );
+
+      const decryptedToken = new TextDecoder().decode(decryptedBuffer);
+      console.log('[ig-dashboard] Token decrypted successfully');
+      return decryptedToken;
+    } catch (error) {
+      console.error('[ig-dashboard] Decryption error:', error);
+      throw new Error('Failed to decrypt access token');
+    }
+  }
+
+  // Case 2: Raw token (preferred if it already looks like a Graph token)
+  // FB/IG Graph tokens typically start with "EAA" or "IG".
+  if (/^(EAA|IG)/.test(storedToken)) {
     return storedToken;
   }
 
-  const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-  if (!encryptionKey) {
-    console.error('[ig-dashboard] No ENCRYPTION_KEY set but token is encrypted!');
-    throw new Error('Cannot decrypt token: ENCRYPTION_KEY not configured');
-  }
-
+  // Case 3: Legacy base64(token)
+  // Many older rows have access_token stored as base64 and start with "SUd" (base64("IG"...)).
   try {
-    // Remove ENCRYPTED: prefix and decode base64
-    const encryptedData = decodeBase64(storedToken.substring('ENCRYPTED:'.length));
-    
-    // Extract IV (first 12 bytes) and encrypted content
-    const iv = encryptedData.slice(0, 12);
-    const encryptedContent = encryptedData.slice(12);
+    const decodedBytes = decodeBase64(storedToken);
+    const decoded = new TextDecoder().decode(decodedBytes);
 
-    // Import the key
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(encryptionKey.padEnd(32, '0').substring(0, 32)),
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['decrypt']
-    );
-
-    // Decrypt
-    const decryptedBuffer = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      keyMaterial,
-      encryptedContent
-    );
-
-    const decryptedToken = new TextDecoder().decode(decryptedBuffer);
-    console.log('[ig-dashboard] Token decrypted successfully');
-    return decryptedToken;
-  } catch (error) {
-    console.error('[ig-dashboard] Decryption error:', error);
-    throw new Error('Failed to decrypt access token');
+    if (/^(EAA|IG)/.test(decoded) && decoded.length > 20) {
+      console.log('[ig-dashboard] Detected legacy base64 token; decoded successfully');
+      return decoded;
+    }
+  } catch {
+    // Not base64 → ignore
   }
+
+  console.log('[ig-dashboard] Token is not encrypted; using as-is');
+  return storedToken;
 }
 
 const allowedOrigins = [
