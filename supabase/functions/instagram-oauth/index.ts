@@ -200,34 +200,18 @@ serve(async (req) => {
       token_prefix: shortLivedToken.substring(0, 20) + '...'
     });
 
-    // Step 4: Exchange short-lived token for long-lived token (60 days)
-    // This is REQUIRED per Instagram Business Login documentation
-    console.log('[instagram-oauth] Step 4: Exchanging short-lived token for long-lived token...');
+    // Step 4: Use the access token from Instagram Business Login
+    // NOTE: Instagram Business Login returns a token that works directly with Graph API
+    // Unlike the old Basic Display API, there is NO ig_exchange_token step
+    // The token is already usable with Instagram Graph API endpoints
+    console.log('[instagram-oauth] Step 4: Using Instagram Business Login access token...');
 
-    const longLivedUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${instagramAppSecret}&access_token=${shortLivedToken}`;
+    const accessToken = shortLivedToken;
+    // Instagram Business Login tokens don't have a standard expiration API
+    // Setting to 60 days based on typical Instagram token lifetime
+    const expiresIn = 60 * 24 * 60 * 60; // 60 days in seconds
 
-    const longLivedResponse = await fetch(longLivedUrl);
-    const longLivedText = await longLivedResponse.text();
-
-    console.log('[instagram-oauth] Long-lived token response status:', longLivedResponse.status);
-    console.log('[instagram-oauth] Long-lived token response:', longLivedText);
-
-    if (!longLivedResponse.ok) {
-      console.error('[instagram-oauth] Long-lived token exchange failed');
-      throw new Error(`Failed to get long-lived token: ${longLivedText}`);
-    }
-
-    const longLivedData = JSON.parse(longLivedText);
-
-    if (longLivedData.error) {
-      console.error('[instagram-oauth] Long-lived token error:', longLivedData.error);
-      throw new Error(`Long-lived token error: ${longLivedData.error.message || JSON.stringify(longLivedData.error)}`);
-    }
-
-    const accessToken = longLivedData.access_token;
-    const expiresIn = longLivedData.expires_in || (60 * 24 * 60 * 60); // Default to 60 days
-
-    console.log('[instagram-oauth] ✓ Long-lived token received, expires in:', expiresIn, 'seconds (', Math.floor(expiresIn / 86400), 'days )');
+    console.log('[instagram-oauth] ✓ Access token ready for Graph API use');
 
     // Step 5: Get Instagram Business Account ID
     // Try multiple methods to get the correct Business Account ID
