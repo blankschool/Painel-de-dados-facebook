@@ -200,18 +200,51 @@ serve(async (req) => {
       token_prefix: shortLivedToken.substring(0, 20) + '...'
     });
 
-    // Step 4: Use the access token from Instagram Business Login
-    // NOTE: Instagram Business Login returns a token that works directly with Graph API
-    // Unlike the old Basic Display API, there is NO ig_exchange_token step
-    // The token is already usable with Instagram Graph API endpoints
-    console.log('[instagram-oauth] Step 4: Using Instagram Business Login access token...');
+    // Step 4: Exchange short-lived token for long-lived token (60 days)
+    // According to Instagram Business Login documentation, we MUST exchange the token
+    // https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=...&access_token=...
+    console.log('[instagram-oauth] Step 4: Exchanging for long-lived token...');
+    console.log('[instagram-oauth] Short-lived token format:', shortLivedToken.substring(0, 4) + '...');
 
-    const accessToken = shortLivedToken;
-    // Instagram Business Login tokens don't have a standard expiration API
-    // Setting to 60 days based on typical Instagram token lifetime
-    const expiresIn = 60 * 24 * 60 * 60; // 60 days in seconds
+    let accessToken: string;
+    let expiresIn: number;
 
-    console.log('[instagram-oauth] ✓ Access token ready for Graph API use');
+    const exchangeUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${instagramAppSecret}&access_token=${shortLivedToken}`;
+
+    const exchangeResponse = await fetch(exchangeUrl, {
+      method: 'GET',
+    });
+
+    const exchangeText = await exchangeResponse.text();
+    console.log('[instagram-oauth] Long-lived token response status:', exchangeResponse.status);
+    console.log('[instagram-oauth] Long-lived token response:', exchangeText);
+
+    if (!exchangeResponse.ok) {
+      console.error('[instagram-oauth] Token exchange failed:', exchangeText);
+      // FALLBACK: If exchange fails, try using the short-lived token directly
+      console.warn('[instagram-oauth] WARNING: Token exchange failed, using short-lived token directly');
+      accessToken = shortLivedToken;
+      expiresIn = 60 * 60; // 1 hour for short-lived token
+      console.log('[instagram-oauth] ⚠️ Using short-lived token (1 hour expiry)');
+    } else {
+      let exchangeData: any;
+      try {
+        exchangeData = JSON.parse(exchangeText);
+      } catch (e) {
+        console.error('[instagram-oauth] Failed to parse exchange response:', exchangeText);
+        throw new Error('Invalid exchange response from Instagram');
+      }
+
+      if (exchangeData.error) {
+        console.error('[instagram-oauth] Exchange error:', exchangeData.error);
+        throw new Error(`Failed to get long-lived token: ${exchangeData.error.message || 'Unknown error'}`);
+      }
+
+      accessToken = exchangeData.access_token;
+      expiresIn = exchangeData.expires_in || (60 * 24 * 60 * 60); // 60 days default
+
+      console.log('[instagram-oauth] ✓ Long-lived token received, expires in:', expiresIn, 'seconds');
+    }
 
     // Step 5: Get Instagram Business Account ID
     // Try multiple methods to get the correct Business Account ID
