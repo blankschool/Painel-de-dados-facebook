@@ -159,23 +159,15 @@ serve(async (req) => {
       token_prefix: shortLivedToken.substring(0, 20) + '...'
     });
 
-    // Step 4: Exchange for long-lived token (60 days)
-    console.log('[instagram-oauth] Step 4: Getting long-lived token...');
-    const longLivedUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${instagramAppSecret}&access_token=${shortLivedToken}`;
+    // Step 4: For Instagram Business Login, the token is already usable with Graph API
+    // No need to exchange - the token from Instagram OAuth is already a valid Graph API token
+    console.log('[instagram-oauth] Step 4: Using Instagram Business Login token (already Graph API compatible)');
 
-    const longLivedResponse = await fetch(longLivedUrl);
-    const longLivedData = await longLivedResponse.json();
+    const accessToken = shortLivedToken;
+    // Instagram Business Login tokens typically expire in 60 days
+    const expiresIn = 60 * 24 * 60 * 60; // 60 days in seconds
 
-    console.log('[instagram-oauth] Long-lived token response:', JSON.stringify(longLivedData, null, 2));
-
-    const accessToken = longLivedData.access_token || shortLivedToken;
-    const expiresIn = longLivedData.expires_in || 3600;
-
-    if (longLivedData.access_token) {
-      console.log('[instagram-oauth] Long-lived token received, expires in:', expiresIn, 'seconds');
-    } else {
-      console.warn('[instagram-oauth] Using short-lived token, long-lived exchange failed:', longLivedData.error);
-    }
+    console.log('[instagram-oauth] Token will be stored with 60-day expiration');
 
     // Step 5: Get Instagram Business Account ID
     // Try multiple methods to get the correct Business Account ID
@@ -215,29 +207,23 @@ serve(async (req) => {
       } else {
         console.log('[instagram-oauth] ✗ Method 2 FAILED:', meData.error?.message || 'No error details');
 
-        // METHOD 3: Fallback to Facebook Pages
-        console.log('[instagram-oauth] Method 3: Falling back to Facebook Pages...');
-        const pagesResponse = await fetch(
-          `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,instagram_business_account&access_token=${accessToken}`
-        );
-        const pagesData = await pagesResponse.json();
-        console.log('[instagram-oauth] Pages response:', JSON.stringify(pagesData, null, 2));
+        // All methods failed - provide helpful error message
+        console.error('[instagram-oauth] All discovery methods failed');
+        console.error('[instagram-oauth] Method 1 error:', testData.error);
+        console.error('[instagram-oauth] Method 2 error:', meData.error);
 
-        if (pagesData.error) {
-          console.error('[instagram-oauth] ✗ Method 3 FAILED:', pagesData.error.message);
-          throw new Error(`Failed to fetch Facebook Pages: ${pagesData.error.message}`);
-        }
+        // Determine the most likely cause based on error messages
+        const method1Error = testData.error?.message || '';
+        const method2Error = meData.error?.message || '';
 
-        const pageWithInstagram = pagesData.data?.find((page: any) => page.instagram_business_account);
-
-        if (pageWithInstagram?.instagram_business_account) {
-          businessAccountId = pageWithInstagram.instagram_business_account.id;
-          discoveryMethod = 'facebook_pages';
-          console.log('[instagram-oauth] ✓ Method 3 SUCCESS: Found via Facebook Page:', pageWithInstagram.name);
-          console.log('[instagram-oauth] Business Account ID:', businessAccountId);
+        if (method1Error.includes('missing permissions') || method2Error.includes('missing permissions')) {
+          throw new Error('Permissões ausentes. Certifique-se de conceder todas as permissões necessárias durante o login do Instagram.');
+        } else if (method1Error.includes('does not exist') || method2Error.includes('does not exist')) {
+          throw new Error('Conta Business do Instagram não encontrada. Certifique-se de que sua conta do Instagram foi convertida para Business ou Creator nas configurações do aplicativo Instagram.');
+        } else if (method1Error.includes('access token') || method2Error.includes('access token')) {
+          throw new Error('Token de acesso inválido. Tente conectar novamente.');
         } else {
-          console.error('[instagram-oauth] ✗ Method 3 FAILED: No Instagram Business Account found');
-          throw new Error('No Instagram Business Account found. Please ensure your Instagram account is converted to a Business or Creator account.');
+          throw new Error(`Não foi possível acessar a Conta Business do Instagram. Erro Método 1: ${method1Error}. Erro Método 2: ${method2Error}`);
         }
       }
     }
@@ -270,16 +256,16 @@ serve(async (req) => {
         error_subcode: profileData.error.error_subcode,
         fbtrace_id: profileData.error.fbtrace_id,
         user_id_used: instagramUserId,
-        token_type: longLivedData.access_token ? 'long-lived' : 'short-lived'
+        token_type: 'instagram_business_login'
       });
 
       // Provide helpful error messages based on the error
       if (profileData.error.code === 190 || profileData.error.code === 10) {
-        throw new Error('Instagram account access denied. Please ensure your account is a Business or Creator account and has granted all required permissions.');
+        throw new Error('Acesso à conta Instagram negado. Certifique-se de que sua conta é Business ou Creator e que concedeu todas as permissões necessárias.');
       } else if (profileData.error.message.includes('does not exist')) {
-        throw new Error('Instagram account not found. This may indicate a personal account that needs to be converted to Business or Creator type. Please convert your account in the Instagram app settings.');
+        throw new Error('Conta Instagram não encontrada. Isso pode indicar uma conta pessoal que precisa ser convertida para Business ou Creator. Converta sua conta nas configurações do aplicativo Instagram.');
       } else {
-        throw new Error(`Profile fetch error: ${profileData.error.message}`);
+        throw new Error(`Erro ao buscar perfil: ${profileData.error.message}`);
       }
     }
 
@@ -299,7 +285,7 @@ serve(async (req) => {
 
     // Verify Business/Creator account
     if (profileInfo.account_type && profileInfo.account_type !== 'BUSINESS' && profileInfo.account_type !== 'MEDIA_CREATOR') {
-      throw new Error('Only Instagram Business or Creator accounts can be connected. Please convert your account in Instagram app settings.');
+      throw new Error('Apenas contas Business ou Creator do Instagram podem ser conectadas. Converta sua conta nas configurações do aplicativo Instagram.');
     }
 
     // Warn if account seems incomplete
