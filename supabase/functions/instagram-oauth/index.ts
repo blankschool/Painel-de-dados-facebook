@@ -1,6 +1,47 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+
+// Encryption function for sensitive data
+async function encryptToken(token: string): Promise<string> {
+  const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+  if (!encryptionKey) {
+    console.warn('[instagram-oauth] WARNING: No ENCRYPTION_KEY set, storing token in base64 only');
+    return encodeBase64(new TextEncoder().encode(token));
+  }
+
+  try {
+    // Use Web Crypto API for AES-GCM encryption
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(encryptionKey.padEnd(32, '0').substring(0, 32)),
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encodedToken = new TextEncoder().encode(token);
+
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      keyMaterial,
+      encodedToken
+    );
+
+    // Combine IV + encrypted data and encode as base64
+    const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedBuffer), iv.length);
+
+    return encodeBase64(combined);
+  } catch (error) {
+    console.error('[instagram-oauth] Encryption error:', error);
+    // Fallback to base64 encoding if encryption fails
+    return encodeBase64(new TextEncoder().encode(token));
+  }
+}
 
 const allowedOrigins = [
   'https://painel-de-dados-instagram.lovable.app',
@@ -159,15 +200,34 @@ serve(async (req) => {
       token_prefix: shortLivedToken.substring(0, 20) + '...'
     });
 
-    // Step 4: For Instagram Business Login, the token is already usable with Graph API
-    // No need to exchange - the token from Instagram OAuth is already a valid Graph API token
-    console.log('[instagram-oauth] Step 4: Using Instagram Business Login token (already Graph API compatible)');
+    // Step 4: Exchange short-lived token for long-lived token (60 days)
+    // This is REQUIRED per Instagram Business Login documentation
+    console.log('[instagram-oauth] Step 4: Exchanging short-lived token for long-lived token...');
 
-    const accessToken = shortLivedToken;
-    // Instagram Business Login tokens typically expire in 60 days
-    const expiresIn = 60 * 24 * 60 * 60; // 60 days in seconds
+    const longLivedUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${instagramAppSecret}&access_token=${shortLivedToken}`;
 
-    console.log('[instagram-oauth] Token will be stored with 60-day expiration');
+    const longLivedResponse = await fetch(longLivedUrl);
+    const longLivedText = await longLivedResponse.text();
+
+    console.log('[instagram-oauth] Long-lived token response status:', longLivedResponse.status);
+    console.log('[instagram-oauth] Long-lived token response:', longLivedText);
+
+    if (!longLivedResponse.ok) {
+      console.error('[instagram-oauth] Long-lived token exchange failed');
+      throw new Error(`Failed to get long-lived token: ${longLivedText}`);
+    }
+
+    const longLivedData = JSON.parse(longLivedText);
+
+    if (longLivedData.error) {
+      console.error('[instagram-oauth] Long-lived token error:', longLivedData.error);
+      throw new Error(`Long-lived token error: ${longLivedData.error.message || JSON.stringify(longLivedData.error)}`);
+    }
+
+    const accessToken = longLivedData.access_token;
+    const expiresIn = longLivedData.expires_in || (60 * 24 * 60 * 60); // Default to 60 days
+
+    console.log('[instagram-oauth] ✓ Long-lived token received, expires in:', expiresIn, 'seconds (', Math.floor(expiresIn / 86400), 'days )');
 
     // Step 5: Get Instagram Business Account ID
     // Try multiple methods to get the correct Business Account ID
@@ -293,9 +353,13 @@ serve(async (req) => {
       console.warn('[instagram-oauth] WARNING: Account has no username or name - may be incomplete profile');
     }
 
-    // Step 7: Save to database
-    console.log('[instagram-oauth] Step 7: Saving to database...');
+    // Step 7: Save to database with encrypted token
+    console.log('[instagram-oauth] Step 7: Encrypting token and saving to database...');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Encrypt the access token before storing
+    const encryptedToken = await encryptToken(accessToken);
+    console.log('[instagram-oauth] Token encrypted successfully');
 
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
@@ -305,7 +369,7 @@ serve(async (req) => {
         user_id: user.id,
         provider: 'instagram',
         provider_account_id: finalInstagramUserId,
-        access_token: accessToken,
+        access_token: encryptedToken, // Store encrypted token
         token_expires_at: tokenExpiresAt,
         account_username: profileInfo.username || null,
         account_name: profileInfo.name || null,
