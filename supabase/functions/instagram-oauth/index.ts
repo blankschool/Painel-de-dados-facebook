@@ -1,14 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 // Encryption function for sensitive data
 async function encryptToken(token: string): Promise<string> {
   const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
   if (!encryptionKey) {
-    console.warn('[instagram-oauth] WARNING: No ENCRYPTION_KEY set, storing token in base64 only');
-    return encodeBase64(token);
+    console.warn('[instagram-oauth] WARNING: No ENCRYPTION_KEY set, storing token as-is');
+    // Store raw token - no encoding needed
+    return token;
   }
 
   try {
@@ -35,11 +36,12 @@ async function encryptToken(token: string): Promise<string> {
     combined.set(iv);
     combined.set(new Uint8Array(encryptedBuffer), iv.length);
 
-    return encodeBase64(combined);
+    // ENCRYPTED: prefix indicates this token is encrypted
+    return 'ENCRYPTED:' + encodeBase64(combined);
   } catch (error) {
     console.error('[instagram-oauth] Encryption error:', error);
-    // Fallback to base64 encoding if encryption fails
-    return encodeBase64(token);
+    // Fallback to raw token if encryption fails
+    return token;
   }
 }
 
