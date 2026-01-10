@@ -525,8 +525,26 @@ serve(async (req) => {
     }
 
     const businessId = connectedAccount.provider_account_id;
+
+    // Log token format for debugging
+    const storedToken = connectedAccount.access_token;
+    console.log('[ig-dashboard] Token format check:', {
+      starts_with_encrypted: storedToken.startsWith('ENCRYPTED:'),
+      starts_with_ig: storedToken.startsWith('IGAA') || storedToken.startsWith('IG'),
+      starts_with_eaa: storedToken.startsWith('EAA'),
+      first_10_chars: storedToken.substring(0, 10),
+      length: storedToken.length,
+    });
+
     // Decrypt the access token if it's encrypted
-    const accessToken = await decryptToken(connectedAccount.access_token);
+    const accessToken = await decryptToken(storedToken);
+
+    console.log('[ig-dashboard] Decrypted token format:', {
+      starts_with_ig: accessToken.startsWith('IGAA') || accessToken.startsWith('IG'),
+      starts_with_eaa: accessToken.startsWith('EAA'),
+      first_10_chars: accessToken.substring(0, 10),
+      length: accessToken.length,
+    });
 
     console.log(`[ig-dashboard] Fetching data for @${connectedAccount.account_username} businessId=${businessId} (user=${user.id}, accountId=${connectedAccount.id})`);
 
