@@ -559,9 +559,24 @@ serve(async (req) => {
       `[ig-dashboard] Fetching data for businessId=${businessId}, maxPosts=${maxPosts}, maxInsightsPosts=${maxInsightsPosts}`,
     );
 
-    const profileJson = await graphGet(`/${businessId}`, accessToken, {
-      fields: "id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website",
-    });
+    let profileJson: unknown;
+    try {
+      profileJson = await graphGet(`/${businessId}`, accessToken, {
+        fields: "id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website",
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[ig-dashboard] Profile fetch failed:', errorMsg);
+
+      // Check if it's an invalid token error
+      if (errorMsg.includes('Cannot parse access token') || errorMsg.includes('Invalid OAuth access token')) {
+        throw new Error(
+          'Token de acesso inválido ou expirado. Por favor, vá para /connect e reconecte sua conta Instagram para obter um novo token.'
+        );
+      }
+
+      throw error;
+    }
     const profile = profileJson as InstagramProfile;
 
     const allMedia: MediaItem[] = [];
