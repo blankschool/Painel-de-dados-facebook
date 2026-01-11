@@ -72,20 +72,18 @@ const getCorsHeaders = (origin: string | null) => {
   };
 };
 
-// Instagram Graph API base URL (works for IGAA tokens)
+// Instagram Graph API base URL - IGAA tokens ONLY work with graph.instagram.com
 const GRAPH_BASE = "https://graph.instagram.com/v24.0";
-const FB_GRAPH_BASE = "https://graph.facebook.com/v24.0";
 
-async function graphGet(path: string, accessToken: string, params: Record<string, string> = {}, useFbGraph = false): Promise<any> {
-  const base = useFbGraph ? FB_GRAPH_BASE : GRAPH_BASE;
-  const url = new URL(`${base}${path}`);
+async function graphGet(path: string, accessToken: string, params: Record<string, string> = {}): Promise<any> {
+  const url = new URL(`${GRAPH_BASE}${path}`);
 
   Object.entries(params).forEach(([key, value]) => {
     url.searchParams.append(key, value);
   });
   url.searchParams.append('access_token', accessToken);
 
-  console.log(`[igaa-dashboard] GET ${url.pathname}${url.search.substring(0, 100)}...`);
+  console.log(`[igaa-dashboard] GET ${GRAPH_BASE}${path}?...`);
 
   const response = await fetch(url.toString());
   const data = await response.json();
@@ -183,11 +181,11 @@ serve(async (req) => {
 
     const businessId = connectedAccount.provider_account_id;
 
-    // Fetch basic profile using Facebook Graph API (works better with IGAA tokens)
-    console.log('[igaa-dashboard] Fetching profile via Facebook Graph API...');
+    // Fetch basic profile using Instagram Graph API (IGAA tokens only work with graph.instagram.com)
+    console.log('[igaa-dashboard] Fetching profile via Instagram Graph API...');
     const profile = await graphGet(`/${businessId}`, accessToken, {
       fields: 'id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website'
-    }, true); // Use Facebook Graph API
+    });
 
     console.log('[igaa-dashboard] Profile fetched:', {
       id: profile.id,
@@ -200,7 +198,7 @@ serve(async (req) => {
     const mediaResponse = await graphGet(`/${businessId}/media`, accessToken, {
       fields: 'id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count',
       limit: '25'
-    }, true);
+    });
 
     const media = mediaResponse.data || [];
     console.log('[igaa-dashboard] Fetched', media.length, 'media items');
@@ -211,7 +209,7 @@ serve(async (req) => {
       try {
         const insights = await graphGet(`/${item.id}/insights`, accessToken, {
           metric: 'engagement,impressions,reach,saved'
-        }, true);
+        });
 
         const insightsData: Record<string, number> = {};
         if (insights.data) {
