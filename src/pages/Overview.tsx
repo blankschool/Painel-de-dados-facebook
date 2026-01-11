@@ -4,7 +4,8 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Grid2X2, Search, Play, Clock, Image, ExternalLink } from "lucide-react";
+import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
@@ -200,7 +201,15 @@ export default function Overview() {
 
   return (
     <>
-      <FiltersBar />
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <FiltersBar />
+        {data?.token_type && (
+          <Badge variant="outline" className="flex items-center gap-1.5 shrink-0">
+            <Instagram className="w-3.5 h-3.5" />
+            {data.token_type === 'IGAA' ? 'Instagram Business Login' : 'Facebook Login'}
+          </Badge>
+        )}
+      </div>
 
       <div className="content-area space-y-6">
         {/* Business Overview Metrics */}

@@ -22,6 +22,8 @@ export type IgDashboardResponse = {
   request_id?: string;
   snapshot_date?: string;
   provider?: string;
+  token_type?: 'IGAA' | 'EAA' | 'unknown';
+  api_endpoint?: string;
   profile?: {
     id: string;
     username?: string;
