@@ -169,14 +169,43 @@ type StoryItem = {
   insights?: Record<string, number>;
 };
 
-const GRAPH_BASE = "https://graph.facebook.com/v24.0";
+// Dual API base URLs for token type support
+const FB_GRAPH_BASE = "https://graph.facebook.com/v24.0";  // For EAA tokens (Facebook Login)
+const IG_GRAPH_BASE = "https://graph.instagram.com/v24.0"; // For IGAA tokens (Instagram Business Login)
+
+type TokenType = 'IGAA' | 'EAA' | 'unknown';
+
+function detectTokenType(token: string): TokenType {
+  // IGAA tokens from Instagram Business Login start with IGAA or IGQV
+  if (token.startsWith('IGAA') || token.startsWith('IGQV')) {
+    return 'IGAA';
+  }
+  // Some older IG tokens start with just IG (but not IGAA)
+  if (token.startsWith('IG') && !token.startsWith('IGAA')) {
+    return 'IGAA';
+  }
+  // EAA tokens from Facebook Login for Business
+  if (token.startsWith('EAA')) {
+    return 'EAA';
+  }
+  return 'unknown';
+}
+
+function getGraphBase(tokenType: TokenType): string {
+  return tokenType === 'IGAA' ? IG_GRAPH_BASE : FB_GRAPH_BASE;
+}
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-async function graphGet(path: string, accessToken: string, params: Record<string, string> = {}): Promise<unknown> {
-  const url = new URL(`${GRAPH_BASE}${path}`);
+async function graphGet(
+  path: string, 
+  accessToken: string, 
+  params: Record<string, string> = {},
+  graphBase: string = FB_GRAPH_BASE
+): Promise<unknown> {
+  const url = new URL(`${graphBase}${path}`);
   url.searchParams.set("access_token", accessToken);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
@@ -259,6 +288,7 @@ async function fetchMediaInsights(
   mediaId: string,
   mediaType: string,
   mediaProductType?: string,
+  graphBase: string = FB_GRAPH_BASE,
 ): Promise<Record<string, number>> {
   const isReel = mediaProductType === "REELS" || mediaProductType === "REEL";
   const isCarousel = mediaType === "CAROUSEL_ALBUM";
@@ -314,7 +344,7 @@ async function fetchMediaInsights(
 
   for (const metric of candidates) {
     try {
-      const json = await graphGet(`/${mediaId}/insights`, accessToken, { metric });
+      const json = await graphGet(`/${mediaId}/insights`, accessToken, { metric }, graphBase);
       const raw = parseInsightsResponse(json);
       const normalized = normalizeMediaInsights(raw);
 
@@ -443,18 +473,22 @@ function computeMediaMetrics(
   return { normalizedInsights, computed };
 }
 
-async function fetchStoryInsights(accessToken: string, storyId: string): Promise<Record<string, number>> {
+async function fetchStoryInsights(
+  accessToken: string, 
+  storyId: string,
+  graphBase: string = FB_GRAPH_BASE
+): Promise<Record<string, number>> {
   try {
     const json = await graphGet(`/${storyId}/insights`, accessToken, {
       metric: "views,reach,replies,exits,taps_forward,taps_back",
-    });
+    }, graphBase);
     const raw = parseInsightsResponse(json);
     return raw;
   } catch {
     try {
       const json = await graphGet(`/${storyId}/insights`, accessToken, {
         metric: "impressions,reach,replies,exits,taps_forward,taps_back",
-      });
+      }, graphBase);
       const raw = parseInsightsResponse(json);
       if (raw.impressions && !raw.views) {
         raw.views = raw.impressions;
@@ -539,14 +573,18 @@ serve(async (req) => {
     // Decrypt the access token if it's encrypted
     const accessToken = await decryptToken(storedToken);
 
-    console.log('[ig-dashboard] Decrypted token format:', {
-      starts_with_ig: accessToken.startsWith('IGAA') || accessToken.startsWith('IG'),
-      starts_with_eaa: accessToken.startsWith('EAA'),
+    // Detect token type and select appropriate API base
+    const tokenType = detectTokenType(accessToken);
+    const GRAPH_BASE = getGraphBase(tokenType);
+
+    console.log('[ig-dashboard] Token detection:', {
+      token_type: tokenType,
+      api_base: GRAPH_BASE,
       first_10_chars: accessToken.substring(0, 10),
       length: accessToken.length,
     });
 
-    console.log(`[ig-dashboard] Fetching data for @${connectedAccount.account_username} businessId=${businessId} (user=${user.id}, accountId=${connectedAccount.id})`);
+    console.log(`[ig-dashboard] Fetching data for @${connectedAccount.account_username} businessId=${businessId} (user=${user.id}, accountId=${connectedAccount.id}, tokenType=${tokenType})`);
 
     const maxPosts = typeof body.maxPosts === "number" ? Math.max(1, Math.min(2000, body.maxPosts)) : 500;
     const maxStories = typeof body.maxStories === "number" ? Math.max(1, Math.min(50, body.maxStories)) : 25;
@@ -563,7 +601,7 @@ serve(async (req) => {
     try {
       profileJson = await graphGet(`/${businessId}`, accessToken, {
         fields: "id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website",
-      });
+      }, GRAPH_BASE);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[ig-dashboard] Profile fetch failed:', errorMsg);
@@ -588,7 +626,7 @@ serve(async (req) => {
     const firstMediaJson = await graphGet(`/${businessId}/media`, accessToken, {
       fields: mediaFields,
       limit: "100",
-    });
+    }, GRAPH_BASE);
 
     const firstMediaData = (firstMediaJson as { data?: unknown; paging?: { next?: string } }).data;
     if (Array.isArray(firstMediaData)) allMedia.push(...(firstMediaData as MediaItem[]));
@@ -612,7 +650,7 @@ serve(async (req) => {
     const storiesJson = await graphGet(`/${businessId}/stories`, accessToken, {
       fields: "id,media_type,media_url,permalink,timestamp",
       limit: String(maxStories),
-    });
+    }, GRAPH_BASE);
     const storiesData = (storiesJson as { data?: unknown }).data;
     const storyItems: StoryItem[] = Array.isArray(storiesData) ? (storiesData as StoryItem[]) : [];
 
@@ -627,7 +665,7 @@ serve(async (req) => {
           const absoluteIndex = i + j;
           const insights =
             absoluteIndex < maxInsightsPosts
-              ? await fetchMediaInsights(accessToken, m.id, m.media_type, m.media_product_type)
+              ? await fetchMediaInsights(accessToken, m.id, m.media_type, m.media_product_type, GRAPH_BASE)
               : {};
 
           const followersCount = asNumber(profile.followers_count);
@@ -642,7 +680,7 @@ serve(async (req) => {
 
     const storiesWithInsights = await Promise.all(
       storyItems.map(async (s) => {
-        const insights = await fetchStoryInsights(accessToken, s.id);
+        const insights = await fetchStoryInsights(accessToken, s.id, GRAPH_BASE);
         const views = insights.views ?? insights.impressions ?? 0;
         const exits = insights.exits ?? 0;
         const completionRate = views > 0 ? Math.round((1 - exits / views) * 100) : 0;
@@ -704,7 +742,7 @@ serve(async (req) => {
           period: "lifetime",
           metric_type: "total_value",
           breakdown: breakdownType,
-        });
+        }, GRAPH_BASE);
 
         const demoData = (demoJson as { data?: unknown[] }).data;
         if (Array.isArray(demoData) && demoData.length > 0) {
@@ -738,7 +776,7 @@ serve(async (req) => {
             period: "lifetime",
             metric_type: "total_value",
             breakdown: breakdownType,
-          });
+          }, GRAPH_BASE);
 
           const demoData = (demoJson as { data?: unknown[] }).data;
           if (Array.isArray(demoData) && demoData.length > 0) {
@@ -787,7 +825,7 @@ serve(async (req) => {
       const onlineJson = await graphGet(`/${businessId}/insights`, accessToken, {
         metric: "online_followers",
         period: "lifetime",
-      });
+      }, GRAPH_BASE);
       const onlineData = (onlineJson as { data?: unknown[] }).data;
       if (Array.isArray(onlineData) && onlineData.length > 0) {
         const metric = onlineData[0] as { values?: Array<{ value?: Record<string, number> }> };
@@ -836,6 +874,8 @@ serve(async (req) => {
         snapshot_date: new Date().toISOString().slice(0, 10),
         provider: "instagram_graph_api",
         api_version: "v24.0",
+        token_type: tokenType,
+        api_endpoint: GRAPH_BASE,
         profile,
         media: mediaWithInsights,
         posts: mediaWithInsights,
