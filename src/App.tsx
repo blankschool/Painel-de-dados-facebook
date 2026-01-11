@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Connect from "./pages/Connect";
 import AuthCallback from "./pages/AuthCallback";
+import Debug from "./pages/Debug";
 
 // Dashboard Pages
 import Overview from "./pages/Overview";
@@ -49,6 +50,7 @@ const App = () => (
                 {/* Protected routes - requires login */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="/connect" element={<Connect />} />
+                  <Route path="/debug" element={<Debug />} />
                 </Route>
 
                 {/* Protected routes - requires login AND connected account */}
