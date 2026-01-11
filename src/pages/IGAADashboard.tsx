@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, FileText, Heart, MessageCircle, TrendingUp, Instagram, ArrowLeft } from 'lucide-react';
+import { Loader2, Users, FileText, Heart, MessageCircle, TrendingUp, Instagram, ArrowLeft, Eye, Target, Share2, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function IGAADashboard() {
@@ -147,7 +147,7 @@ export default function IGAADashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Stats Grid */}
+        {/* Primary Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-3">
@@ -196,6 +196,108 @@ export default function IGAADashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{summary.avg_comments.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">nos últimos {summary.total_posts} posts</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Performance Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Engagement Rate */}
+          <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-pink-500" />
+                Taxa de Engajamento
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const followers = profile.followers_count || 0;
+                const avgEngagement = summary.avg_likes + summary.avg_comments;
+                const engagementRate = followers > 0 ? ((avgEngagement / followers) * 100) : 0;
+                return (
+                  <>
+                    <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+                      {engagementRate.toFixed(2)}%
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      (curtidas + comentários) / seguidores
+                    </p>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          {/* Reach Rate */}
+          <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Target className="h-4 w-4 text-blue-500" />
+                Taxa de Alcance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const followers = profile.followers_count || 0;
+                const avgReach = summary.avg_reach || 0;
+                const reachRate = followers > 0 && avgReach > 0 ? ((avgReach / followers) * 100) : null;
+                return (
+                  <>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {reachRate !== null ? `${reachRate.toFixed(1)}%` : 'N/A'}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {summary.avg_reach ? `Alcance médio: ${summary.avg_reach.toLocaleString()}` : 'Dados insuficientes'}
+                    </p>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          {/* Average Views */}
+          <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Eye className="h-4 w-4 text-orange-500" />
+                Visualizações Médias
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                {summary.avg_views ? summary.avg_views.toLocaleString() : 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {summary.posts_with_insights || 0} posts com insights
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Insights Available */}
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Bookmark className="h-4 w-4 text-emerald-500" />
+                Cobertura de Insights
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const insightsCount = summary.posts_with_insights || 0;
+                const totalPosts = summary.total_posts || 0;
+                const coverage = totalPosts > 0 ? ((insightsCount / totalPosts) * 100) : 0;
+                return (
+                  <>
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                      {coverage.toFixed(0)}%
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {insightsCount} de {totalPosts} posts analisados
+                    </p>
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
@@ -275,19 +377,36 @@ export default function IGAADashboard() {
                       <div className="mt-2 pt-2 border-t border-border">
                         <p className="text-xs font-semibold text-muted-foreground mb-1">Insights:</p>
                         <div className="grid grid-cols-2 gap-1 text-xs">
-                          {item.insights.impressions && (
-                            <div>Impressões: {item.insights.impressions.toLocaleString()}</div>
+                          {item.insights.views !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <Eye className="h-3 w-3 text-orange-500" />
+                              {item.insights.views.toLocaleString()}
+                            </div>
                           )}
-                          {item.insights.reach && (
-                            <div>Alcance: {item.insights.reach.toLocaleString()}</div>
+                          {item.insights.reach !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <Target className="h-3 w-3 text-blue-500" />
+                              {item.insights.reach.toLocaleString()}
+                            </div>
                           )}
-                          {item.insights.engagement && (
-                            <div>Engajamento: {item.insights.engagement.toLocaleString()}</div>
+                          {item.insights.shares !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <Share2 className="h-3 w-3 text-green-500" />
+                              {item.insights.shares.toLocaleString()}
+                            </div>
                           )}
-                          {item.insights.saved && (
-                            <div>Salvos: {item.insights.saved.toLocaleString()}</div>
+                          {item.insights.saved !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <Bookmark className="h-3 w-3 text-purple-500" />
+                              {item.insights.saved.toLocaleString()}
+                            </div>
                           )}
                         </div>
+                        {item.computed && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            ER: {item.computed.er?.toFixed(2) || 'N/A'}%
+                          </div>
+                        )}
                       </div>
                     )}
 
