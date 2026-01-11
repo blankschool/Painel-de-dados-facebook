@@ -75,6 +75,35 @@ const getCorsHeaders = (origin: string | null) => {
 // Instagram Graph API base URL - IGAA tokens ONLY work with graph.instagram.com
 const GRAPH_BASE = "https://graph.instagram.com/v24.0";
 
+type MediaItem = {
+  id: string;
+  caption?: string;
+  media_type: string;
+  media_product_type?: string;
+  media_url?: string;
+  permalink?: string;
+  thumbnail_url?: string;
+  timestamp: string;
+  like_count?: number;
+  comments_count?: number;
+  insights?: Record<string, number>;
+  computed?: ComputedMetrics;
+};
+
+type ComputedMetrics = {
+  likes: number;
+  comments: number;
+  saves: number | null;
+  shares: number | null;
+  reach: number | null;
+  views: number | null;
+  total_interactions: number | null;
+  engagement: number;
+  score: number;
+  er: number | null;
+  has_insights: boolean;
+};
+
 async function graphGet(path: string, accessToken: string, params: Record<string, string> = {}): Promise<any> {
   const url = new URL(`${GRAPH_BASE}${path}`);
 
@@ -94,6 +123,173 @@ async function graphGet(path: string, accessToken: string, params: Record<string
   }
 
   return data;
+}
+
+// Parse insights response from Instagram API
+function parseInsightsResponse(json: unknown): Record<string, number> {
+  const data = (json as { data?: unknown }).data;
+  if (!Array.isArray(data)) return {};
+
+  const out: Record<string, number> = {};
+  for (const item of data) {
+    const obj = typeof item === "object" && item ? (item as Record<string, unknown>) : null;
+    const name = obj && typeof obj.name === "string" ? obj.name : null;
+    const values = obj && Array.isArray(obj.values) ? obj.values : null;
+    const lastValue = Array.isArray(values) && values.length > 0 ? values[values.length - 1]?.value : null;
+
+    if (typeof name === "string" && typeof lastValue === "number") {
+      out[name] = lastValue;
+    }
+  }
+  return out;
+}
+
+// Normalize media insights to consistent keys
+function normalizeMediaInsights(raw: Record<string, number>): Record<string, number> {
+  const saved = raw.saved ?? raw.saves;
+  const shares = raw.shares;
+  const reach = raw.reach;
+  const views = raw.views;
+  const total_interactions = raw.total_interactions ?? raw.engagement;
+
+  return {
+    ...raw,
+    ...(typeof views === "number" ? { views } : {}),
+    ...(typeof reach === "number" ? { reach } : {}),
+    ...(typeof saved === "number" ? { saved, saves: raw.saves ?? saved } : {}),
+    ...(typeof shares === "number" ? { shares } : {}),
+    ...(typeof total_interactions === "number" ? { total_interactions } : {}),
+  };
+}
+
+// Fetch media insights with fallback metric combinations
+// Valid metrics for Instagram Graph API: impressions, shares, comments, plays, likes, saved, replies, 
+// total_interactions, navigation, follows, profile_visits, profile_activity, reach, 
+// ig_reels_video_view_total_time, ig_reels_avg_watch_time, clips_replays_count, 
+// ig_reels_aggregated_all_plays_count, views
+async function fetchMediaInsights(
+  accessToken: string,
+  mediaId: string,
+  mediaType: string,
+  mediaProductType?: string,
+): Promise<Record<string, number>> {
+  const isReel = mediaProductType === "REELS" || mediaProductType === "REEL";
+  const isCarousel = mediaType === "CAROUSEL_ALBUM";
+  const isVideo = mediaType === "VIDEO";
+
+  // Build metric candidates based on media type
+  // Using only valid Instagram Graph API metrics
+  const candidates: string[] = [];
+
+  if (isReel) {
+    candidates.push(
+      "views,reach,saved,shares,total_interactions",
+      "views,reach,saved,shares",
+      "views,reach,saved",
+      "views,reach",
+      "reach,saved,shares",
+      "reach,saved",
+      "reach",
+      "impressions,reach,saved",
+      "impressions,reach",
+    );
+  } else if (isCarousel) {
+    candidates.push(
+      "views,reach,saved,shares,total_interactions",
+      "views,reach,saved,shares",
+      "views,reach,saved",
+      "reach,saved,shares",
+      "reach,saved",
+      "reach",
+      "impressions,reach,saved",
+      "impressions,reach",
+    );
+  } else if (isVideo) {
+    candidates.push(
+      "views,reach,saved,shares,total_interactions",
+      "views,reach,saved,shares",
+      "views,reach,saved",
+      "views,reach",
+      "reach,saved,shares",
+      "reach,saved",
+      "reach",
+      "impressions,reach,saved",
+      "impressions,reach",
+    );
+  } else {
+    // IMAGE type
+    candidates.push(
+      "views,reach,saved,shares,total_interactions",
+      "views,reach,saved,shares",
+      "views,reach,saved",
+      "reach,saved,shares",
+      "reach,saved",
+      "reach",
+      "impressions,reach,saved",
+      "impressions,reach",
+      "likes,comments,saved",
+    );
+  }
+
+  for (const metric of candidates) {
+    try {
+      const json = await graphGet(`/${mediaId}/insights`, accessToken, { metric });
+      const raw = parseInsightsResponse(json);
+      const normalized = normalizeMediaInsights(raw);
+
+      if (Object.keys(normalized).length > 0) {
+        console.log(
+          `[igaa-dashboard] Insights SUCCESS media=${mediaId} metric=${metric} keys=${Object.keys(normalized).join(",")}`,
+        );
+        return normalized;
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.log(`[igaa-dashboard] Insights attempt failed media=${mediaId} metric=${metric}: ${errMsg.slice(0, 120)}`);
+      continue;
+    }
+  }
+
+  console.log(`[igaa-dashboard] Insights EMPTY for media=${mediaId} type=${mediaType} product=${mediaProductType}`);
+  return {};
+}
+
+// Compute media metrics from insights
+function computeMediaMetrics(
+  media: MediaItem,
+  insightsRaw: Record<string, number>,
+  followersCount: number | null,
+): ComputedMetrics {
+  const likes = media.like_count ?? 0;
+  const comments = media.comments_count ?? 0;
+
+  const saves = insightsRaw.saved ?? insightsRaw.saves ?? null;
+  const reach = insightsRaw.reach ?? null;
+  const views = insightsRaw.views ?? null;
+  const shares = insightsRaw.shares ?? null;
+  const total_interactions = insightsRaw.total_interactions ?? null;
+
+  const engagement = likes + comments + (saves ?? 0) + (shares ?? 0);
+  const score = likes * 1 + comments * 2 + (saves ?? 0) * 3 + (shares ?? 0) * 4;
+
+  const followers = typeof followersCount === "number" && followersCount > 0 ? followersCount : null;
+  const er = followers ? (engagement / followers) * 100 : null;
+
+  const hasInsights = Object.keys(insightsRaw).length > 0;
+
+  return {
+    likes,
+    comments,
+    saves,
+    shares,
+    reach,
+    views,
+    total_interactions,
+    engagement,
+    score,
+    er,
+    has_insights: hasInsights,
+  };
 }
 
 serve(async (req) => {
@@ -129,6 +325,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const accountId = body.accountId;
+    const maxInsightsPosts = body.maxInsightsPosts ?? 10;
 
     // Fetch connected account - only Instagram provider with IGAA token
     let accountQuery = supabaseAuth
@@ -177,11 +374,11 @@ serve(async (req) => {
       });
     }
 
-    console.log('[igaa-dashboard] IGAA token detected, fetching Instagram Basic data...');
+    console.log('[igaa-dashboard] IGAA token detected, fetching Instagram data...');
 
     const businessId = connectedAccount.provider_account_id;
 
-    // Fetch basic profile using Instagram Graph API (IGAA tokens only work with graph.instagram.com)
+    // Fetch profile using Instagram Graph API
     console.log('[igaa-dashboard] Fetching profile via Instagram Graph API...');
     const profile = await graphGet(`/${businessId}`, accessToken, {
       fields: 'id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website'
@@ -193,47 +390,60 @@ serve(async (req) => {
       followers: profile.followers_count,
     });
 
-    // Fetch recent media
+    // Fetch recent media with media_product_type for proper insight handling
     console.log('[igaa-dashboard] Fetching recent media...');
     const mediaResponse = await graphGet(`/${businessId}/media`, accessToken, {
-      fields: 'id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count',
+      fields: 'id,caption,media_type,media_product_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count',
       limit: '25'
     });
 
-    const media = mediaResponse.data || [];
+    const media: MediaItem[] = mediaResponse.data || [];
     console.log('[igaa-dashboard] Fetched', media.length, 'media items');
 
-    // Try to fetch insights for recent posts (may not work with IGAA tokens in dev mode)
-    const mediaWithInsights = [];
-    for (const item of media.slice(0, 10)) { // Only first 10 to avoid rate limits
-      try {
-        const insights = await graphGet(`/${item.id}/insights`, accessToken, {
-          metric: 'engagement,impressions,reach,saved'
-        });
+    // Fetch insights for recent posts using proper fallback system
+    const mediaWithInsights: MediaItem[] = [];
+    const insightsToFetch = media.slice(0, maxInsightsPosts);
 
-        const insightsData: Record<string, number> = {};
-        if (insights.data) {
-          insights.data.forEach((metric: any) => {
-            insightsData[metric.name] = metric.values?.[0]?.value || 0;
-          });
-        }
+    for (const item of insightsToFetch) {
+      const insightsRaw = await fetchMediaInsights(
+        accessToken,
+        item.id,
+        item.media_type,
+        item.media_product_type
+      );
 
-        mediaWithInsights.push({
-          ...item,
-          insights: insightsData,
-        });
-      } catch (error) {
-        console.warn('[igaa-dashboard] Could not fetch insights for', item.id, ':', error instanceof Error ? error.message : 'Unknown error');
-        // Add media without insights
-        mediaWithInsights.push({
-          ...item,
-          insights: {},
-        });
-      }
+      const computed = computeMediaMetrics(item, insightsRaw, profile.followers_count ?? null);
+
+      mediaWithInsights.push({
+        ...item,
+        insights: insightsRaw,
+        computed,
+      });
     }
 
     // Add remaining media without insights
-    mediaWithInsights.push(...media.slice(10));
+    for (const item of media.slice(maxInsightsPosts)) {
+      mediaWithInsights.push({
+        ...item,
+        insights: {},
+        computed: computeMediaMetrics(item, {}, profile.followers_count ?? null),
+      });
+    }
+
+    // Calculate summary stats
+    const totalLikes = media.reduce((sum, item) => sum + (item.like_count || 0), 0);
+    const totalComments = media.reduce((sum, item) => sum + (item.comments_count || 0), 0);
+    const avgLikes = media.length > 0 ? Math.round(totalLikes / media.length) : 0;
+    const avgComments = media.length > 0 ? Math.round(totalComments / media.length) : 0;
+
+    // Calculate insights-based metrics
+    const postsWithInsights = mediaWithInsights.filter(m => m.computed?.has_insights);
+    const avgReach = postsWithInsights.length > 0
+      ? Math.round(postsWithInsights.reduce((sum, m) => sum + (m.computed?.reach ?? 0), 0) / postsWithInsights.length)
+      : null;
+    const avgViews = postsWithInsights.length > 0
+      ? Math.round(postsWithInsights.reduce((sum, m) => sum + (m.computed?.views ?? 0), 0) / postsWithInsights.length)
+      : null;
 
     const duration = Date.now() - startedAt;
     console.log('[igaa-dashboard] Success! Duration:', duration, 'ms');
@@ -255,15 +465,18 @@ serve(async (req) => {
       media: mediaWithInsights,
       summary: {
         total_posts: media.length,
-        total_likes: media.reduce((sum: number, item: any) => sum + (item.like_count || 0), 0),
-        total_comments: media.reduce((sum: number, item: any) => sum + (item.comments_count || 0), 0),
-        avg_likes: media.length > 0 ? Math.round(media.reduce((sum: number, item: any) => sum + (item.like_count || 0), 0) / media.length) : 0,
-        avg_comments: media.length > 0 ? Math.round(media.reduce((sum: number, item: any) => sum + (item.comments_count || 0), 0) / media.length) : 0,
+        total_likes: totalLikes,
+        total_comments: totalComments,
+        avg_likes: avgLikes,
+        avg_comments: avgComments,
+        avg_reach: avgReach,
+        avg_views: avgViews,
+        posts_with_insights: postsWithInsights.length,
       },
       _metadata: {
         duration_ms: duration,
         media_fetched: media.length,
-        insights_fetched: mediaWithInsights.filter(m => m.insights && Object.keys(m.insights).length > 0).length,
+        insights_fetched: postsWithInsights.length,
       },
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
