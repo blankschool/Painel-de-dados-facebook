@@ -3,12 +3,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Debug() {
   const { user, connectedAccounts } = useAuth();
   const [testing, setTesting] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const navigate = useNavigate();
 
   const runDiagnostics = async () => {
     setTesting(true);
@@ -159,6 +161,16 @@ export default function Debug() {
                                     )}
                                   </p>
                                 </div>
+
+                                {result.token_info.starts_with_igaa && (
+                                  <Button
+                                    onClick={() => navigate('/igaa-dashboard')}
+                                    className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400"
+                                  >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Abrir Dashboard IGAA
+                                  </Button>
+                                )}
 
                                 {result.tests && result.tests.length > 0 && (
                                   <div className="space-y-2">

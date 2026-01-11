@@ -15,6 +15,7 @@ import Auth from "./pages/Auth";
 import Connect from "./pages/Connect";
 import AuthCallback from "./pages/AuthCallback";
 import Debug from "./pages/Debug";
+import IGAADashboard from "./pages/IGAADashboard";
 
 // Dashboard Pages
 import Overview from "./pages/Overview";
@@ -55,6 +56,7 @@ const App = () => (
 
                 {/* Protected routes - requires login AND connected account */}
                 <Route element={<ProtectedRoute requiresConnection />}>
+                  <Route path="/igaa-dashboard" element={<IGAADashboard />} />
                   <Route element={<DashboardLayout />}>
                     <Route path="/" element={<Overview />} />
                     <Route path="/overview" element={<Overview />} />
