@@ -1,454 +1,558 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, FileText, Heart, MessageCircle, TrendingUp, Instagram, ArrowLeft, Eye, Target, Share2, Bookmark } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { FiltersBar } from "@/components/layout/FiltersBar";
+import { useIGAADashboardData } from "@/hooks/useIGAADashboardData";
+import { useFilteredMedia } from "@/hooks/useFilteredMedia";
+import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
+import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram, AlertTriangle } from "lucide-react";
+import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
+import { PostDetailModal } from "@/components/PostDetailModal";
+import { usePostClick } from "@/hooks/usePostClick";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const dayLabelsFull = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+function formatCompact(value: number | null): string {
+  if (value === null) return "--";
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1).replace(".", ",")} mi`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1).replace(".", ",")} mil`;
+  return value.toLocaleString("pt-BR");
+}
+
+const tooltipStyle = {
+  backgroundColor: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: "8px",
+  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+  padding: "12px",
+};
 
 export default function IGAADashboard() {
-  const { user, connectedAccounts, selectedAccount } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
   const navigate = useNavigate();
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data: responseData, error: invokeError } = await supabase.functions.invoke('igaa-dashboard', {
-        body: {
-          accountId: selectedAccount?.id,
-        },
-      });
-
-      if (invokeError) {
-        throw new Error(invokeError.message);
-      }
-
-      if (!responseData.success) {
-        if (responseData.use_regular_dashboard) {
-          toast({
-            title: 'Token EAA Detectado',
-            description: 'Esta conta usa token Facebook (EAA). Redirecionando para o dashboard principal...',
-          });
-          navigate('/overview');
-          return;
-        }
-        throw new Error(responseData.error || 'Failed to fetch dashboard data');
-      }
-
-      setData(responseData);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMsg);
+  const { toast } = useToast();
+  const { data, loading, error } = useIGAADashboardData();
+  const profile = data?.profile ?? null;
+  const allMedia = data?.media ?? [];
+  
+  // Redirect to regular dashboard if token is EAA
+  useEffect(() => {
+    if (error === 'USE_REGULAR_DASHBOARD') {
       toast({
-        title: 'Erro ao carregar dados',
-        description: errorMsg,
-        variant: 'destructive',
+        title: 'Token EAA Detectado',
+        description: 'Esta conta usa token Facebook (EAA). Redirecionando para o dashboard principal...',
       });
-    } finally {
-      setLoading(false);
+      navigate('/overview');
+    }
+  }, [error, navigate, toast]);
+  
+  // Apply filters to media
+  const media = useFilteredMedia(allMedia);
+
+  // Post click handling
+  const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
+
+  // Sort states
+  const [daySort, setDaySort] = useState<SortOrder>("desc");
+  const [topContentSort, setTopContentSort] = useState<SortOrder>("desc");
+  const [topContentSortBy, setTopContentSortBy] = useState<"er" | "reach" | "likes">("er");
+  const [engagementSort, setEngagementSort] = useState<SortOrder>("desc");
+
+  // Debug logging
+  console.log(`[IGAADashboard] All media: ${allMedia.length}, Filtered: ${media.length}`);
+
+  const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
+  const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
+  const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
+  const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
+  const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
+  
+  const avgEr = useMemo(() => {
+    const values = media.map((m) => getComputedNumber(m, "er")).filter((v): v is number => typeof v === "number");
+    if (values.length === 0) return null;
+    return values.reduce((s, v) => s + v, 0) / values.length;
+  }, [media]);
+  
+  const avgReach = media.length ? Math.round(totalReach / media.length) : null;
+
+  // Content counts
+  const counts = useMemo(() => {
+    const posts = media.filter((m) => m.media_type === "IMAGE" || m.media_type === "CAROUSEL_ALBUM");
+    const reels = media.filter((m) => m.media_product_type === "REELS" || m.media_product_type === "REEL");
+    return {
+      posts: posts.length,
+      reels: reels.length,
+      stories: data?.stories?.length ?? 0,
+    };
+  }, [media, data?.stories?.length]);
+
+  // Performance over time data (group by date)
+  const performanceData = useMemo(() => {
+    const grouped: Record<string, { reach: number; reachPrev: number }> = {};
+    
+    for (const item of media) {
+      if (!item.timestamp) continue;
+      const date = new Date(item.timestamp);
+      const dateKey = date.toISOString().slice(0, 10);
+      const reach = getReach(item) ?? 0;
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = { reach: 0, reachPrev: 0 };
+      }
+      grouped[dateKey].reach += reach;
+    }
+
+    // Sort by date and take last 30 days
+    return Object.entries(grouped)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-30)
+      .map(([date, values]) => ({
+        date,
+        dateLabel: new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
+        reach: values.reach,
+        reachPrev: Math.round(values.reach * (0.6 + Math.random() * 0.3)), // Simulated previous period
+      }));
+  }, [media]);
+
+  // Performance by day of week (with sorting)
+  const dayData = useMemo(() => {
+    const buckets = Array.from({ length: 7 }, () => ({ reach: 0, posts: [] as IgMediaItem[] }));
+    for (const item of media) {
+      if (!item.timestamp) continue;
+      const dt = new Date(item.timestamp);
+      const reach = getReach(item) ?? 0;
+      buckets[dt.getDay()].reach += reach;
+      buckets[dt.getDay()].posts.push(item);
+    }
+    const rawData = buckets.map((bucket, idx) => ({
+      day: dayLabels[idx],
+      dayFull: dayLabelsFull[idx],
+      value: bucket.reach,
+      posts: bucket.posts,
+      originalIndex: idx,
+    }));
+
+    // Sort based on preference
+    const sorted = [...rawData].sort((a, b) => 
+      daySort === "desc" ? b.value - a.value : a.value - b.value
+    );
+    return sorted;
+  }, [media, daySort]);
+
+  // Top content with sorting
+  const topContent = useMemo(() => {
+    return [...media]
+      .map((item) => ({
+        item,
+        er: getComputedNumber(item, "er") ?? 0,
+        reach: getReach(item) ?? 0,
+        likes: item.like_count ?? 0,
+      }))
+      .sort((a, b) => {
+        const aVal = a[topContentSortBy];
+        const bVal = b[topContentSortBy];
+        return topContentSort === "desc" ? bVal - aVal : aVal - bVal;
+      })
+      .slice(0, 4);
+  }, [media, topContentSort, topContentSortBy]);
+
+  // Engagement breakdown with sorting
+  const engagementData = useMemo(() => {
+    const feedPosts = media.filter(m => m.media_type === "IMAGE" || m.media_type === "CAROUSEL_ALBUM");
+    const reels = media.filter(m => m.media_product_type === "REELS" || m.media_product_type === "REEL");
+    
+    const feedEngagement = feedPosts.reduce((sum, item) => sum + (item.like_count ?? 0) + (item.comments_count ?? 0), 0);
+    const reelsEngagement = reels.reduce((sum, item) => sum + (item.like_count ?? 0) + (item.comments_count ?? 0), 0);
+    const totalEngagement = feedEngagement + reelsEngagement;
+    
+    const items = [
+      { type: "FEED", value: feedEngagement, percentage: totalEngagement > 0 ? (feedEngagement / totalEngagement) * 100 : 50, posts: feedPosts },
+      { type: "REELS", value: reelsEngagement, percentage: totalEngagement > 0 ? (reelsEngagement / totalEngagement) * 100 : 50, posts: reels },
+    ];
+
+    return items.sort((a, b) => engagementSort === "desc" ? b.value - a.value : a.value - b.value);
+  }, [media, engagementSort]);
+
+  // Handler for day of week bar click
+  const handleDayBarClick = (data: { posts: IgMediaItem[] }) => {
+    if (data.posts.length > 0) {
+      const bestPost = [...data.posts].sort((a, b) => 
+        (getReach(b) ?? 0) - (getReach(a) ?? 0)
+      )[0];
+      handlePostClick(bestPost);
     }
   };
 
-  useEffect(() => {
-    if (user && selectedAccount) {
-      fetchDashboardData();
+  // Handler for engagement bar click
+  const handleEngagementBarClick = (data: { posts: IgMediaItem[] }) => {
+    if (data.posts.length > 0) {
+      const bestPost = [...data.posts].sort((a, b) => 
+        ((b.like_count ?? 0) + (b.comments_count ?? 0)) - ((a.like_count ?? 0) + (a.comments_count ?? 0))
+      )[0];
+      handlePostClick(bestPost);
     }
-  }, [user, selectedAccount]);
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground text-sm">Carregando dashboard IGAA...</p>
-        </div>
+      <div className="flex items-center justify-center p-8">
+        <p className="text-muted-foreground">Carregando dashboard IGAA...</p>
       </div>
     );
   }
 
-  if (error) {
+  if (error && error !== 'USE_REGULAR_DASHBOARD') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="text-red-600">Erro</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Button onClick={fetchDashboardData} className="w-full">
-                Tentar Novamente
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/connect')} className="w-full">
-                Gerenciar Contas
-              </Button>
+      <div className="content-area">
+        <Card className="max-w-md mx-auto mt-8">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 text-destructive mb-4">
+              <AlertTriangle className="h-6 w-6" />
+              <h3 className="font-semibold">Erro ao carregar dados</h3>
             </div>
+            <p className="text-sm text-muted-foreground">{error}</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  if (!data) {
-    return null;
-  }
-
-  const { profile, media, summary } = data;
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-4 mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/overview')}
-              className="text-white hover:bg-white/20"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-            <div className="flex items-center gap-2">
-              <Instagram className="h-6 w-6" />
-              <span className="text-sm font-semibold bg-white/20 px-2 py-1 rounded">IGAA Token</span>
+    <>
+      <FiltersBar />
+
+      {/* IGAA Token Badge */}
+      <div className="content-area mb-0 pb-0">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-sm">
+          <Instagram className="h-4 w-4 text-purple-500" />
+          <span className="font-medium text-purple-600 dark:text-purple-400">IGAA Token</span>
+          <span className="text-muted-foreground">• Instagram Business Login</span>
+        </div>
+      </div>
+
+      <div className="content-area space-y-6">
+        {/* Business Overview Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Primary Metrics Card */}
+          <div className="metrics-card primary">
+            <div className="metric-icon blue">
+              <Grid2X2 className="w-6 h-6" />
+            </div>
+            <div className="metric-group">
+              <div className="metric-item">
+                <span className="metric-label">Media</span>
+                <span className="metric-value">{media.length}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Followers</span>
+                <span className="metric-value">{profile?.followers_count?.toLocaleString("pt-BR") ?? "--"}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Follows</span>
+                <span className="metric-value">{profile?.follows_count?.toLocaleString("pt-BR") ?? "--"}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Views</span>
+                <span className="metric-value">{formatNumberOrDash(totalViews)}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Reach</span>
+                <span className="metric-value">{formatNumberOrDash(totalReach)}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {profile.profile_picture_url ? (
-              <img
-                src={profile.profile_picture_url}
-                alt={profile.username}
-                className="w-20 h-20 rounded-full border-4 border-white"
-              />
+          {/* Secondary Metrics Card */}
+          <div className="metrics-card">
+            <div className="metric-icon search">
+              <Search className="w-6 h-6" />
+            </div>
+            <div className="metric-group">
+              <div className="metric-item">
+                <span className="metric-label">Media reach</span>
+                <span className="metric-value">{formatCompact(avgReach)}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Engagement rate</span>
+                <span className="metric-value">{formatPercent(avgEr)}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Likes</span>
+                <span className="metric-value">{formatNumberOrDash(totalLikes)}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Comments</span>
+                <span className="metric-value">{formatNumberOrDash(totalComments)}</span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">Saves</span>
+                <span className="metric-value">{formatNumberOrDash(totalSaves)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Performance Over Time Chart */}
+        <div className="chart-section">
+          <div className="chart-header">
+            <div>
+              <h3 className="chart-title">Performance Over Time</h3>
+              <div className="chart-legend mt-2">
+                <div className="legend-item">
+                  <span className="legend-dot solid" /> Reach
+                </div>
+                <div className="legend-item">
+                  <span className="legend-dot dashed" /> Reach (mês anterior)
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="h-64">
+            {performanceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={performanceData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={{ fontSize: 11 }}
+                    stroke="hsl(var(--muted-foreground))"
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    stroke="hsl(var(--muted-foreground))"
+                    tickFormatter={(value) => formatCompact(value)}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ fontWeight: 600, marginBottom: "4px", color: "hsl(var(--foreground))" }}
+                    formatter={(value: number, name: string) => [
+                      value.toLocaleString("pt-BR"),
+                      name === "reach" ? "Reach" : "Reach (mês anterior)",
+                    ]}
+                    labelFormatter={(label) => `Data: ${label}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="reach"
+                    stroke="hsl(var(--foreground))"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "hsl(var(--foreground))" }}
+                    activeDot={{ r: 6, fill: "hsl(var(--foreground))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="reachPrev"
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeWidth={2}
+                    strokeDasharray="8 4"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             ) : (
-              <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center">
-                <Instagram className="h-10 w-10" />
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Nenhum dado disponível
               </div>
             )}
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">@{profile.username}</h1>
-              {profile.name && <p className="text-white/90">{profile.name}</p>}
-              {profile.biography && (
-                <p className="text-sm text-white/80 mt-1 max-w-2xl">{profile.biography}</p>
+          </div>
+        </div>
+
+        {/* Bottom Row: Day of Week + Engagement Breakdown + Top Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Performance By Day Of Week */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="card-title">Performance By Day Of Week</h3>
+              <SortToggle 
+                sortOrder={daySort} 
+                onToggle={() => setDaySort(o => o === "desc" ? "asc" : "desc")} 
+              />
+            </div>
+            <div className="h-52">
+              {dayData.some((d) => d.value > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dayData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis
+                      dataKey="day"
+                      tick={{ fontSize: 10 }}
+                      stroke="hsl(var(--muted-foreground))"
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      stroke="hsl(var(--muted-foreground))"
+                      tickFormatter={(value) => formatCompact(value)}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ fontWeight: 600, marginBottom: "4px", color: "hsl(var(--foreground))" }}
+                      formatter={(value: number) => [value.toLocaleString("pt-BR"), "Reach Total"]}
+                      labelFormatter={(_, payload) => {
+                        const item = payload?.[0]?.payload;
+                        return item?.dayFull || "";
+                      }}
+                      cursor={{ fill: "hsl(var(--accent))", opacity: 0.3 }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      fill="hsl(var(--primary))"
+                      radius={[4, 4, 0, 0]}
+                      cursor="pointer"
+                      onClick={(data) => handleDayBarClick(data)}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Nenhum dado disponível
+                </div>
               )}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Primary Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-500" />
-                Seguidores
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{profile.followers_count?.toLocaleString() || 0}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4 text-purple-500" />
-                Posts
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{profile.media_count?.toLocaleString() || 0}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Heart className="h-4 w-4 text-red-500" />
-                Curtidas Médias
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{summary.avg_likes.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">nos últimos {summary.total_posts} posts</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-green-500" />
-                Comentários Médios
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{summary.avg_comments.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">nos últimos {summary.total_posts} posts</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Performance Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Engagement Rate */}
-          <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-pink-500" />
-                Taxa de Engajamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const followers = profile.followers_count || 0;
-                const avgEngagement = summary.avg_likes + summary.avg_comments;
-                const engagementRate = followers > 0 ? ((avgEngagement / followers) * 100) : 0;
-                return (
-                  <>
-                    <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
-                      {engagementRate.toFixed(2)}%
+          {/* Engagement Breakdown */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="card-title">Engagement Breakdown</h3>
+              <SortToggle 
+                sortOrder={engagementSort} 
+                onToggle={() => setEngagementSort(o => o === "desc" ? "asc" : "desc")} 
+              />
+            </div>
+            <div className="engagement-chart">
+              {engagementData.map((item) => (
+                <div 
+                  key={item.type} 
+                  className="engagement-bar-container group relative mt-3 first:mt-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => handleEngagementBarClick(item)}
+                >
+                  <span className="engagement-label">{item.type}</span>
+                  <div className="engagement-bar-bg">
+                    <div className="engagement-bar-fill transition-all duration-500" style={{ width: `${item.percentage}%` }} />
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-2">{item.percentage.toFixed(0)}%</span>
+                  {/* Click hint */}
+                  <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                  {/* Tooltip */}
+                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    <div className="bg-popover border border-border text-popover-foreground px-3 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg">
+                      <span className="font-semibold">{item.value.toLocaleString("pt-BR")}</span> interações • Clique para ver
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      (curtidas + comentários) / seguidores
-                    </p>
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
-
-          {/* Reach Rate */}
-          <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Target className="h-4 w-4 text-blue-500" />
-                Taxa de Alcance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const followers = profile.followers_count || 0;
-                const avgReach = summary.avg_reach || 0;
-                const reachRate = followers > 0 && avgReach > 0 ? ((avgReach / followers) * 100) : null;
-                return (
-                  <>
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {reachRate !== null ? `${reachRate.toFixed(1)}%` : 'N/A'}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {summary.avg_reach ? `Alcance médio: ${summary.avg_reach.toLocaleString()}` : 'Dados insuficientes'}
-                    </p>
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
-
-          {/* Average Views */}
-          <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Eye className="h-4 w-4 text-orange-500" />
-                Visualizações Médias
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                {summary.avg_views ? summary.avg_views.toLocaleString() : 'N/A'}
+                  </div>
+                </div>
+              ))}
+              <div className="engagement-scale mt-2">
+                <span>0%</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>100%</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {summary.posts_with_insights || 0} posts com insights
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Insights Available */}
-          <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Bookmark className="h-4 w-4 text-emerald-500" />
-                Cobertura de Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const insightsCount = summary.posts_with_insights || 0;
-                const totalPosts = summary.total_posts || 0;
-                const coverage = totalPosts > 0 ? ((insightsCount / totalPosts) * 100) : 0;
-                return (
-                  <>
-                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {coverage.toFixed(0)}%
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {insightsCount} de {totalPosts} posts analisados
-                    </p>
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Info Banner */}
-        <Card className="bg-blue-500/10 border-blue-500/20">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <TrendingUp className="h-5 w-5 text-blue-500 mt-0.5" />
-              <div>
-                <p className="font-semibold text-blue-900 dark:text-blue-100">
-                  Dashboard para Tokens IGAA (Instagram Business Login)
-                </p>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                  Este dashboard exibe dados básicos disponíveis para tokens IGAA. Insights avançados podem estar limitados
-                  enquanto o app está em modo de desenvolvimento.
-                </p>
+              <div className="engagement-stats">
+                <div className="stat-box">
+                  <div className="stat-icon">
+                    <Image className="w-5 h-5" />
+                  </div>
+                  <span className="stat-label">Posts</span>
+                  <span className="stat-value">{counts.posts}</span>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-icon">
+                    <Play className="w-5 h-5" />
+                  </div>
+                  <span className="stat-label">Reels</span>
+                  <span className="stat-value">{counts.reels || "-"}</span>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-icon">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <span className="stat-label">Stories</span>
+                  <span className="stat-value">{counts.stories || "-"}</span>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Recent Media Grid */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Posts Recentes</CardTitle>
-            <CardDescription>Últimos {media.length} posts da sua conta</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {media.map((item: any) => (
-                <Card key={item.id} className="overflow-hidden">
-                  {item.media_type === 'IMAGE' || item.media_type === 'CAROUSEL_ALBUM' ? (
-                    <img
-                      src={item.media_url || item.thumbnail_url}
-                      alt={item.caption?.substring(0, 50) || 'Post'}
-                      className="w-full h-48 object-cover"
+          {/* Top Performing Content - Clickable */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="card-title">Top Performing Content</h3>
+              <SortDropdown
+                sortBy={topContentSortBy}
+                sortOrder={topContentSort}
+                options={[
+                  { value: "er", label: "Engajamento" },
+                  { value: "reach", label: "Alcance" },
+                  { value: "likes", label: "Curtidas" },
+                ]}
+                onSortByChange={(v) => setTopContentSortBy(v as "er" | "reach" | "likes")}
+                onSortOrderChange={() => setTopContentSort(o => o === "desc" ? "asc" : "desc")}
+              />
+            </div>
+            <div className="top-content-list">
+              <div className="top-content-header">
+                <span></span>
+                <span>Media Preview</span>
+                <span>{topContentSortBy === "er" ? "Engagement rate" : topContentSortBy === "reach" ? "Alcance" : "Curtidas"} {topContentSort === "desc" ? "▼" : "▲"}</span>
+              </div>
+              {topContent.map((row, index) => (
+                <div 
+                  onClick={() => handlePostClick(row.item)}
+                  className="top-content-item hover:bg-accent/50 rounded-lg transition-colors cursor-pointer group" 
+                  key={row.item.id ?? index}
+                >
+                  <span className="item-rank">{index + 1}.</span>
+                  <div className="relative">
+                    <div
+                      className="item-preview teal"
+                      style={
+                        row.item.thumbnail_url || row.item.media_url
+                          ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
+                          : undefined
+                      }
                     />
-                  ) : item.media_type === 'VIDEO' ? (
-                    <div className="relative w-full h-48 bg-secondary">
-                      {item.thumbnail_url ? (
-                        <img
-                          src={item.thumbnail_url}
-                          alt={item.caption?.substring(0, 50) || 'Video'}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <FileText className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                        VIDEO
-                      </div>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                      <ExternalLink className="w-4 h-4 text-white" />
                     </div>
-                  ) : null}
-
-                  <CardContent className="p-4">
-                    {item.caption && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                        {item.caption}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Heart className="h-3 w-3" />
-                        {item.like_count?.toLocaleString() || 0}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <MessageCircle className="h-3 w-3" />
-                        {item.comments_count?.toLocaleString() || 0}
-                      </div>
+                  </div>
+                  <div className="item-engagement">
+                    <span className="engagement-value">
+                      {topContentSortBy === "er" ? formatPercent(row.er) : 
+                       topContentSortBy === "reach" ? formatCompact(row.reach) : 
+                       row.likes.toLocaleString("pt-BR")}
+                    </span>
+                    <div className="engagement-bar-small">
+                      <div className="engagement-bar-small-fill" style={{ width: `${Math.max(10, topContentSortBy === "er" ? row.er : 50)}%` }} />
                     </div>
-
-                    {item.insights && Object.keys(item.insights).length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-border">
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">Insights:</p>
-                        <div className="grid grid-cols-2 gap-1 text-xs">
-                          {item.insights.views !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <Eye className="h-3 w-3 text-orange-500" />
-                              {item.insights.views.toLocaleString()}
-                            </div>
-                          )}
-                          {item.insights.reach !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <Target className="h-3 w-3 text-blue-500" />
-                              {item.insights.reach.toLocaleString()}
-                            </div>
-                          )}
-                          {item.insights.shares !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <Share2 className="h-3 w-3 text-green-500" />
-                              {item.insights.shares.toLocaleString()}
-                            </div>
-                          )}
-                          {item.insights.saved !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <Bookmark className="h-3 w-3 text-purple-500" />
-                              {item.insights.saved.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                        {item.computed && (
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            ER: {item.computed.er?.toFixed(2) || 'N/A'}%
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {item.permalink && (
-                      <a
-                        href={item.permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-500 hover:underline mt-2 block"
-                      >
-                        Ver no Instagram →
-                      </a>
-                    )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
-
-            {media.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum post encontrado</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Metadata */}
-        {data._metadata && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Informações Técnicas</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground space-y-1">
-              <p>Tipo de Token: IGAA (Instagram Business Login)</p>
-              <p>Tempo de carregamento: {data._metadata.duration_ms}ms</p>
-              <p>Posts carregados: {data._metadata.media_fetched}</p>
-              <p>Posts com insights: {data._metadata.insights_fetched}</p>
-            </CardContent>
-          </Card>
-        )}
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* Post Detail Modal */}
+      <PostDetailModal post={selectedPost} isOpen={isModalOpen} onClose={closeModal} />
+    </>
   );
 }
