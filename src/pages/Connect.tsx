@@ -198,17 +198,16 @@ export default function Connect() {
     navigate('/auth');
   };
 
-  // Handler for Instagram Business connection
-  // IMPORTANT: For Instagram Graph API analytics, we must use Facebook OAuth (EAA... / page tokens).
-  // The direct instagram.com OAuth flow yields IG tokens which won't work with graph.facebook.com endpoints.
+  // Handler for Instagram Business Login (instagram.com/oauth/authorize)
+  // Uses NEW Instagram API with Instagram Login - direct Instagram OAuth
   const handleInstagramConnect = () => {
-    setUsingFacebookOAuth(true); // Force Facebook OAuth flow
+    setUsingFacebookOAuth(false); // Save provider='instagram', will call instagram-oauth edge function
     setShowInstructions(true);
   };
 
   // Handler for Facebook OAuth (facebook.com endpoint)
   const handleFacebookConnect = () => {
-    setUsingFacebookOAuth(true); // provider='facebook', will call facebook-oauth edge function
+    setUsingFacebookOAuth(true); // Save provider='facebook', will call facebook-oauth edge function
     setShowInstructions(true);
   };
 
@@ -226,8 +225,8 @@ export default function Connect() {
     const redirectUri = getRedirectUri();
     const timestamp = Date.now().toString();
 
-    // Always use Facebook OAuth for Instagram Business analytics
-    const provider = 'facebook';
+    // Determine provider (both use Facebook OAuth, but different edge functions)
+    const provider = usingFacebookOAuth ? 'facebook' : 'instagram';
 
     console.log('=== OAuth Configuration Debug ===');
     console.log('Provider:', provider);
@@ -245,22 +244,41 @@ export default function Connect() {
     sessionStorage.setItem('oauth_timestamp', timestamp);
     sessionStorage.setItem('oauth_redirect_uri', redirectUri);
     sessionStorage.setItem('oauth_provider', provider);
-
+    
     // Cookie fallback
     document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax`;
     document.cookie = `oauth_timestamp=${timestamp}; path=/; max-age=600; SameSite=Lax`;
 
-    // FACEBOOK OAUTH (facebook.com endpoint)
-    const params = new URLSearchParams({
-      client_id: FACEBOOK_APP_ID,
-      redirect_uri: redirectUri,
-      scope: FACEBOOK_SCOPES,
-      response_type: 'code',
-      state: state,
-    });
+    // Build OAuth URL based on provider
+    let authUrl: string;
 
-    const authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
-    console.log('[OAuth] Facebook OAuth URL:', authUrl);
+    if (usingFacebookOAuth) {
+      // FACEBOOK OAUTH (facebook.com endpoint)
+      const params = new URLSearchParams({
+        client_id: FACEBOOK_APP_ID,
+        redirect_uri: redirectUri,
+        scope: FACEBOOK_SCOPES,
+        response_type: 'code',
+        state: state,
+      });
+
+      authUrl = `https://www.facebook.com/v24.0/dialog/oauth?${params.toString()}`;
+      console.log('[OAuth] Facebook OAuth URL:', authUrl);
+
+    } else {
+      // INSTAGRAM BUSINESS LOGIN (instagram.com/oauth/authorize)
+      // Uses NEW Instagram API with Instagram Login
+      const params = new URLSearchParams({
+        client_id: INSTAGRAM_APP_ID,
+        redirect_uri: redirectUri,
+        scope: INSTAGRAM_BUSINESS_SCOPES,
+        response_type: 'code',
+        state: state,
+      });
+
+      authUrl = `https://www.instagram.com/oauth/authorize?${params.toString()}`;
+      console.log('[OAuth] Instagram Business Login URL:', authUrl);
+    }
 
     // Redirect after short delay
     setTimeout(() => {
