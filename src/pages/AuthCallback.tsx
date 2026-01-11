@@ -138,9 +138,10 @@ export default function AuthCallback() {
         console.log('2. Origin:', window.location.origin);
         
         // Use the provider we saved BEFORE clearOAuthState() was called
-        const provider = savedProvider || 'instagram';
+        // Default to facebook because Instagram Graph API analytics requires FB page/user tokens.
+        const provider = savedProvider || 'facebook';
         if (!savedProvider) {
-          console.warn('[AuthCallback] No provider in storage, defaulting to instagram');
+          console.warn('[AuthCallback] No provider in storage, defaulting to facebook');
         }
 
         console.log('3. Provider:', provider);
