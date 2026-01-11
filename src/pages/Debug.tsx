@@ -15,8 +15,8 @@ export default function Debug() {
     setResults(null);
 
     try {
-      // Call the debug-token edge function
-      const { data, error } = await supabase.functions.invoke('debug-token', {
+      // Call the test-instagram-token edge function (more comprehensive)
+      const { data, error } = await supabase.functions.invoke('test-instagram-token', {
         body: {},
       });
 
@@ -137,10 +137,19 @@ export default function Debug() {
                                 <div className="bg-secondary/30 p-2 rounded">
                                   <p className="font-semibold mb-1">Token Info:</p>
                                   <p className="text-xs text-muted-foreground">
-                                    Stored: {result.token_info.stored_prefix}... ({result.token_info.stored_length} chars)
+                                    Stored: {result.token_info.stored_format}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    Decrypted: {result.token_info.decrypted_prefix}... ({result.token_info.decrypted_length} chars)
+                                    Decrypted: {result.token_info.decrypted_format}
+                                  </p>
+                                  <p className="text-xs">
+                                    IGAA token: {result.token_info.starts_with_igaa ? (
+                                      <span className="text-blue-600">✓ Yes (Instagram Business Login)</span>
+                                    ) : result.token_info.starts_with_eaa ? (
+                                      <span className="text-purple-600">✓ Yes (Facebook OAuth)</span>
+                                    ) : (
+                                      <span className="text-red-600">✗ No</span>
+                                    )}
                                   </p>
                                   <p className="text-xs">
                                     Format: {result.token_info.looks_valid ? (
@@ -151,39 +160,58 @@ export default function Debug() {
                                   </p>
                                 </div>
 
-                                <div className={`p-2 rounded ${
-                                  result.api_test.success
-                                    ? 'bg-green-500/10 border border-green-500/20'
-                                    : 'bg-red-500/10 border border-red-500/20'
-                                }`}>
-                                  <p className="font-semibold mb-1">
-                                    {result.api_test.success ? '✓' : '✗'} Instagram API Test
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Status: {result.api_test.status}
-                                  </p>
-                                  {result.api_test.success ? (
-                                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                      API responded successfully: {JSON.stringify(result.api_test.response)}
-                                    </p>
-                                  ) : (
-                                    <div className="mt-1">
-                                      <p className="text-xs text-red-600 dark:text-red-400 font-semibold">
-                                        {result.api_test.error_details?.message || 'Unknown error'}
-                                      </p>
-                                      {result.api_test.error_details && (
-                                        <details className="mt-2">
-                                          <summary className="text-xs cursor-pointer text-muted-foreground">
-                                            Full Error Details
-                                          </summary>
-                                          <pre className="text-xs bg-secondary/50 p-2 rounded mt-1 overflow-auto">
-                                            {JSON.stringify(result.api_test.error_details, null, 2)}
-                                          </pre>
-                                        </details>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                {result.tests && result.tests.length > 0 && (
+                                  <div className="space-y-2">
+                                    <p className="font-semibold">API Tests:</p>
+                                    {result.tests.map((test: any, testIndex: number) => (
+                                      <div key={testIndex} className={`p-2 rounded border ${
+                                        test.success
+                                          ? 'bg-green-500/10 border-green-500/20'
+                                          : 'bg-red-500/10 border-red-500/20'
+                                      }`}>
+                                        <p className="font-semibold text-xs mb-1">
+                                          {test.success ? '✓' : '✗'} {test.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {test.endpoint}
+                                        </p>
+                                        {test.status && (
+                                          <p className="text-xs text-muted-foreground">
+                                            Status: {test.status}
+                                          </p>
+                                        )}
+                                        {test.success ? (
+                                          test.response && (
+                                            <details className="mt-1">
+                                              <summary className="text-xs cursor-pointer text-green-600">
+                                                View Response
+                                              </summary>
+                                              <pre className="text-xs bg-secondary/50 p-2 rounded mt-1 overflow-auto max-h-32">
+                                                {JSON.stringify(test.response, null, 2)}
+                                              </pre>
+                                            </details>
+                                          )
+                                        ) : (
+                                          <div className="mt-1">
+                                            <p className="text-xs text-red-600 dark:text-red-400 font-semibold">
+                                              {test.response?.error?.message || test.error || 'Unknown error'}
+                                            </p>
+                                            {test.response?.error && (
+                                              <details className="mt-2">
+                                                <summary className="text-xs cursor-pointer text-muted-foreground">
+                                                  Full Error Details
+                                                </summary>
+                                                <pre className="text-xs bg-secondary/50 p-2 rounded mt-1 overflow-auto">
+                                                  {JSON.stringify(test.response.error, null, 2)}
+                                                </pre>
+                                              </details>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </>
                             )}
 
@@ -222,9 +250,13 @@ export default function Debug() {
           <CardContent className="text-sm space-y-2 text-muted-foreground">
             <p>1. ✓ Fetches all your connected accounts from database</p>
             <p>2. ✓ Checks token format (encrypted vs raw vs base64)</p>
-            <p>3. ✓ Decrypts tokens if needed</p>
-            <p>4. ✓ Tests each token against Instagram Graph API</p>
-            <p>5. ✓ Shows exact error messages from Instagram</p>
+            <p>3. ✓ Identifies IGAA vs EAA token types</p>
+            <p>4. ✓ Decrypts tokens if needed</p>
+            <p>5. ✓ Tests against Facebook Graph API (basic profile)</p>
+            <p>6. ✓ Tests against Instagram Graph API (/me endpoint)</p>
+            <p>7. ✓ Token introspection (debug_token)</p>
+            <p>8. ✓ Full profile fetch (simulates ig-dashboard)</p>
+            <p>9. ✓ Shows exact error messages from Instagram/Facebook</p>
           </CardContent>
         </Card>
       </div>
