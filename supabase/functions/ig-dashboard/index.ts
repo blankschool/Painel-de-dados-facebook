@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import * as cache from './cache.ts';
 
 // Normalize / decrypt stored access tokens.
 // Historical formats in this project:
@@ -596,6 +597,106 @@ serve(async (req) => {
       `[ig-dashboard] Fetching data for businessId=${businessId}, date range: ${sinceDate} to ${untilDate}`,
     );
 
+    // ============================================================================
+    // CACHE CHECK: Try to load data from database first
+    // ============================================================================
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const cacheStatus = await cache.checkCacheStatus(supabaseService, connectedAccount.id, {
+      maxAgeHours: 24, // Cache is valid for 24 hours
+      forceRefresh: body.forceRefresh === true,
+    });
+
+    console.log('[ig-dashboard] Cache status:', cacheStatus);
+
+    // If cache is fresh, return cached data immediately
+    if (cacheStatus.hasCachedData && !cacheStatus.shouldRefresh) {
+      console.log(`[ig-dashboard] ⚡ Using cached data (${cacheStatus.cacheAge?.toFixed(1)}h old)`);
+
+      const [cachedPosts, cachedInsights, cachedProfile] = await Promise.all([
+        cache.getCachedPosts(supabaseService, connectedAccount.id, sinceDate, untilDate),
+        cache.getCachedDailyInsights(supabaseService, connectedAccount.id, sinceDate, untilDate),
+        cache.getCachedProfile(supabaseService, connectedAccount.id),
+      ]);
+
+      if (cachedPosts.length > 0 && cachedProfile) {
+        // Transform cached data to match API response format
+        const mediaWithInsights = cachedPosts.map((post: any) => ({
+          id: post.media_id,
+          caption: post.caption,
+          media_type: post.media_type,
+          media_product_type: post.media_product_type,
+          media_url: post.media_url,
+          permalink: post.permalink,
+          thumbnail_url: post.thumbnail_url,
+          timestamp: post.timestamp,
+          like_count: post.like_count,
+          comments_count: post.comments_count,
+          insights: post.insights_raw || {
+            impressions: post.impressions,
+            reach: post.reach,
+            engagement: post.engagement,
+            saved: post.saved,
+            video_views: post.video_views,
+            plays: post.plays,
+          },
+          computed: post.computed_raw || {
+            er: post.engagement_rate,
+          },
+        }));
+
+        // Calculate consolidated metrics from cached daily insights
+        const consolidatedMetrics = cachedInsights.reduce(
+          (acc: any, insight: any) => ({
+            reach: acc.reach + (insight.reach || 0),
+            impressions: acc.impressions + (insight.impressions || 0),
+            profile_views: acc.profile_views + (insight.profile_views || 0),
+          }),
+          { reach: 0, impressions: 0, profile_views: 0 }
+        );
+
+        const duration = Date.now() - startedAt;
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            from_cache: true,
+            cache_age_hours: cacheStatus.cacheAge,
+            request_id: requestId,
+            duration_ms: duration,
+            snapshot_date: new Date().toISOString().slice(0, 10),
+            provider: "instagram_cache",
+            profile: {
+              id: cachedProfile.business_id,
+              username: cachedProfile.username,
+              name: cachedProfile.name,
+              followers_count: cachedProfile.followers_count,
+              follows_count: cachedProfile.follows_count,
+              media_count: cachedProfile.media_count,
+              profile_picture_url: cachedProfile.profile_picture_url,
+              website: cachedProfile.website,
+            },
+            media: mediaWithInsights,
+            posts: mediaWithInsights,
+            total_posts: mediaWithInsights.length,
+            consolidated_reach: consolidatedMetrics.reach,
+            consolidated_impressions: consolidatedMetrics.impressions,
+            consolidated_profile_views: consolidatedMetrics.profile_views,
+            messages: [`⚡ Loaded from cache (${cacheStatus.cacheAge?.toFixed(1)}h old)`],
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    console.log('[ig-dashboard] 🌐 Fetching fresh data from Instagram API...');
+
     // No longer using fixed limits - will fetch all posts within date range
     const maxStories = typeof body.maxStories === "number" ? Math.max(1, Math.min(50, body.maxStories)) : 25;
 
@@ -975,6 +1076,57 @@ serve(async (req) => {
         reach: totalReach,
         impressions: totalViews, // Use views as fallback for impressions
       };
+    }
+
+    // ============================================================================
+    // SAVE TO CACHE: Store fetched data in database for future fast loading
+    // ============================================================================
+    try {
+      console.log('[ig-dashboard] 💾 Saving data to cache...');
+
+      // Save profile snapshot
+      await cache.saveProfileSnapshot(
+        supabaseService,
+        connectedAccount.id,
+        businessId,
+        profile
+      );
+
+      // Save posts to cache
+      await cache.savePosts(
+        supabaseService,
+        connectedAccount.id,
+        mediaWithInsights
+      );
+
+      // Save daily insights (today's snapshot)
+      const today = new Date().toISOString().split('T')[0];
+      await cache.saveDailyInsights(
+        supabaseService,
+        connectedAccount.id,
+        accountInsights,
+        today
+      );
+
+      // Update cache metadata
+      const postDates = mediaWithInsights
+        .map((p: any) => p.timestamp?.split('T')[0])
+        .filter(Boolean)
+        .sort();
+
+      await cache.updateCacheMetadata(supabaseService, connectedAccount.id, {
+        lastProfileSync: true,
+        lastInsightsSync: true,
+        lastPostsSync: true,
+        totalPostsCached: mediaWithInsights.length,
+        oldestPostDate: postDates[postDates.length - 1],
+        newestPostDate: postDates[0],
+      });
+
+      console.log('[ig-dashboard] ✅ Data saved to cache successfully');
+    } catch (cacheError) {
+      console.error('[ig-dashboard] ⚠️  Failed to save to cache (non-critical):', cacheError);
+      // Don't fail the request if caching fails
     }
 
     return new Response(
