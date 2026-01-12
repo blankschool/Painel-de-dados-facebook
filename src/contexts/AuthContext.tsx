@@ -10,6 +10,7 @@ export interface ConnectedAccount {
   account_name: string | null;
   profile_picture_url: string | null;
   token_expires_at: string | null;
+  timezone: string;
 }
 
 interface AuthContextType {
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('connected_accounts')
-        .select('id, provider, provider_account_id, account_username, account_name, profile_picture_url, token_expires_at')
+        .select('id, provider, provider_account_id, account_username, account_name, profile_picture_url, token_expires_at, timezone')
         .eq('user_id', userId)
         .in('provider', ['facebook', 'instagram'])  // Fetch both Facebook and Instagram accounts
         .order('created_at', { ascending: false });

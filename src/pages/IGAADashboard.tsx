@@ -9,6 +9,7 @@ import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortTo
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   LineChart,
@@ -43,6 +44,7 @@ const tooltipStyle = {
 export default function IGAADashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { selectedAccount } = useAuth();
   const { data, loading, error } = useIGAADashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
@@ -58,8 +60,9 @@ export default function IGAADashboard() {
     }
   }, [error, navigate, toast]);
   
-  // Apply filters to media
-  const media = useFilteredMedia(allMedia);
+  // Apply filters to media using account's timezone
+  const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
+  const media = useFilteredMedia(allMedia, accountTimezone);
 
   // Post click handling
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useFilters, type DayFilter } from '@/contexts/FiltersContext';
 import type { IgMediaItem } from '@/utils/ig';
+import { getBestPostPerDay } from '@/lib/dashboardHelpers';
 
 // Check if day matches filter
 function matchesDayFilter(dayOfWeek: number, filter: DayFilter): boolean {
@@ -13,7 +14,7 @@ function matchesDayFilter(dayOfWeek: number, filter: DayFilter): boolean {
   }
 }
 
-export function useFilteredMedia(media: IgMediaItem[]) {
+export function useFilteredMedia(media: IgMediaItem[], timezone: string = 'America/Sao_Paulo') {
   const { filters, getDateRangeFromPreset } = useFilters();
 
   return useMemo(() => {
@@ -74,7 +75,11 @@ export function useFilteredMedia(media: IgMediaItem[]) {
       console.log(`[useFilteredMedia] After search filter: ${filtered.length} items`);
     }
 
-    console.log(`[useFilteredMedia] Final result: ${filtered.length} items`);
-    return filtered;
-  }, [media, filters, getDateRangeFromPreset]);
+    // Apply "best post per day" filter - only keep the best performing post from each day
+    // This aligns with Minter.io's approach of showing 1 post per day
+    const bestPerDay = getBestPostPerDay(filtered, 'engagement', timezone);
+    console.log(`[useFilteredMedia] After best-per-day filter: ${bestPerDay.length} items (from ${filtered.length})`);
+
+    return bestPerDay;
+  }, [media, filters, getDateRangeFromPreset, timezone]);
 }

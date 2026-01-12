@@ -15,6 +15,7 @@ import { PostsSection } from "@/components/sections/PostsSection";
 import { StoriesSection } from "@/components/sections/StoriesSection";
 import { AudienceSection } from "@/components/sections/AudienceSection";
 import { OptimizationSection } from "@/components/sections/OptimizationSection";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LineChart,
   Line,
@@ -73,12 +74,14 @@ const tooltipStyle = {
 };
 
 export default function Overview() {
+  const { selectedAccount } = useAuth();
   const { data, loading, error } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
 
-  // Apply filters to media
-  const media = useFilteredMedia(allMedia);
+  // Apply filters to media using account's timezone
+  const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
+  const media = useFilteredMedia(allMedia, accountTimezone);
 
   // Post click handling
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");

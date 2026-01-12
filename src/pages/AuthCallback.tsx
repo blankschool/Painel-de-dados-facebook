@@ -249,6 +249,23 @@ export default function AuthCallback() {
 
         console.log('11. Success! Account:', data.username);
 
+        // Detect user's timezone from browser and save it to the account
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        console.log('11.5. Detected timezone:', userTimezone);
+        
+        if (data.account_id && userTimezone) {
+          const { error: tzError } = await supabase
+            .from('connected_accounts')
+            .update({ timezone: userTimezone })
+            .eq('id', data.account_id);
+          
+          if (tzError) {
+            console.warn('Failed to save timezone:', tzError);
+          } else {
+            console.log('11.6. Timezone saved successfully');
+          }
+        }
+
         setAccountInfo({
           username: data.username,
           name: data.name || data.username,

@@ -267,3 +267,79 @@ export function getDayName(dayIndex: number): string {
 export function formatTime(hour: number): string {
   return `${hour.toString().padStart(2, '0')}:00`;
 }
+
+/**
+ * Get best performing post per day
+ * Groups posts by day in the specified timezone and returns only the best performer from each day
+ * @param posts Array of posts with timestamp and engagement data
+ * @param metric Metric to use for ranking ('engagement', 'reach', or 'views')
+ * @param timezone IANA timezone identifier (e.g., 'America/Sao_Paulo')
+ * @returns Array of best posts, one per day, sorted by date (newest first)
+ */
+export function getBestPostPerDay<T extends {
+  timestamp?: string;
+  like_count?: number;
+  comments_count?: number;
+  insights?: Record<string, number>;
+  computed?: Record<string, unknown>;
+}>(
+  posts: T[],
+  metric: 'engagement' | 'reach' | 'views' = 'engagement',
+  timezone: string = 'America/Sao_Paulo'
+): T[] {
+  if (!posts || posts.length === 0) return [];
+
+  // Helper functions inline to avoid circular imports
+  const getEngagement = (item: T): number => {
+    const likes = item.like_count ?? 0;
+    const comments = item.comments_count ?? 0;
+    const saves = item.insights?.saved ?? item.insights?.saves ?? (item.computed?.saves as number) ?? 0;
+    const shares = item.insights?.shares ?? (item.computed?.shares as number) ?? 0;
+    return likes + comments + saves + shares;
+  };
+
+  const getReach = (item: T): number => {
+    return (item.computed?.reach as number) ?? item.insights?.reach ?? 0;
+  };
+
+  const getViews = (item: T): number => {
+    return (item.computed?.views as number) ?? item.insights?.views ?? item.insights?.impressions ?? 0;
+  };
+
+  // Group posts by day using the account's timezone
+  const postsByDay = new Map<string, T[]>();
+
+  posts.forEach(post => {
+    if (!post.timestamp) return;
+    
+    const date = new Date(post.timestamp);
+    // Format date in the specified timezone to get consistent day grouping
+    const dayKey = date.toLocaleDateString('sv-SE', { timeZone: timezone });
+
+    if (!postsByDay.has(dayKey)) {
+      postsByDay.set(dayKey, []);
+    }
+    postsByDay.get(dayKey)!.push(post);
+  });
+
+  // Select the best post from each day
+  const bestPosts: T[] = [];
+
+  postsByDay.forEach((dayPosts) => {
+    const sorted = [...dayPosts].sort((a, b) => {
+      if (metric === 'engagement') {
+        return getEngagement(b) - getEngagement(a);
+      } else if (metric === 'reach') {
+        return getReach(b) - getReach(a);
+      } else {
+        return getViews(b) - getViews(a);
+      }
+    });
+    bestPosts.push(sorted[0]);
+  });
+
+  // Sort by date (newest first)
+  return bestPosts.sort((a, b) => 
+    new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime()
+  );
+}
