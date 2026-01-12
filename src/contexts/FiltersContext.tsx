@@ -36,43 +36,43 @@ const defaultFilters: FiltersState = {
 };
 
 // Helper to compute date range from preset
-// "7d" means: 7 complete days backwards ending yesterday (e.g., Jan 5-11 if today is Jan 12)
+// "7d" means: last 7 days including today (e.g., Jan 6-12 if today is Jan 12)
+// This matches Minter.io behavior which includes the current day
 function computeDateRangeFromPreset(preset: DateRangePreset): DateRange {
   const now = new Date();
   const today = startOfDay(now);
-  const yesterday = subDays(today, 1);  // Last complete day
   let startDate: Date;
-  
+
   switch (preset) {
     case '7d':
-      startDate = subDays(yesterday, 6);  // 6 days before yesterday + yesterday = 7 days
+      startDate = subDays(today, 6);  // 6 days before today + today = 7 days
       break;
     case '14d':
-      startDate = subDays(yesterday, 13); // 13 + 1 = 14 days
+      startDate = subDays(today, 13); // 13 + 1 = 14 days
       break;
     case '30d':
-      startDate = subDays(yesterday, 29); // 29 + 1 = 30 days
+      startDate = subDays(today, 29); // 29 + 1 = 30 days
       break;
     case '60d':
-      startDate = subDays(yesterday, 59);
+      startDate = subDays(today, 59);
       break;
     case '90d':
-      startDate = subDays(yesterday, 89);
+      startDate = subDays(today, 89);
       break;
     case '6m':
-      startDate = subMonths(yesterday, 6);
+      startDate = subMonths(today, 6);
       break;
     case '1y':
-      startDate = subYears(yesterday, 1);
+      startDate = subYears(today, 1);
       break;
     case 'custom':
     default:
-      startDate = subDays(yesterday, 29);
+      startDate = subDays(today, 29);
   }
-  
+
   return {
     from: startOfDay(startDate),
-    to: endOfDay(yesterday),  // Ends at yesterday, not today
+    to: endOfDay(today),  // Includes today (current behavior)
   };
 }
 
