@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Filter, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilters, type DayFilter, type MediaType, type DateRangePreset } from "@/contexts/FiltersContext";
@@ -53,7 +53,8 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
     setDateRangePreset, 
     setCustomDateRange,
     resetFilters, 
-    activeFiltersCount 
+    activeFiltersCount,
+    getDateRangeFromPreset 
   } = useFilters();
   
   const [customPickerOpen, setCustomPickerOpen] = useState(false);
@@ -67,12 +68,23 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
   const selectedDay = dayOptions.find((d) => d.value === filters.dayFilter)?.label || "Dias";
   const selectedMediaType = mediaTypeOptions.find((m) => m.value === filters.mediaType)?.label || "Tipo";
   
-  // Get display text for date range
+  // Get the actual date range for display (like Minter.io: "Jan 6, 2026 – Jan 12, 2026")
+  const getActualDateRange = () => {
+    const range = getDateRangeFromPreset();
+    if (range.from && range.to) {
+      const fromStr = format(range.from, "MMM d, yyyy", { locale: enUS });
+      const toStr = format(range.to, "MMM d, yyyy", { locale: enUS });
+      return `${fromStr} – ${toStr}`;
+    }
+    return null;
+  };
+  
+  // Get display text for date range dropdown
   const getDateRangeDisplay = () => {
     if (filters.dateRangePreset === 'custom' && filters.customDateRange?.from) {
-      const from = format(filters.customDateRange.from, "dd MMM", { locale: ptBR });
+      const from = format(filters.customDateRange.from, "dd MMM", { locale: enUS });
       const to = filters.customDateRange.to 
-        ? format(filters.customDateRange.to, "dd MMM", { locale: ptBR })
+        ? format(filters.customDateRange.to, "dd MMM", { locale: enUS })
         : "...";
       return `${from} - ${to}`;
     }
@@ -126,31 +138,40 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
         <span className="text-sm font-medium">{accountName}</span>
       </div>
 
-      {/* Date Range Selector */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            <span>{getDateRangeDisplay()}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-48">
-          {dateRangeOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.value}
-              onClick={() => handlePresetSelect(option.value)}
-              className={cn(
-                "cursor-pointer",
-                filters.dateRangePreset === option.value && "bg-accent font-medium"
-              )}
-            >
-              {option.label}
-              {filters.dateRangePreset === option.value && <span className="ml-auto">✓</span>}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Date Range Selector with actual date display */}
+      <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <span>{getDateRangeDisplay()}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            {dateRangeOptions.map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                onClick={() => handlePresetSelect(option.value)}
+                className={cn(
+                  "cursor-pointer",
+                  filters.dateRangePreset === option.value && "bg-accent font-medium"
+                )}
+              >
+                {option.label}
+                {filters.dateRangePreset === option.value && <span className="ml-auto">✓</span>}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        {/* Actual date range display (like Minter.io) */}
+        {getActualDateRange() && (
+          <span className="text-sm text-muted-foreground hidden sm:inline">
+            {getActualDateRange()}
+          </span>
+        )}
+      </div>
 
       {/* Custom Date Range Picker Popover */}
       <Popover open={customPickerOpen} onOpenChange={setCustomPickerOpen}>
@@ -164,14 +185,14 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
               {tempRange?.from ? (
                 tempRange.to ? (
                   <>
-                    {format(tempRange.from, "dd 'de' MMMM", { locale: ptBR })} até{" "}
-                    {format(tempRange.to, "dd 'de' MMMM", { locale: ptBR })}
+                    {format(tempRange.from, "MMMM d", { locale: enUS })} to{" "}
+                    {format(tempRange.to, "MMMM d", { locale: enUS })}
                   </>
                 ) : (
-                  <>Início: {format(tempRange.from, "dd 'de' MMMM", { locale: ptBR })}</>
+                  <>Start: {format(tempRange.from, "MMMM d", { locale: enUS })}</>
                 )
               ) : (
-                "Clique para selecionar as datas"
+                "Click to select dates"
               )}
             </p>
           </div>
@@ -180,7 +201,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
             selected={tempRange}
             onSelect={handleCustomSelect}
             numberOfMonths={2}
-            locale={ptBR}
+            locale={enUS}
             disabled={(date) => date > new Date()}
             className="pointer-events-auto"
           />
