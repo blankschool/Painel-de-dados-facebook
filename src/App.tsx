@@ -34,12 +34,14 @@ import MediaDetail from "./pages/MediaDetail";
 
 const queryClient = new QueryClient();
 
+// Main App component - FiltersProvider must wrap AuthProvider
+// to ensure filters are available in all components
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <TooltipProvider>
-        <AuthProvider>
-          <FiltersProvider>
+        <FiltersProvider>
+          <AuthProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -78,8 +80,8 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </FiltersProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </FiltersProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
