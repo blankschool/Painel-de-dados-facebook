@@ -6,8 +6,6 @@ import { formatPercent, getComputedNumber, getReach, type IgMediaItem } from "@/
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
-import { Heart, MessageCircle, Eye, Play, Image as ImageIcon, ExternalLink } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const dayLabels = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
@@ -31,9 +29,6 @@ export default function Time() {
   const [daySortBy, setDaySortBy] = useState<"reach" | "count">("reach");
   const [monthSort, setMonthSort] = useState<SortOrder>("desc");
   const [monthSortBy, setMonthSortBy] = useState<"reach" | "likes" | "er">("reach");
-
-  // Day posts modal
-  const [selectedDayPosts, setSelectedDayPosts] = useState<{ day: string; posts: IgMediaItem[] } | null>(null);
 
   const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
@@ -107,10 +102,13 @@ export default function Time() {
     });
   }, [media, monthSort, monthSortBy]);
 
-  // Handler for day bar click - show all posts for that day
-  const handleDayClick = (day: string, posts: IgMediaItem[]) => {
+  // Handler for day bar click
+  const handleDayClick = (posts: IgMediaItem[]) => {
     if (posts.length > 0) {
-      setSelectedDayPosts({ day, posts });
+      const bestPost = [...posts].sort((a, b) => 
+        (getReach(b) ?? 0) - (getReach(a) ?? 0)
+      )[0];
+      handlePostClick(bestPost);
     }
   };
 
@@ -168,26 +166,16 @@ export default function Time() {
               <span>0</span>
             </div>
             {dayData.map((d, idx) => (
-              <div
-                key={d.label}
-                className="bar-group cursor-pointer hover:opacity-80 transition-opacity relative group"
+              <div 
+                key={d.label} 
+                className="bar-group cursor-pointer hover:opacity-80 transition-opacity" 
                 style={idx === 0 ? { marginLeft: 40 } : undefined}
-                onClick={() => handleDayClick(d.label, d.posts)}
+                onClick={() => handleDayClick(d.posts)}
               >
                 <div className="bar" style={{ height: `${Math.max(12, d.height)}px` }}>
                   <span className="bar-value">{formatCompact(d.value)}</span>
                 </div>
                 <span className="bar-label">{d.label}</span>
-                {/* Hover tooltip */}
-                {d.count > 0 && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    <div className="bg-popover border border-border text-popover-foreground px-3 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg">
-                      <div className="font-semibold mb-1">{d.label}</div>
-                      <div>{d.count} publicaç{d.count === 1 ? 'ão' : 'ões'}</div>
-                      <div className="text-muted-foreground text-[10px] mt-1">Clique para ver todos</div>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -255,95 +243,6 @@ export default function Time() {
 
       {/* Post Detail Modal */}
       <PostDetailModal post={selectedPost} isOpen={isModalOpen} onClose={closeModal} />
-
-      {/* Day Posts Modal - Shows all posts for selected day */}
-      <Dialog open={!!selectedDayPosts} onOpenChange={() => setSelectedDayPosts(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
-              Publicações de {selectedDayPosts?.day}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedDayPosts?.posts.length} publicaç{selectedDayPosts?.posts.length === 1 ? 'ão' : 'ões'} encontrada{selectedDayPosts?.posts.length === 1 ? '' : 's'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {selectedDayPosts?.posts
-              .sort((a, b) => (getReach(b) ?? 0) - (getReach(a) ?? 0))
-              .map((post) => (
-                <div
-                  key={post.id}
-                  className="border border-border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => {
-                    handlePostClick(post);
-                    setSelectedDayPosts(null);
-                  }}
-                >
-                  {/* Thumbnail */}
-                  <div className="relative aspect-square bg-secondary">
-                    {post.media_url || post.thumbnail_url ? (
-                      <img
-                        src={post.thumbnail_url || post.media_url}
-                        alt="Post"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        {(post.media_product_type === "REELS" || post.media_product_type === "REEL") ? (
-                          <Play className="w-12 h-12 text-muted-foreground/50" />
-                        ) : (
-                          <ImageIcon className="w-12 h-12 text-muted-foreground/50" />
-                        )}
-                      </div>
-                    )}
-                    {/* Reel indicator */}
-                    {(post.media_product_type === "REELS" || post.media_product_type === "REEL") && (
-                      <div className="absolute top-2 right-2 bg-black/60 rounded p-1">
-                        <Play className="w-3 h-3 text-white" fill="white" />
-                      </div>
-                    )}
-                    {/* Click hint */}
-                    <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
-                      <ExternalLink className="w-8 h-8 text-white drop-shadow-lg" />
-                    </div>
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="p-3 bg-card">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <Heart className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">{(post.like_count ?? 0).toLocaleString("pt-BR")}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <MessageCircle className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">{(post.comments_count ?? 0).toLocaleString("pt-BR")}</span>
-                      </div>
-                      {getReach(post) && (
-                        <div className="flex items-center gap-1.5">
-                          <Eye className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-medium">{getReach(post)?.toLocaleString("pt-BR")}</span>
-                        </div>
-                      )}
-                    </div>
-                    {post.timestamp && (
-                      <div className="text-xs text-muted-foreground mt-2">
-                        {new Date(post.timestamp).toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
