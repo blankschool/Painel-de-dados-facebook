@@ -16,6 +16,19 @@ export type StoriesAggregate = {
   avg_completion_rate: number;
 };
 
+export type ComparisonMetric = {
+  current: number;
+  previous: number;
+  change: number;
+  changePercent: number;
+};
+
+export type AccountInsights = {
+  reach?: number;
+  impressions?: number;
+  profile_views?: number;
+};
+
 export type IgDashboardResponse = {
   success: boolean;
   error?: string;
@@ -46,6 +59,12 @@ export type IgDashboardResponse = {
   demographics?: Record<string, unknown>;
   online_followers?: Record<string, number>;
   messages?: string[];
+  // Consolidated account-level insights
+  consolidated_reach?: number;
+  consolidated_impressions?: number;
+  consolidated_profile_views?: number;
+  account_insights?: AccountInsights;
+  comparison_metrics?: Record<string, ComparisonMetric>;
 };
 
 function toYmd(date: Date): string {
