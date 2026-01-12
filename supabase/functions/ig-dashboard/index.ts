@@ -866,6 +866,44 @@ serve(async (req) => {
     const totalViews = mediaWithInsights.reduce((sum, m) => sum + (m.computed?.views ?? 0), 0);
     const totalReach = mediaWithInsights.reduce((sum, m) => sum + (m.computed?.reach ?? 0), 0);
 
+    // CRITICAL: Fetch consolidated account-level insights directly from Instagram API
+    // This provides real-time, accurate metrics instead of summing individual posts
+    let accountInsights: Record<string, number> = {};
+    try {
+      const since = body.since || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const until = body.until || new Date().toISOString().split('T')[0];
+
+      console.log(`[ig-dashboard] Fetching account insights from ${since} to ${until}`);
+
+      const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+        metric: 'reach,impressions,profile_views',
+        period: 'day',
+        since: since,
+        until: until,
+      });
+
+      const insightsData = (insightsJson as { data?: unknown[] }).data;
+      if (Array.isArray(insightsData)) {
+        for (const metric of insightsData) {
+          const metricData = metric as { name?: string; values?: Array<{ value?: number }> };
+          if (metricData.name && metricData.values) {
+            // Sum all daily values to get total for the period
+            const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+            accountInsights[metricData.name] = total;
+          }
+        }
+      }
+
+      console.log('[ig-dashboard] Account insights:', accountInsights);
+    } catch (err) {
+      console.error('[ig-dashboard] Failed to fetch account insights:', err instanceof Error ? err.message : String(err));
+      // Fallback to summed post metrics if account insights fail
+      accountInsights = {
+        reach: totalReach,
+        impressions: totalViews, // Use views as fallback for impressions
+      };
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -882,6 +920,11 @@ serve(async (req) => {
         total_posts: mediaWithInsights.length,
         total_views: totalViews,
         total_reach: totalReach,
+        // Consolidated account-level insights (real-time data from Instagram)
+        account_insights: accountInsights,
+        consolidated_reach: accountInsights.reach || totalReach,
+        consolidated_impressions: accountInsights.impressions || totalViews,
+        consolidated_profile_views: accountInsights.profile_views || 0,
         top_posts_by_score,
         top_posts_by_reach,
         top_reels_by_views,
