@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -28,7 +29,7 @@ const pageNames: Record<string, string> = {
 
 export function Topbar() {
   const location = useLocation();
-  const { getDateRangeFromPreset, setDateRangePreset, filters } = useFilters();
+  const { getDateRangeFromPreset, setDateRangePreset, setCustomDateRange, filters } = useFilters();
   const { data, refresh } = useDashboardData();
   const { theme, setTheme } = useTheme();
   
@@ -38,6 +39,17 @@ export function Topbar() {
   
   // Get current date range from FiltersContext
   const dateRange = getDateRangeFromPreset();
+  
+  // State for calendar popover
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [tempRange, setTempRange] = useState<DateRange | undefined>(undefined);
+  
+  // Sync tempRange when calendar opens
+  useEffect(() => {
+    if (isCalendarOpen) {
+      setTempRange(dateRange);
+    }
+  }, [isCalendarOpen]);
   
   const dateLabel = dateRange?.from
     ? dateRange.to
@@ -49,12 +61,23 @@ export function Topbar() {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  // Handle calendar date selection - for now, just show the date range but don't change filters
-  // To support custom date ranges, we'd need to extend FiltersContext
+  // Handle calendar date selection
   const handleDateSelect = (range: DateRange | undefined) => {
-    // Currently the calendar is view-only - the date range is controlled by the preset buttons
-    // If custom date selection is needed, we can extend FiltersContext to support it
-    console.log('[Topbar] Calendar date selected (read-only mode):', range);
+    setTempRange(range);
+  };
+  
+  // Apply the selected date range
+  const handleApplyRange = () => {
+    if (tempRange?.from && tempRange?.to) {
+      setCustomDateRange(tempRange);
+      setIsCalendarOpen(false);
+    }
+  };
+  
+  // Cancel and close
+  const handleCancel = () => {
+    setTempRange(undefined);
+    setIsCalendarOpen(false);
   };
 
   return (
@@ -127,8 +150,8 @@ export function Topbar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Date Range Picker - shows current preset range */}
-        <Popover>
+        {/* Date Range Picker - functional custom date selection */}
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <PopoverTrigger asChild>
             <button type="button" className="date-range hover:bg-accent/50 transition-colors rounded-lg">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -146,14 +169,43 @@ export function Topbar() {
               initialFocus
               mode="range"
               defaultMonth={dateRange?.from}
-              selected={dateRange}
+              selected={tempRange}
               onSelect={handleDateSelect}
               numberOfMonths={2}
               locale={ptBR}
+              disabled={(date) => date > new Date()}
               className={cn("p-3 pointer-events-auto")}
             />
-            <div className="p-3 border-t border-border text-xs text-muted-foreground text-center">
-              Use os botões de filtro (7D, 30D, 90D) para alterar o período
+            <div className="p-3 border-t border-border flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">
+                {tempRange?.from ? (
+                  tempRange.to ? (
+                    <>
+                      {format(tempRange.from, "dd MMM", { locale: ptBR })} - {format(tempRange.to, "dd MMM", { locale: ptBR })}
+                    </>
+                  ) : (
+                    "Selecione a data final"
+                  )
+                ) : (
+                  "Selecione a data inicial"
+                )}
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleCancel}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={handleApplyRange}
+                  disabled={!tempRange?.from || !tempRange?.to}
+                >
+                  Aplicar
+                </Button>
+              </div>
             </div>
           </PopoverContent>
         </Popover>
