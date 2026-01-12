@@ -100,6 +100,10 @@ export default function Overview() {
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
   console.log(`[Overview] Consolidated reach: ${data?.consolidated_reach}, Post sum: ${postSumReach}, Using: ${totalReach}`);
   console.log(`[Overview] Comparison metrics:`, comparisonMetrics);
+
+  // Profile views from consolidated API
+  const profileViews = data?.consolidated_profile_views ?? 0;
+
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
   const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
@@ -293,8 +297,9 @@ export default function Overview() {
             </div>
             <div className="metric-group">
               <div className="metric-item">
-                <span className="metric-label">Alcance médio</span>
-                <span className="metric-value">{formatCompact(avgReach)}</span>
+                <span className="metric-label">Visualizações do Perfil</span>
+                <span className="metric-value">{formatNumberOrDash(profileViews)}</span>
+                <ComparisonBadge metric={comparisonMetrics?.profile_views} />
               </div>
               <div className="metric-item">
                 <span className="metric-label">Taxa de engajamento</span>
