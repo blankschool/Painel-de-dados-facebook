@@ -3,6 +3,9 @@ project_id = "phbwmfjrgadzybqpjnoi"
 [functions.ig-dashboard]
 verify_jwt = true
 
+[functions.igaa-dashboard]
+verify_jwt = true
+
 [functions.facebook-oauth]
 verify_jwt = true
 
