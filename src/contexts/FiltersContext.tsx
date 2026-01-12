@@ -10,6 +10,7 @@ interface FiltersState {
   dayFilter: DayFilter;
   mediaType: MediaType;
   dateRangePreset: DateRangePreset;
+  customDateRange: DateRange | null;
   searchQuery: string;
 }
 
@@ -18,6 +19,7 @@ interface FiltersContextType {
   setDayFilter: (day: DayFilter) => void;
   setMediaType: (type: MediaType) => void;
   setDateRangePreset: (preset: DateRangePreset) => void;
+  setCustomDateRange: (range: DateRange | undefined) => void;
   setSearchQuery: (query: string) => void;
   resetFilters: () => void;
   activeFiltersCount: number;
@@ -29,6 +31,7 @@ const defaultFilters: FiltersState = {
   dayFilter: 'all',
   mediaType: 'all',
   dateRangePreset: '30d',
+  customDateRange: null,
   searchQuery: '',
 };
 
@@ -93,6 +96,15 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     setFilters((prev) => ({ ...prev, dateRangePreset: preset }));
   }, []);
 
+  const setCustomDateRange = useCallback((range: DateRange | undefined) => {
+    console.log('[FiltersContext] Setting customDateRange:', range);
+    setFilters((prev) => ({ 
+      ...prev, 
+      customDateRange: range || null,
+      dateRangePreset: 'custom' 
+    }));
+  }, []);
+
   const setSearchQuery = useCallback((query: string) => {
     setFilters((prev) => ({ ...prev, searchQuery: query }));
   }, []);
@@ -103,8 +115,12 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getDateRangeFromPreset = useCallback(() => {
+    // If custom preset and customDateRange is set, use it
+    if (filters.dateRangePreset === 'custom' && filters.customDateRange?.from) {
+      return filters.customDateRange;
+    }
     return computeDateRangeFromPreset(filters.dateRangePreset);
-  }, [filters.dateRangePreset]);
+  }, [filters.dateRangePreset, filters.customDateRange]);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -122,6 +138,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
         setDayFilter,
         setMediaType,
         setDateRangePreset,
+        setCustomDateRange,
         setSearchQuery,
         resetFilters,
         activeFiltersCount,

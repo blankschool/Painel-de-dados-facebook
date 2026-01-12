@@ -1,4 +1,8 @@
-import { Filter, X, ChevronDown, Calendar } from "lucide-react";
+import { useState } from "react";
+import { Filter, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilters, type DayFilter, type MediaType, type DateRangePreset } from "@/contexts/FiltersContext";
 import {
@@ -7,7 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -34,20 +39,61 @@ const dateRangeOptions: { value: DateRangePreset; label: string }[] = [
   { value: "90d", label: "Últimos 90 dias" },
   { value: "6m", label: "Últimos 6 meses" },
   { value: "1y", label: "Último ano" },
+  { value: "custom", label: "Personalizado..." },
 ];
 
 const quickFilters: DateRangePreset[] = ["7d", "30d", "90d"];
 
 export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean }) {
   const { data } = useDashboardData();
-  const { filters, setDayFilter, setMediaType, setDateRangePreset, resetFilters, activeFiltersCount } = useFilters();
+  const { 
+    filters, 
+    setDayFilter, 
+    setMediaType, 
+    setDateRangePreset, 
+    setCustomDateRange,
+    resetFilters, 
+    activeFiltersCount 
+  } = useFilters();
+  
+  const [customPickerOpen, setCustomPickerOpen] = useState(false);
+  const [tempRange, setTempRange] = useState<DateRange | undefined>(
+    filters.customDateRange || undefined
+  );
   
   const accountName = data?.profile?.username ? data.profile.username : "Instagram Business";
   const profilePicture = data?.profile?.profile_picture_url;
 
   const selectedDay = dayOptions.find((d) => d.value === filters.dayFilter)?.label || "Dias";
   const selectedMediaType = mediaTypeOptions.find((m) => m.value === filters.mediaType)?.label || "Tipo";
-  const selectedDateRange = dateRangeOptions.find((r) => r.value === filters.dateRangePreset)?.label || "Período";
+  
+  // Get display text for date range
+  const getDateRangeDisplay = () => {
+    if (filters.dateRangePreset === 'custom' && filters.customDateRange?.from) {
+      const from = format(filters.customDateRange.from, "dd MMM", { locale: ptBR });
+      const to = filters.customDateRange.to 
+        ? format(filters.customDateRange.to, "dd MMM", { locale: ptBR })
+        : "...";
+      return `${from} - ${to}`;
+    }
+    return dateRangeOptions.find((r) => r.value === filters.dateRangePreset)?.label || "Período";
+  };
+
+  const handlePresetSelect = (preset: DateRangePreset) => {
+    if (preset === 'custom') {
+      setCustomPickerOpen(true);
+    } else {
+      setDateRangePreset(preset);
+    }
+  };
+
+  const handleCustomSelect = (range: DateRange | undefined) => {
+    setTempRange(range);
+    if (range?.from && range?.to) {
+      setCustomDateRange(range);
+      setCustomPickerOpen(false);
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-xl border border-border/40 shadow-card mb-6">
@@ -84,8 +130,8 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{selectedDateRange}</span>
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <span>{getDateRangeDisplay()}</span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
@@ -93,7 +139,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           {dateRangeOptions.map((option) => (
             <DropdownMenuItem
               key={option.value}
-              onClick={() => setDateRangePreset(option.value)}
+              onClick={() => handlePresetSelect(option.value)}
               className={cn(
                 "cursor-pointer",
                 filters.dateRangePreset === option.value && "bg-accent font-medium"
@@ -105,6 +151,65 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Custom Date Range Picker Popover */}
+      <Popover open={customPickerOpen} onOpenChange={setCustomPickerOpen}>
+        <PopoverTrigger asChild>
+          <span className="hidden" />
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
+          <div className="p-3 border-b border-border">
+            <p className="text-sm font-medium">Selecione o período</p>
+            <p className="text-xs text-muted-foreground">
+              {tempRange?.from ? (
+                tempRange.to ? (
+                  <>
+                    {format(tempRange.from, "dd 'de' MMMM", { locale: ptBR })} até{" "}
+                    {format(tempRange.to, "dd 'de' MMMM", { locale: ptBR })}
+                  </>
+                ) : (
+                  <>Início: {format(tempRange.from, "dd 'de' MMMM", { locale: ptBR })}</>
+                )
+              ) : (
+                "Clique para selecionar as datas"
+              )}
+            </p>
+          </div>
+          <Calendar
+            mode="range"
+            selected={tempRange}
+            onSelect={handleCustomSelect}
+            numberOfMonths={2}
+            locale={ptBR}
+            disabled={(date) => date > new Date()}
+            className="pointer-events-auto"
+          />
+          <div className="p-3 border-t border-border flex justify-end gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setTempRange(undefined);
+                setCustomPickerOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={() => {
+                if (tempRange?.from && tempRange?.to) {
+                  setCustomDateRange(tempRange);
+                  setCustomPickerOpen(false);
+                }
+              }}
+              disabled={!tempRange?.from || !tempRange?.to}
+            >
+              Aplicar
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
 
       {/* Day Filter */}
       <DropdownMenu>
