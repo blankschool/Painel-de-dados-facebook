@@ -70,10 +70,18 @@ function computeDateRangeFromPreset(preset: DateRangePreset): DateRange {
       startDate = subDays(today, 29);
   }
 
-  return {
+  const result = {
     from: startOfDay(startDate),
     to: endOfDay(today),  // Includes today (current behavior)
   };
+
+  console.log(`[FiltersContext] Date range for ${preset}:`, {
+    from: result.from.toISOString().split('T')[0],
+    to: result.to.toISOString().split('T')[0],
+    today: today.toISOString().split('T')[0],
+  });
+
+  return result;
 }
 
 const FiltersContext = createContext<FiltersContextType | undefined>(undefined);
