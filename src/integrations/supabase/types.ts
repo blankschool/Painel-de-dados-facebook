@@ -56,6 +56,269 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_cache_metadata: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          is_syncing: boolean | null
+          last_insights_sync: string | null
+          last_posts_sync: string | null
+          last_profile_sync: string | null
+          last_sync_error: string | null
+          newest_post_date: string | null
+          oldest_post_date: string | null
+          total_insights_days: number | null
+          total_posts_cached: number | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          is_syncing?: boolean | null
+          last_insights_sync?: string | null
+          last_posts_sync?: string | null
+          last_profile_sync?: string | null
+          last_sync_error?: string | null
+          newest_post_date?: string | null
+          oldest_post_date?: string | null
+          total_insights_days?: number | null
+          total_posts_cached?: number | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          is_syncing?: boolean | null
+          last_insights_sync?: string | null
+          last_posts_sync?: string | null
+          last_profile_sync?: string | null
+          last_sync_error?: string | null
+          newest_post_date?: string | null
+          oldest_post_date?: string | null
+          total_insights_days?: number | null
+          total_posts_cached?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_cache_metadata_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "connected_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_daily_insights: {
+        Row: {
+          account_id: string
+          created_at: string
+          email_contacts: number | null
+          follower_count: number | null
+          get_directions_clicks: number | null
+          id: string
+          impressions: number | null
+          insight_date: string
+          phone_call_clicks: number | null
+          profile_views: number | null
+          reach: number | null
+          text_message_clicks: number | null
+          updated_at: string
+          website_clicks: number | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email_contacts?: number | null
+          follower_count?: number | null
+          get_directions_clicks?: number | null
+          id?: string
+          impressions?: number | null
+          insight_date: string
+          phone_call_clicks?: number | null
+          profile_views?: number | null
+          reach?: number | null
+          text_message_clicks?: number | null
+          updated_at?: string
+          website_clicks?: number | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email_contacts?: number | null
+          follower_count?: number | null
+          get_directions_clicks?: number | null
+          id?: string
+          impressions?: number | null
+          insight_date?: string
+          phone_call_clicks?: number | null
+          profile_views?: number | null
+          reach?: number | null
+          text_message_clicks?: number | null
+          updated_at?: string
+          website_clicks?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_daily_insights_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "connected_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_posts_cache: {
+        Row: {
+          account_id: string
+          caption: string | null
+          comments_count: number | null
+          computed_raw: Json | null
+          created_at: string
+          engagement: number | null
+          engagement_rate: number | null
+          id: string
+          impressions: number | null
+          insights_raw: Json | null
+          last_fetched_at: string | null
+          like_count: number | null
+          media_id: string
+          media_product_type: string | null
+          media_type: string | null
+          media_url: string | null
+          permalink: string | null
+          plays: number | null
+          reach: number | null
+          saved: number | null
+          thumbnail_url: string | null
+          timestamp: string
+          updated_at: string
+          video_views: number | null
+        }
+        Insert: {
+          account_id: string
+          caption?: string | null
+          comments_count?: number | null
+          computed_raw?: Json | null
+          created_at?: string
+          engagement?: number | null
+          engagement_rate?: number | null
+          id?: string
+          impressions?: number | null
+          insights_raw?: Json | null
+          last_fetched_at?: string | null
+          like_count?: number | null
+          media_id: string
+          media_product_type?: string | null
+          media_type?: string | null
+          media_url?: string | null
+          permalink?: string | null
+          plays?: number | null
+          reach?: number | null
+          saved?: number | null
+          thumbnail_url?: string | null
+          timestamp: string
+          updated_at?: string
+          video_views?: number | null
+        }
+        Update: {
+          account_id?: string
+          caption?: string | null
+          comments_count?: number | null
+          computed_raw?: Json | null
+          created_at?: string
+          engagement?: number | null
+          engagement_rate?: number | null
+          id?: string
+          impressions?: number | null
+          insights_raw?: Json | null
+          last_fetched_at?: string | null
+          like_count?: number | null
+          media_id?: string
+          media_product_type?: string | null
+          media_type?: string | null
+          media_url?: string | null
+          permalink?: string | null
+          plays?: number | null
+          reach?: number | null
+          saved?: number | null
+          thumbnail_url?: string | null
+          timestamp?: string
+          updated_at?: string
+          video_views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_posts_cache_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "connected_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_profile_snapshots: {
+        Row: {
+          account_id: string
+          biography: string | null
+          business_id: string
+          created_at: string
+          followers_count: number | null
+          follows_count: number | null
+          id: string
+          media_count: number | null
+          name: string | null
+          profile_picture_url: string | null
+          snapshot_date: string
+          updated_at: string
+          username: string | null
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          biography?: string | null
+          business_id: string
+          created_at?: string
+          followers_count?: number | null
+          follows_count?: number | null
+          id?: string
+          media_count?: number | null
+          name?: string | null
+          profile_picture_url?: string | null
+          snapshot_date: string
+          updated_at?: string
+          username?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          biography?: string | null
+          business_id?: string
+          created_at?: string
+          followers_count?: number | null
+          follows_count?: number | null
+          id?: string
+          media_count?: number | null
+          name?: string | null
+          profile_picture_url?: string | null
+          snapshot_date?: string
+          updated_at?: string
+          username?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_profile_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "connected_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

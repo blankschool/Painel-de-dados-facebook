@@ -132,6 +132,7 @@ type DashboardRequest = {
   maxInsightsPosts?: number;
   since?: string;
   until?: string;
+  forceRefresh?: boolean;
 };
 
 type InstagramProfile = {
