@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { formatDateForGraph, formatDateForTooltip, getDateKey } from "@/utils/dateFormat";
 import { Link } from "react-router-dom";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -125,7 +124,7 @@ export default function Overview() {
       if (!item.timestamp) continue;
       const date = new Date(item.timestamp);
       // Use local timezone format to avoid UTC shift issues
-      const dateKey = format(date, 'yyyy-MM-dd');
+      const dateKey = getDateKey(date);
       const reach = getReach(item) ?? 0;
       
       if (!grouped[dateKey]) {
@@ -134,14 +133,15 @@ export default function Overview() {
       grouped[dateKey].reach += reach;
     }
 
+    // Get total days for formatting
+    const entries = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).slice(-30);
+    const totalDays = entries.length;
+
     // Sort by date and take last 30 days
-    return Object.entries(grouped)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-30)
-      .map(([date, values]) => ({
+    return entries.map(([date, values]) => ({
         date,
-        // Use parseISO to correctly interpret date string in local timezone
-        dateLabel: format(parseISO(date), "dd 'de' MMM.", { locale: ptBR }),
+        // Use universal date format: "12 Jan"
+        dateLabel: formatDateForGraph(date, totalDays),
         reach: values.reach,
         reachPrev: Math.round(values.reach * (0.6 + Math.random() * 0.3)), // Simulated previous period
       }));

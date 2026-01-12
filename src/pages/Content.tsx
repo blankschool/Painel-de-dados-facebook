@@ -16,8 +16,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { format, eachWeekOfInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { eachWeekOfInterval } from "date-fns";
+import { formatWeekLabel } from "@/utils/dateFormat";
 
 type ContentTab = "overview" | "posts" | "reels" | "stories";
 
@@ -99,8 +99,8 @@ export default function Content() {
       ).length;
 
       return {
-        week: format(weekStart, "dd/MM", { locale: ptBR }),
-        weekFull: format(weekStart, "'Semana de' dd MMM", { locale: ptBR }),
+        week: formatWeekLabel(weekStart),
+        weekFull: `Week of ${formatWeekLabel(weekStart)}`,
         total: weekPosts.length,
         feed: feedCount,
         reels: reelsCount,
