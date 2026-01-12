@@ -67,9 +67,9 @@ export function findBestTimeFromOnlineFollowers(onlineFollowers: Record<string, 
  */
 export function findBestTimeFromEngagement(
   posts: Array<{
-    timestamp: string;
-    like_count: number;
-    comments_count: number;
+    timestamp?: string;
+    like_count?: number;
+    comments_count?: number;
     insights?: { saved?: number };
   }>,
   followersCount: number
@@ -80,12 +80,13 @@ export function findBestTimeFromEngagement(
   > = {};
 
   posts.forEach((post) => {
+    if (!post.timestamp) return;
     const date = new Date(post.timestamp);
     const hour = date.getHours();
 
     const engagement =
-      post.like_count +
-      post.comments_count +
+      (post.like_count || 0) +
+      (post.comments_count || 0) +
       (post.insights?.saved || 0);
     const er = followersCount > 0 ? (engagement / followersCount) * 100 : 0;
 
@@ -178,9 +179,9 @@ export function aggregateStoriesMetrics(
  */
 export function calculateEngagementByMediaType(
   media: Array<{
-    media_type: string;
-    like_count: number;
-    comments_count: number;
+    media_type?: string;
+    like_count?: number;
+    comments_count?: number;
     insights?: { saved?: number };
   }>,
   followersCount: number
@@ -191,10 +192,10 @@ export function calculateEngagementByMediaType(
   > = {};
 
   media.forEach((post) => {
-    const type = post.media_type;
+    const type = post.media_type || 'OTHER';
     const engagement =
-      post.like_count +
-      post.comments_count +
+      (post.like_count || 0) +
+      (post.comments_count || 0) +
       (post.insights?.saved || 0);
     const er = followersCount > 0 ? (engagement / followersCount) * 100 : 0;
 

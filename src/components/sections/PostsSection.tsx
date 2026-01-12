@@ -13,8 +13,8 @@ interface PostsSectionProps {
       followers_count?: number;
     };
     media?: Array<{
-      like_count: number;
-      comments_count: number;
+      like_count?: number;
+      comments_count?: number;
       insights?: { saved?: number };
     }>;
     comparison_metrics?: {
@@ -35,9 +35,9 @@ export function PostsSection({ data }: PostsSectionProps) {
 
   // Calcular métricas agregadas
   const metrics = useMemo(() => {
-    const totalLikes = posts.reduce((sum, post) => sum + post.like_count, 0);
+    const totalLikes = posts.reduce((sum, post) => sum + (post.like_count || 0), 0);
     const totalComments = posts.reduce(
-      (sum, post) => sum + post.comments_count,
+      (sum, post) => sum + (post.comments_count || 0),
       0
     );
     const totalSaves = posts.reduce(
