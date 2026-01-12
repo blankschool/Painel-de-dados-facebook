@@ -6,7 +6,7 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram } from "lucide-react";
+import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
@@ -33,6 +33,33 @@ function formatCompact(value: number | null): string {
   return value.toLocaleString("pt-BR");
 }
 
+// Comparison badge component
+function ComparisonBadge({ metric }: { metric?: { current: number; previous: number; change: number; changePercent: number } }) {
+  if (!metric || metric.previous === 0) return null;
+
+  const isPositive = metric.change > 0;
+  const isNeutral = metric.change === 0;
+
+  if (isNeutral) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+        <Minus className="w-3 h-3" />
+        <span>Sem mudanças</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-1 text-xs mt-1 ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+      {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      <span className="font-medium">
+        {isPositive ? '+' : ''}{metric.changePercent.toFixed(1)}%
+      </span>
+      <span className="text-muted-foreground text-[10px]">vs período anterior</span>
+    </div>
+  );
+}
+
 const tooltipStyle = {
   backgroundColor: "hsl(var(--card))",
   border: "1px solid hsl(var(--border))",
@@ -45,7 +72,7 @@ export default function Overview() {
   const { data, loading, error } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
-  
+
   // Apply filters to media
   const media = useFilteredMedia(allMedia);
 
@@ -58,8 +85,12 @@ export default function Overview() {
   const [topContentSortBy, setTopContentSortBy] = useState<"er" | "reach" | "likes">("er");
   const [engagementSort, setEngagementSort] = useState<SortOrder>("desc");
 
+  // Extract comparison metrics from API response
+  const comparisonMetrics = (data as any)?.comparison_metrics as Record<string, { current: number; previous: number; change: number; changePercent: number }> | undefined;
+
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
+  console.log(`[Overview] Comparison metrics:`, comparisonMetrics);
 
   const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
   const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
@@ -239,10 +270,12 @@ export default function Overview() {
               <div className="metric-item">
                 <span className="metric-label">Visualizações</span>
                 <span className="metric-value">{formatNumberOrDash(totalViews)}</span>
+                <ComparisonBadge metric={comparisonMetrics?.impressions} />
               </div>
               <div className="metric-item">
                 <span className="metric-label">Alcance</span>
                 <span className="metric-value">{formatNumberOrDash(totalReach)}</span>
+                <ComparisonBadge metric={comparisonMetrics?.reach} />
               </div>
             </div>
           </div>

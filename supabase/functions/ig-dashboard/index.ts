@@ -869,12 +869,25 @@ serve(async (req) => {
     // CRITICAL: Fetch consolidated account-level insights directly from Instagram API
     // This provides real-time, accurate metrics instead of summing individual posts
     let accountInsights: Record<string, number> = {};
+    let previousPeriodInsights: Record<string, number> = {};
+    let comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
+
     try {
       const since = body.since || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const until = body.until || new Date().toISOString().split('T')[0];
 
       console.log(`[ig-dashboard] Fetching account insights from ${since} to ${until}`);
 
+      // Calculate previous period dates (same duration)
+      const sinceDate = new Date(since);
+      const untilDate = new Date(until);
+      const periodDuration = untilDate.getTime() - sinceDate.getTime();
+      const prevSince = new Date(sinceDate.getTime() - periodDuration).toISOString().split('T')[0];
+      const prevUntil = new Date(sinceDate.getTime() - 1).toISOString().split('T')[0]; // Day before current period starts
+
+      console.log(`[ig-dashboard] Previous period: ${prevSince} to ${prevUntil}`);
+
+      // Fetch current period insights
       const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
         metric: 'reach,impressions,profile_views',
         period: 'day',
@@ -894,7 +907,50 @@ serve(async (req) => {
         }
       }
 
-      console.log('[ig-dashboard] Account insights:', accountInsights);
+      console.log('[ig-dashboard] Account insights (current):', accountInsights);
+
+      // Fetch previous period insights for comparison
+      try {
+        const prevInsightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: 'reach,impressions,profile_views',
+          period: 'day',
+          since: prevSince,
+          until: prevUntil,
+        });
+
+        const prevInsightsData = (prevInsightsJson as { data?: unknown[] }).data;
+        if (Array.isArray(prevInsightsData)) {
+          for (const metric of prevInsightsData) {
+            const metricData = metric as { name?: string; values?: Array<{ value?: number }> };
+            if (metricData.name && metricData.values) {
+              const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+              previousPeriodInsights[metricData.name] = total;
+            }
+          }
+        }
+
+        console.log('[ig-dashboard] Account insights (previous):', previousPeriodInsights);
+
+        // Calculate comparison metrics
+        for (const metric of ['reach', 'impressions', 'profile_views']) {
+          const current = accountInsights[metric] || 0;
+          const previous = previousPeriodInsights[metric] || 0;
+          const change = current - previous;
+          const changePercent = previous > 0 ? ((change / previous) * 100) : 0;
+
+          comparisonMetrics[metric] = {
+            current,
+            previous,
+            change,
+            changePercent,
+          };
+        }
+
+        console.log('[ig-dashboard] Comparison metrics:', comparisonMetrics);
+      } catch (prevErr) {
+        console.log('[ig-dashboard] Failed to fetch previous period insights (non-critical):', prevErr instanceof Error ? prevErr.message : String(prevErr));
+        // Previous period is optional, so we don't fail the entire request
+      }
     } catch (err) {
       console.error('[ig-dashboard] Failed to fetch account insights:', err instanceof Error ? err.message : String(err));
       // Fallback to summed post metrics if account insights fail
@@ -925,6 +981,9 @@ serve(async (req) => {
         consolidated_reach: accountInsights.reach || totalReach,
         consolidated_impressions: accountInsights.impressions || totalViews,
         consolidated_profile_views: accountInsights.profile_views || 0,
+        // Period comparison metrics (current vs previous period)
+        previous_period_insights: previousPeriodInsights,
+        comparison_metrics: comparisonMetrics,
         top_posts_by_score,
         top_posts_by_reach,
         top_reels_by_views,
