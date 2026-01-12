@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useFilteredMedia } from '@/hooks/useFilteredMedia';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
+import { FiltersBar } from '@/components/layout/FiltersBar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getScore, getShares, getViews, type IgMediaItem } from '@/utils/ig';
@@ -39,6 +41,9 @@ const POSTS_PER_PAGE = 25;
 
 const Posts = () => {
   const { data, loading, error, refresh } = useDashboardData();
+  const allPosts = data?.posts ?? [];
+  const posts = useFilteredMedia(allPosts);
+  
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'score' | 'engagement' | 'likes' | 'comments' | 'saves' | 'shares' | 'reach' | 'views' | 'er'>('score');
   const [displayCount, setDisplayCount] = useState(POSTS_PER_PAGE);
@@ -110,8 +115,6 @@ const Posts = () => {
     a.click();
   };
 
-  const posts = data?.posts ?? [];
-  
   // Aggregate metrics
   const totalLikes = posts.reduce((sum, p) => sum + (p.like_count || 0), 0);
   const totalComments = posts.reduce((sum, p) => sum + (p.comments_count || 0), 0);
@@ -180,12 +183,15 @@ const Posts = () => {
 
   return (
     <div className="space-y-6">
+      {/* Filters Bar */}
+      <FiltersBar showMediaType={true} />
+
       {/* Header */}
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Posts</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Análise de {posts.length.toLocaleString()} posts. Rankings usam Score (ponderado) e métricas normalizadas quando disponíveis.
+            Análise de {posts.length.toLocaleString()} posts{allPosts.length !== posts.length ? ` (filtrado de ${allPosts.length.toLocaleString()})` : ''}. Rankings usam Score (ponderado) e métricas normalizadas quando disponíveis.
           </p>
         </div>
         <div className="flex items-center gap-3">

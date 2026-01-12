@@ -33,35 +33,37 @@ const defaultFilters: FiltersState = {
 };
 
 // Helper to compute date range from preset
+// "7d" means: today + 6 previous days = 7 days total (e.g., Jan 6-12 if today is Jan 12)
 function computeDateRangeFromPreset(preset: DateRangePreset): DateRange {
   const now = new Date();
+  const today = startOfDay(now);
   let startDate: Date;
   
   switch (preset) {
     case '7d':
-      startDate = subDays(now, 7);
+      startDate = subDays(today, 6);  // 6 days before today + today = 7 days
       break;
     case '14d':
-      startDate = subDays(now, 14);
+      startDate = subDays(today, 13); // 13 + 1 = 14 days
       break;
     case '30d':
-      startDate = subDays(now, 30);
+      startDate = subDays(today, 29); // 29 + 1 = 30 days
       break;
     case '60d':
-      startDate = subDays(now, 60);
+      startDate = subDays(today, 59);
       break;
     case '90d':
-      startDate = subDays(now, 90);
+      startDate = subDays(today, 89);
       break;
     case '6m':
-      startDate = subMonths(now, 6);
+      startDate = subMonths(today, 6);
       break;
     case '1y':
-      startDate = subYears(now, 1);
+      startDate = subYears(today, 1);
       break;
     case 'custom':
     default:
-      startDate = subDays(now, 30);
+      startDate = subDays(today, 29);
   }
   
   return {
