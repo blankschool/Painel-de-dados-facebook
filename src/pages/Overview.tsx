@@ -180,7 +180,7 @@ export default function Overview() {
     return sorted;
   }, [media, daySort]);
 
-  // Top content with sorting
+  // Top content with sorting - show ALL filtered posts (1 per day)
   const topContent = useMemo(() => {
     return [...media]
       .map((item) => ({
@@ -193,9 +193,19 @@ export default function Overview() {
         const aVal = a[topContentSortBy];
         const bVal = b[topContentSortBy];
         return topContentSort === "desc" ? bVal - aVal : aVal - bVal;
-      })
-      .slice(0, 4);
+      });
+    // No .slice() - show all posts (1 per day = 7 for 7-day period)
   }, [media, topContentSort, topContentSortBy]);
+
+  // Calculate max value for bar chart scaling
+  const maxTopContentValue = useMemo(() => {
+    if (topContent.length === 0) return 1;
+    return Math.max(...topContent.map(row => 
+      topContentSortBy === "er" ? row.er : 
+      topContentSortBy === "reach" ? row.reach : 
+      row.likes
+    ));
+  }, [topContent, topContentSortBy]);
 
   // Engagement breakdown with sorting
   const engagementData = useMemo(() => {
@@ -506,10 +516,15 @@ export default function Overview() {
             </div>
           </div>
 
-          {/* Top Performing Content - Clickable */}
+          {/* Top Performing Content - Shows all posts (1 per day) */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>
+              <div>
+                <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {media.length} {media.length === 1 ? 'publicação' : 'publicações'} • 1 por dia
+                </p>
+              </div>
               <SortDropdown
                 sortBy={topContentSortBy}
                 sortOrder={topContentSort}
@@ -522,44 +537,51 @@ export default function Overview() {
                 onSortOrderChange={() => setTopContentSort(o => o === "desc" ? "asc" : "desc")}
               />
             </div>
-            <div className="top-content-list">
-              <div className="top-content-header">
+            <div className="top-content-list max-h-[400px] overflow-y-auto">
+              <div className="top-content-header sticky top-0 bg-card z-10">
                 <span></span>
                 <span>Prévia</span>
                 <span>{topContentSortBy === "er" ? "Taxa de engajamento" : topContentSortBy === "reach" ? "Alcance" : "Curtidas"} {topContentSort === "desc" ? "▼" : "▲"}</span>
               </div>
-              {topContent.map((row, index) => (
-                <div 
-                  onClick={() => handlePostClick(row.item)}
-                  className="top-content-item hover:bg-accent/50 rounded-lg transition-colors cursor-pointer group" 
-                  key={row.item.id ?? index}
-                >
-                  <span className="item-rank">{index + 1}.</span>
-                  <div className="relative">
-                    <div
-                      className="item-preview teal"
-                      style={
-                        row.item.thumbnail_url || row.item.media_url
-                          ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
-                          : undefined
-                      }
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
-                      <ExternalLink className="w-4 h-4 text-white" />
+              {topContent.map((row, index) => {
+                const currentValue = topContentSortBy === "er" ? row.er : 
+                                     topContentSortBy === "reach" ? row.reach : 
+                                     row.likes;
+                const barWidth = maxTopContentValue > 0 ? (currentValue / maxTopContentValue) * 100 : 0;
+                
+                return (
+                  <div 
+                    onClick={() => handlePostClick(row.item)}
+                    className="top-content-item hover:bg-accent/50 rounded-lg transition-colors cursor-pointer group" 
+                    key={row.item.id ?? index}
+                  >
+                    <span className="item-rank">{index + 1}.</span>
+                    <div className="relative">
+                      <div
+                        className="item-preview teal"
+                        style={
+                          row.item.thumbnail_url || row.item.media_url
+                            ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
+                            : undefined
+                        }
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                        <ExternalLink className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
+                    <div className="item-engagement">
+                      <span className="engagement-value">
+                        {topContentSortBy === "er" ? formatPercent(row.er) : 
+                         topContentSortBy === "reach" ? formatCompact(row.reach) : 
+                         row.likes.toLocaleString("pt-BR")}
+                      </span>
+                      <div className="engagement-bar-small">
+                        <div className="engagement-bar-small-fill" style={{ width: `${Math.max(5, barWidth)}%` }} />
+                      </div>
                     </div>
                   </div>
-                  <div className="item-engagement">
-                    <span className="engagement-value">
-                      {topContentSortBy === "er" ? formatPercent(row.er) : 
-                       topContentSortBy === "reach" ? formatCompact(row.reach) : 
-                       row.likes.toLocaleString("pt-BR")}
-                    </span>
-                    <div className="engagement-bar-small">
-                      <div className="engagement-bar-small-fill" style={{ width: `${Math.max(10, topContentSortBy === "er" ? row.er : 50)}%` }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
