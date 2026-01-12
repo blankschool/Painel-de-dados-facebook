@@ -60,16 +60,12 @@ export function useDashboardData() {
     const dateRange = getDateRangeFromPreset();
     const since = dateRange.from ? toYmd(dateRange.from) : undefined;
     const until = dateRange.to ? toYmd(dateRange.to) : undefined;
-    
+
     console.log(`[useDashboardData] Preset: ${filters.dateRangePreset}, Since: ${since}, Until: ${until}, Account: ${selectedAccount?.account_username}`);
-    
-    const maxInsightsPostsEnv = Number(import.meta.env.VITE_MAX_INSIGHTS_POSTS ?? '');
-    const maxInsightsPosts = Number.isFinite(maxInsightsPostsEnv) && maxInsightsPostsEnv > 0 ? maxInsightsPostsEnv : 500;
-    
-    return { 
-      since, 
-      until, 
-      maxInsightsPosts,
+
+    return {
+      since,
+      until,
       accountId: selectedAccount?.id,
     };
   }, [getDateRangeFromPreset, filters.dateRangePreset, selectedAccount?.id, selectedAccount?.account_username]);

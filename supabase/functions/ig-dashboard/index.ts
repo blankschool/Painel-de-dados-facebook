@@ -586,16 +586,18 @@ serve(async (req) => {
 
     console.log(`[ig-dashboard] Fetching data for @${connectedAccount.account_username} businessId=${businessId} (user=${user.id}, accountId=${connectedAccount.id}, tokenType=${tokenType})`);
 
-    const maxPosts = typeof body.maxPosts === "number" ? Math.max(1, Math.min(2000, body.maxPosts)) : 500;
-    const maxStories = typeof body.maxStories === "number" ? Math.max(1, Math.min(50, body.maxStories)) : 25;
-    const maxInsightsPosts =
-      typeof body.maxInsightsPosts === "number"
-        ? Math.max(0, Math.min(maxPosts, Math.floor(body.maxInsightsPosts)))
-        : 200;
+    // Date range for filtering posts
+    const sinceDate = body.since || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const untilDate = body.until || new Date().toISOString().split('T')[0];
+    const sinceTimestamp = new Date(sinceDate).getTime();
+    const untilTimestamp = new Date(untilDate + 'T23:59:59Z').getTime(); // End of day
 
     console.log(
-      `[ig-dashboard] Fetching data for businessId=${businessId}, maxPosts=${maxPosts}, maxInsightsPosts=${maxInsightsPosts}`,
+      `[ig-dashboard] Fetching data for businessId=${businessId}, date range: ${sinceDate} to ${untilDate}`,
     );
+
+    // No longer using fixed limits - will fetch all posts within date range
+    const maxStories = typeof body.maxStories === "number" ? Math.max(1, Math.min(50, body.maxStories)) : 25;
 
     let profileJson: unknown;
     try {
@@ -619,6 +621,7 @@ serve(async (req) => {
 
     const allMedia: MediaItem[] = [];
     let nextUrl: string | null = null;
+    let reachedDateLimit = false;
 
     const mediaFields =
       "id,caption,media_type,media_product_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count";
@@ -629,15 +632,38 @@ serve(async (req) => {
     }, GRAPH_BASE);
 
     const firstMediaData = (firstMediaJson as { data?: unknown; paging?: { next?: string } }).data;
-    if (Array.isArray(firstMediaData)) allMedia.push(...(firstMediaData as MediaItem[]));
+    if (Array.isArray(firstMediaData)) {
+      for (const item of firstMediaData as MediaItem[]) {
+        const postTimestamp = new Date(item.timestamp).getTime();
+        // Stop if we've gone past the date range (posts are ordered newest first)
+        if (postTimestamp < sinceTimestamp) {
+          reachedDateLimit = true;
+          break;
+        }
+        // Only include posts within the date range
+        if (postTimestamp >= sinceTimestamp && postTimestamp <= untilTimestamp) {
+          allMedia.push(item);
+        }
+      }
+    }
     nextUrl = (firstMediaJson as { paging?: { next?: string } }).paging?.next || null;
 
-    while (nextUrl && allMedia.length < maxPosts) {
+    // Continue fetching pages until we reach the date limit or run out of posts
+    while (nextUrl && !reachedDateLimit) {
       const pageJson = await graphGetWithUrl(nextUrl);
       const pageData = (pageJson as { data?: unknown; paging?: { next?: string } }).data;
 
       if (Array.isArray(pageData) && pageData.length > 0) {
-        allMedia.push(...(pageData as MediaItem[]));
+        for (const item of pageData as MediaItem[]) {
+          const postTimestamp = new Date(item.timestamp).getTime();
+          if (postTimestamp < sinceTimestamp) {
+            reachedDateLimit = true;
+            break;
+          }
+          if (postTimestamp >= sinceTimestamp && postTimestamp <= untilTimestamp) {
+            allMedia.push(item);
+          }
+        }
       } else {
         break;
       }
@@ -645,7 +671,8 @@ serve(async (req) => {
       nextUrl = (pageJson as { paging?: { next?: string } }).paging?.next || null;
     }
 
-    const mediaItems = allMedia.slice(0, maxPosts);
+    console.log(`[ig-dashboard] Fetched ${allMedia.length} posts within date range ${sinceDate} to ${untilDate}`);
+    const mediaItems = allMedia;
 
     const storiesJson = await graphGet(`/${businessId}/stories`, accessToken, {
       fields: "id,media_type,media_url,permalink,timestamp",
@@ -657,16 +684,15 @@ serve(async (req) => {
     const INSIGHTS_BATCH_SIZE = 50;
     const mediaWithInsights: MediaItem[] = [];
 
+    console.log(`[ig-dashboard] Fetching insights for ${mediaItems.length} posts...`);
+
     for (let i = 0; i < mediaItems.length; i += INSIGHTS_BATCH_SIZE) {
       const batch = mediaItems.slice(i, i + INSIGHTS_BATCH_SIZE);
 
       const batchResults = await Promise.all(
-        batch.map(async (m, j) => {
-          const absoluteIndex = i + j;
-          const insights =
-            absoluteIndex < maxInsightsPosts
-              ? await fetchMediaInsights(accessToken, m.id, m.media_type, m.media_product_type, GRAPH_BASE)
-              : {};
+        batch.map(async (m) => {
+          // Fetch insights for ALL posts within the date range
+          const insights = await fetchMediaInsights(accessToken, m.id, m.media_type, m.media_product_type, GRAPH_BASE);
 
           const followersCount = asNumber(profile.followers_count);
           const { normalizedInsights, computed } = computeMediaMetrics(m, insights, followersCount);
@@ -676,6 +702,7 @@ serve(async (req) => {
       );
 
       mediaWithInsights.push(...batchResults);
+      console.log(`[ig-dashboard] Processed ${mediaWithInsights.length}/${mediaItems.length} posts...`);
     }
 
     const storiesWithInsights = await Promise.all(
@@ -804,11 +831,6 @@ serve(async (req) => {
     }
 
     const messages: string[] = [];
-    if (mediaItems.length > maxInsightsPosts) {
-      messages.push(
-        `INSIGHTS_LIMIT: Buscamos insights detalhados apenas para os ${maxInsightsPosts} posts mais recentes.`,
-      );
-    }
     if (Object.keys(demographics).length === 0) {
       messages.push("DEMOGRAPHICS_EMPTY: Demografia indisponível para esta conta/permissões.");
     }
@@ -873,26 +895,21 @@ serve(async (req) => {
     let comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
 
     try {
-      const since = body.since || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const until = body.until || new Date().toISOString().split('T')[0];
-
-      console.log(`[ig-dashboard] Fetching account insights from ${since} to ${until}`);
+      console.log(`[ig-dashboard] Fetching account insights from ${sinceDate} to ${untilDate}`);
 
       // Calculate previous period dates (same duration)
-      const sinceDate = new Date(since);
-      const untilDate = new Date(until);
-      const periodDuration = untilDate.getTime() - sinceDate.getTime();
-      const prevSince = new Date(sinceDate.getTime() - periodDuration).toISOString().split('T')[0];
-      const prevUntil = new Date(sinceDate.getTime() - 1).toISOString().split('T')[0]; // Day before current period starts
+      const periodDuration = new Date(untilDate).getTime() - new Date(sinceDate).getTime();
+      const prevSince = new Date(new Date(sinceDate).getTime() - periodDuration).toISOString().split('T')[0];
+      const prevUntil = new Date(new Date(sinceDate).getTime() - 1).toISOString().split('T')[0]; // Day before current period starts
 
       console.log(`[ig-dashboard] Previous period: ${prevSince} to ${prevUntil}`);
 
       // Fetch current period insights
       const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-        metric: 'reach,impressions,profile_views',
+        metric: 'reach,profile_views',
         period: 'day',
-        since: since,
-        until: until,
+        since: sinceDate,
+        until: untilDate,
       });
 
       const insightsData = (insightsJson as { data?: unknown[] }).data;
@@ -912,7 +929,7 @@ serve(async (req) => {
       // Fetch previous period insights for comparison
       try {
         const prevInsightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-          metric: 'reach,impressions,profile_views',
+          metric: 'reach,profile_views',
           period: 'day',
           since: prevSince,
           until: prevUntil,
