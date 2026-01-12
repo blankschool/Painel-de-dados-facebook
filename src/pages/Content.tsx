@@ -36,6 +36,7 @@ export default function Content() {
   const [mediaTypeSortBy, setMediaTypeSortBy] = useState<"reach" | "er" | "likes">("reach");
   const [contentGridSort, setContentGridSort] = useState<SortOrder>("desc");
   const [contentGridSortBy, setContentGridSortBy] = useState<"engagement" | "reach" | "date">("engagement");
+  const [showAllContent, setShowAllContent] = useState(false);
 
   // Filter media by active tab
   const filteredByTab = useMemo(() => {
@@ -593,7 +594,7 @@ export default function Content() {
                       />
                     </div>
                     <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                      {sortedContentGrid.slice(0, 12).map((item) => (
+                      {sortedContentGrid.slice(0, showAllContent ? undefined : 24).map((item) => (
                         <div
                           key={item.id}
                           onClick={() => handlePostClick(item)}
@@ -652,11 +653,22 @@ export default function Content() {
                         </div>
                       ))}
                     </div>
-                    
-                    {filteredByTab.length > 12 && (
+
+                    {filteredByTab.length > 24 && !showAllContent && (
+                      <div className="mt-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowAllContent(true)}
+                          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+                        >
+                          Mostrar todos ({filteredByTab.length} itens)
+                        </button>
+                      </div>
+                    )}
+                    {showAllContent && (
                       <div className="mt-4 text-center">
                         <span className="text-sm text-muted-foreground">
-                          Mostrando 12 de {filteredByTab.length} itens
+                          Mostrando todos os {filteredByTab.length} itens
                         </span>
                       </div>
                     )}
