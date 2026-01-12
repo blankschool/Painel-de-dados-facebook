@@ -7,6 +7,7 @@ import { Image, Play, Clock, Grid2X2, Heart, MessageCircle, Bookmark, Eye, FileX
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AreaChart,
   Area,
@@ -22,10 +23,12 @@ import { formatWeekLabel } from "@/utils/dateFormat";
 type ContentTab = "overview" | "posts" | "reels" | "stories";
 
 export default function Content() {
+  const { selectedAccount } = useAuth();
   const { data, loading, error } = useDashboardData();
   const allMedia = data?.media ?? [];
   const stories = data?.stories ?? [];
-  const media = useFilteredMedia(allMedia);
+  const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
+  const media = useFilteredMedia(allMedia, accountTimezone);
   const [activeTab, setActiveTab] = useState<ContentTab>("overview");
 
   // Post click handling

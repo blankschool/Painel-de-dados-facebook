@@ -24,6 +24,7 @@ export type Database = {
           profile_picture_url: string | null
           provider: string
           provider_account_id: string
+          timezone: string | null
           token_expires_at: string | null
           updated_at: string | null
           user_id: string
@@ -37,6 +38,7 @@ export type Database = {
           profile_picture_url?: string | null
           provider?: string
           provider_account_id: string
+          timezone?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id: string
@@ -50,6 +52,7 @@ export type Database = {
           profile_picture_url?: string | null
           provider?: string
           provider_account_id?: string
+          timezone?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id?: string
