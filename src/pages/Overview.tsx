@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -91,7 +93,8 @@ export default function Overview() {
     for (const item of media) {
       if (!item.timestamp) continue;
       const date = new Date(item.timestamp);
-      const dateKey = date.toISOString().slice(0, 10);
+      // Use local timezone format to avoid UTC shift issues
+      const dateKey = format(date, 'yyyy-MM-dd');
       const reach = getReach(item) ?? 0;
       
       if (!grouped[dateKey]) {
@@ -106,7 +109,8 @@ export default function Overview() {
       .slice(-30)
       .map(([date, values]) => ({
         date,
-        dateLabel: new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
+        // Use parseISO to correctly interpret date string in local timezone
+        dateLabel: format(parseISO(date), "dd 'de' MMM.", { locale: ptBR }),
         reach: values.reach,
         reachPrev: Math.round(values.reach * (0.6 + Math.random() * 0.3)), // Simulated previous period
       }));
