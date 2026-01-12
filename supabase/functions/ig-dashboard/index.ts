@@ -888,8 +888,11 @@ serve(async (req) => {
       console.log(`[ig-dashboard] Previous period: ${prevSince} to ${prevUntil}`);
 
       // Fetch current period insights
+      // NOTE: 'impressions' is NOT a valid metric for account insights - use 'views' instead
+      // Valid metrics: reach, follower_count, website_clicks, profile_views, online_followers, 
+      // accounts_engaged, total_interactions, likes, comments, shares, saves, replies, views
       const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-        metric: 'reach,impressions,profile_views',
+        metric: 'reach,profile_views',
         period: 'day',
         since: since,
         until: until,
@@ -903,8 +906,32 @@ serve(async (req) => {
             // Sum all daily values to get total for the period
             const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
             accountInsights[metricData.name] = total;
+            console.log(`[ig-dashboard] Account metric ${metricData.name}: ${total} (from ${metricData.values.length} daily values)`);
           }
         }
+      }
+      
+      // Also try to fetch views (impressions equivalent) separately
+      try {
+        const viewsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: 'views',
+          period: 'day',
+          since: since,
+          until: until,
+        });
+        const viewsData = (viewsJson as { data?: unknown[] }).data;
+        if (Array.isArray(viewsData)) {
+          for (const metric of viewsData) {
+            const metricData = metric as { name?: string; values?: Array<{ value?: number }> };
+            if (metricData.name === 'views' && metricData.values) {
+              const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+              accountInsights['impressions'] = total; // Map views to impressions
+              console.log(`[ig-dashboard] Account metric views (as impressions): ${total}`);
+            }
+          }
+        }
+      } catch (viewsErr) {
+        console.log('[ig-dashboard] Views metric not available:', viewsErr instanceof Error ? viewsErr.message : String(viewsErr));
       }
 
       console.log('[ig-dashboard] Account insights (current):', accountInsights);
@@ -912,7 +939,7 @@ serve(async (req) => {
       // Fetch previous period insights for comparison
       try {
         const prevInsightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-          metric: 'reach,impressions,profile_views',
+          metric: 'reach,profile_views',
           period: 'day',
           since: prevSince,
           until: prevUntil,
