@@ -85,25 +85,15 @@ export default function Overview() {
   const [topContentSortBy, setTopContentSortBy] = useState<"er" | "reach" | "likes">("er");
   const [engagementSort, setEngagementSort] = useState<SortOrder>("desc");
 
-  // Extract comparison metrics from API response (now properly typed)
-  const comparisonMetrics = data?.comparison_metrics;
-
-  // Use consolidated account-level insights when available (more accurate than summing posts)
-  const postSumViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
-  const postSumReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
-  
-  // Prefer consolidated metrics from Instagram API over summed post metrics
-  const totalViews = data?.consolidated_impressions ?? postSumViews;
-  const totalReach = data?.consolidated_reach ?? postSumReach;
+  // Extract comparison metrics from API response
+  const comparisonMetrics = (data as any)?.comparison_metrics as Record<string, { current: number; previous: number; change: number; changePercent: number }> | undefined;
 
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
-  console.log(`[Overview] Consolidated reach: ${data?.consolidated_reach}, Post sum: ${postSumReach}, Using: ${totalReach}`);
   console.log(`[Overview] Comparison metrics:`, comparisonMetrics);
 
-  // Profile views from consolidated API
-  const profileViews = data?.consolidated_profile_views ?? 0;
-
+  const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
+  const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
   const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
@@ -297,9 +287,8 @@ export default function Overview() {
             </div>
             <div className="metric-group">
               <div className="metric-item">
-                <span className="metric-label">Visualizações do Perfil</span>
-                <span className="metric-value">{formatNumberOrDash(profileViews)}</span>
-                <ComparisonBadge metric={comparisonMetrics?.profile_views} />
+                <span className="metric-label">Alcance médio</span>
+                <span className="metric-value">{formatCompact(avgReach)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Taxa de engajamento</span>
