@@ -13,8 +13,8 @@ interface ProfileSectionProps {
       followers_count?: number;
     };
     media?: Array<{
-      like_count: number;
-      comments_count: number;
+      like_count?: number;
+      comments_count?: number;
       insights?: { saved?: number };
     }>;
     comparison_metrics?: {
@@ -43,8 +43,8 @@ export function ProfileSection({ data }: ProfileSectionProps) {
     data.media?.reduce(
       (sum, post) =>
         sum +
-        post.like_count +
-        post.comments_count +
+        (post.like_count || 0) +
+        (post.comments_count || 0) +
         (post.insights?.saved || 0),
       0
     ) || 0;

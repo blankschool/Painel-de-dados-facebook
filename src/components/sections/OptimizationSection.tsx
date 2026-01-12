@@ -14,10 +14,10 @@ interface OptimizationSectionProps {
   data: {
     online_followers?: Record<string, number>;
     media?: Array<{
-      timestamp: string;
-      media_type: string;
-      like_count: number;
-      comments_count: number;
+      timestamp?: string;
+      media_type?: string;
+      like_count?: number;
+      comments_count?: number;
       insights?: { saved?: number };
     }>;
     media_type_distribution?: Record<string, number>;
