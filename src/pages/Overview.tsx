@@ -225,23 +225,23 @@ export default function Overview() {
             </div>
             <div className="metric-group">
               <div className="metric-item">
-                <span className="metric-label">Media</span>
+                <span className="metric-label">Publicações</span>
                 <span className="metric-value">{media.length}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Followers</span>
+                <span className="metric-label">Seguidores</span>
                 <span className="metric-value">{profile?.followers_count?.toLocaleString("pt-BR") ?? "--"}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Follows</span>
+                <span className="metric-label">Seguindo</span>
                 <span className="metric-value">{profile?.follows_count?.toLocaleString("pt-BR") ?? "--"}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Views</span>
+                <span className="metric-label">Visualizações</span>
                 <span className="metric-value">{formatNumberOrDash(totalViews)}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Reach</span>
+                <span className="metric-label">Alcance</span>
                 <span className="metric-value">{formatNumberOrDash(totalReach)}</span>
               </div>
             </div>
@@ -254,23 +254,23 @@ export default function Overview() {
             </div>
             <div className="metric-group">
               <div className="metric-item">
-                <span className="metric-label">Media reach</span>
+                <span className="metric-label">Alcance médio</span>
                 <span className="metric-value">{formatCompact(avgReach)}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Engagement rate</span>
+                <span className="metric-label">Taxa de engajamento</span>
                 <span className="metric-value">{formatPercent(avgEr)}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Likes</span>
+                <span className="metric-label">Curtidas</span>
                 <span className="metric-value">{formatNumberOrDash(totalLikes)}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Comments</span>
+                <span className="metric-label">Comentários</span>
                 <span className="metric-value">{formatNumberOrDash(totalComments)}</span>
               </div>
               <div className="metric-item">
-                <span className="metric-label">Saves</span>
+                <span className="metric-label">Salvamentos</span>
                 <span className="metric-value">{formatNumberOrDash(totalSaves)}</span>
               </div>
             </div>
@@ -281,13 +281,13 @@ export default function Overview() {
         <div className="chart-section">
           <div className="chart-header">
             <div>
-              <h3 className="chart-title">Performance Over Time</h3>
+              <h3 className="chart-title">Desempenho ao Longo do Tempo</h3>
               <div className="chart-legend mt-2">
                 <div className="legend-item">
-                  <span className="legend-dot solid" /> Reach
+                  <span className="legend-dot solid" /> Alcance
                 </div>
                 <div className="legend-item">
-                  <span className="legend-dot dashed" /> Reach (mês anterior)
+                  <span className="legend-dot dashed" /> Alcance (mês anterior)
                 </div>
               </div>
             </div>
@@ -315,7 +315,7 @@ export default function Overview() {
                     labelStyle={{ fontWeight: 600, marginBottom: "4px", color: "hsl(var(--foreground))" }}
                     formatter={(value: number, name: string) => [
                       value.toLocaleString("pt-BR"),
-                      name === "reach" ? "Reach" : "Reach (mês anterior)",
+                      name === "reach" ? "Alcance" : "Alcance (mês anterior)",
                     ]}
                     labelFormatter={(label) => `Data: ${label}`}
                   />
@@ -350,7 +350,7 @@ export default function Overview() {
           {/* Performance By Day Of Week */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Performance By Day Of Week</h3>
+              <h3 className="card-title">Desempenho por Dia da Semana</h3>
               <SortToggle 
                 sortOrder={daySort} 
                 onToggle={() => setDaySort(o => o === "desc" ? "asc" : "desc")} 
@@ -377,7 +377,7 @@ export default function Overview() {
                     <Tooltip
                       contentStyle={tooltipStyle}
                       labelStyle={{ fontWeight: 600, marginBottom: "4px", color: "hsl(var(--foreground))" }}
-                      formatter={(value: number) => [value.toLocaleString("pt-BR"), "Reach Total"]}
+                      formatter={(value: number) => [value.toLocaleString("pt-BR"), "Alcance Total"]}
                       labelFormatter={(_, payload) => {
                         const item = payload?.[0]?.payload;
                         return item?.dayFull || "";
@@ -404,7 +404,7 @@ export default function Overview() {
           {/* Engagement Breakdown */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Engagement Breakdown</h3>
+              <h3 className="card-title">Detalhamento de Engajamento</h3>
               <SortToggle 
                 sortOrder={engagementSort} 
                 onToggle={() => setEngagementSort(o => o === "desc" ? "asc" : "desc")} 
@@ -468,7 +468,7 @@ export default function Overview() {
           {/* Top Performing Content - Clickable */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Top Performing Content</h3>
+              <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>
               <SortDropdown
                 sortBy={topContentSortBy}
                 sortOrder={topContentSort}
@@ -484,8 +484,8 @@ export default function Overview() {
             <div className="top-content-list">
               <div className="top-content-header">
                 <span></span>
-                <span>Media Preview</span>
-                <span>{topContentSortBy === "er" ? "Engagement rate" : topContentSortBy === "reach" ? "Alcance" : "Curtidas"} {topContentSort === "desc" ? "▼" : "▲"}</span>
+                <span>Prévia</span>
+                <span>{topContentSortBy === "er" ? "Taxa de engajamento" : topContentSortBy === "reach" ? "Alcance" : "Curtidas"} {topContentSort === "desc" ? "▼" : "▲"}</span>
               </div>
               {topContent.map((row, index) => (
                 <div 

@@ -139,10 +139,10 @@ export default function Time() {
         <div className="card">
           <div className="chart-header flex justify-between items-center">
             <div>
-              <h3 className="card-title">Performance By Day Of Week</h3>
+              <h3 className="card-title">Performance por Dia da Semana</h3>
               <div className="chart-legend">
                 <div className="legend-item">
-                  <span className="legend-dot solid" /> Reach
+                  <span className="legend-dot solid" /> Alcance
                 </div>
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function Time() {
         {/* Time Analysis Table */}
         <div className="card">
           <div className="chart-header flex justify-between items-center">
-            <h3 className="card-title">Time Analysis</h3>
+            <h3 className="card-title">Análise Temporal</h3>
             <SortDropdown
               sortBy={monthSortBy}
               sortOrder={monthSort}
@@ -202,10 +202,10 @@ export default function Time() {
               <thead>
                 <tr>
                   <th></th>
-                  <th>Media reach {monthSortBy === "reach" && (monthSort === "desc" ? "▼" : "▲")}</th>
-                  <th>Engagement rate {monthSortBy === "er" && (monthSort === "desc" ? "▼" : "▲")}</th>
-                  <th>Likes {monthSortBy === "likes" && (monthSort === "desc" ? "▼" : "▲")}</th>
-                  <th>Comments</th>
+                  <th>Alcance de mídia {monthSortBy === "reach" && (monthSort === "desc" ? "▼" : "▲")}</th>
+                  <th>Taxa de engajamento {monthSortBy === "er" && (monthSort === "desc" ? "▼" : "▲")}</th>
+                  <th>Curtidas {monthSortBy === "likes" && (monthSort === "desc" ? "▼" : "▲")}</th>
+                  <th>Comentários</th>
                 </tr>
               </thead>
               <tbody>

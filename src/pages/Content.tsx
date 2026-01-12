@@ -242,7 +242,7 @@ export default function Content() {
   }
 
   const tabs: { id: ContentTab; label: string; count: number }[] = [
-    { id: "overview", label: "Overview", count: counts.media },
+    { id: "overview", label: "Visão Geral", count: counts.media },
     { id: "posts", label: "Posts", count: counts.posts },
     { id: "reels", label: "Reels", count: counts.reels },
     { id: "stories", label: "Stories", count: counts.stories },
@@ -381,7 +381,7 @@ export default function Content() {
                         <Grid2X2 className="w-5 h-5" />
                       </div>
                       <div className="metric-item">
-                        <span className="metric-label">Media</span>
+                        <span className="metric-label">Mídia</span>
                         <span className="metric-value">{counts.media}</span>
                       </div>
                     </button>
@@ -429,7 +429,7 @@ export default function Content() {
                   {/* DYNAMIC CHART */}
                   <div className="card lg:col-span-3">
                     <div className="chart-header flex justify-between items-center">
-                      <h3 className="card-title">Posted Content Over Time</h3>
+                      <h3 className="card-title">Conteúdo Publicado ao Longo do Tempo</h3>
                       <span className="text-xs text-muted-foreground">
                         {filteredByTab.length} itens no período
                       </span>
@@ -487,7 +487,7 @@ export default function Content() {
                 {/* Media Type Analysis Table */}
                 <div className="card">
                   <div className="chart-header flex justify-between items-center">
-                    <h3 className="card-title">Media Type Analysis</h3>
+                    <h3 className="card-title">Análise por Tipo de Mídia</h3>
                     <SortDropdown
                       sortBy={mediaTypeSortBy}
                       sortOrder={mediaTypeSort}
@@ -515,9 +515,9 @@ export default function Content() {
                             <th>Qtd</th>
                             <th>Alcance {mediaTypeSortBy === "reach" && (mediaTypeSort === "desc" ? "▼" : "▲")}</th>
                             <th>Taxa Eng. {mediaTypeSortBy === "er" && (mediaTypeSort === "desc" ? "▼" : "▲")}</th>
-                            <th>Likes {mediaTypeSortBy === "likes" && (mediaTypeSort === "desc" ? "▼" : "▲")}</th>
-                            <th>Comments</th>
-                            <th>Saves</th>
+                            <th>Curtidas {mediaTypeSortBy === "likes" && (mediaTypeSort === "desc" ? "▼" : "▲")}</th>
+                            <th>Comentários</th>
+                            <th>Salvos</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -559,7 +559,7 @@ export default function Content() {
                         <tfoot>
                           <tr className="border-t-2 border-border font-medium">
                             <td></td>
-                            <td>TOTAL</td>
+                            <td>Total</td>
                             <td>{mediaTypes.reduce((s, r) => s + r.count, 0)}</td>
                             <td>{mediaTypes.reduce((s, r) => s + r.reach, 0).toLocaleString("pt-BR")}</td>
                             <td>-</td>

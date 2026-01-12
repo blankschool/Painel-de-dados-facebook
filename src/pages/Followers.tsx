@@ -276,7 +276,7 @@ export default function Followers() {
             </div>
             <div className="metric-group">
               <div className="metric-item">
-                <span className="metric-label">Followers</span>
+                <span className="metric-label">Seguidores</span>
                 <span className="metric-value">{followersCount.toLocaleString("pt-BR")}</span>
               </div>
             </div>
@@ -287,7 +287,7 @@ export default function Followers() {
             </div>
             <div className="metric-group">
               <div className="metric-item">
-                <span className="metric-label">Following</span>
+                <span className="metric-label">Seguindo</span>
                 <span className="metric-value">{followsCount.toLocaleString("pt-BR")}</span>
               </div>
             </div>
@@ -321,7 +321,7 @@ export default function Followers() {
           {/* Followers By Age Group */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Followers By Age Group</h3>
+              <h3 className="card-title">Seguidores por Faixa Etária</h3>
               <SortToggle
                 sortOrder={ageSortOrder}
                 onToggle={() => setAgeSortOrder(o => o === "desc" ? "asc" : "desc")}
@@ -354,7 +354,7 @@ export default function Followers() {
                           <span key="value">
                             {value.toLocaleString("pt-BR")} <span className="text-muted-foreground">({percentage}%)</span>
                           </span>,
-                          "Followers",
+                          "Seguidores",
                         ];
                       }}
                       labelFormatter={(label) => `Faixa etária: ${label}`}
@@ -382,7 +382,7 @@ export default function Followers() {
           {/* Gender Distribution */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Gender Distribution</h3>
+              <h3 className="card-title">Distribuição por Gênero</h3>
               <SortToggle
                 sortOrder={genderSortOrder}
                 onToggle={() => setGenderSortOrder(o => o === "desc" ? "asc" : "desc")}
@@ -445,7 +445,7 @@ export default function Followers() {
         {/* Location Map */}
         <div className="card">
           <div className="chart-header">
-            <h3 className="card-title">Followers By Location</h3>
+            <h3 className="card-title">Seguidores por Localização</h3>
           </div>
           <BrazilMap data={stateData} total={followersCount} />
         </div>
@@ -455,7 +455,7 @@ export default function Followers() {
           {/* Country Table */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Followers By Country</h3>
+              <h3 className="card-title">Seguidores por País</h3>
               <SortToggle
                 sortOrder={countrySortOrder}
                 onToggle={() => setCountrySortOrder(o => o === "desc" ? "asc" : "desc")}
@@ -493,7 +493,7 @@ export default function Followers() {
           {/* City Table */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Followers By City</h3>
+              <h3 className="card-title">Seguidores por Cidade</h3>
               <SortToggle
                 sortOrder={citySortOrder}
                 onToggle={() => setCitySortOrder(o => o === "desc" ? "asc" : "desc")}
@@ -531,13 +531,13 @@ export default function Followers() {
 
         {/* Full Demographics Table */}
         <div className="card">
-          <h3 className="card-title mb-4">Follower Demographics</h3>
+          <h3 className="card-title mb-4">Demografia dos Seguidores</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Country Column */}
             <div>
               <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground pb-2 border-b border-border">
-                <span>Country</span>
-                <span>Followers</span>
+                <span>País</span>
+                <span>Seguidores</span>
                 <span>%</span>
               </div>
               <div className="space-y-2 mt-2 text-sm">
@@ -558,8 +558,8 @@ export default function Followers() {
             {/* City Column */}
             <div>
               <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground pb-2 border-b border-border">
-                <span>City</span>
-                <span>Followers</span>
+                <span>Cidade</span>
+                <span>Seguidores</span>
                 <span>%</span>
               </div>
               <div className="space-y-2 mt-2 text-sm">
@@ -580,8 +580,8 @@ export default function Followers() {
             {/* Age Column */}
             <div>
               <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground pb-2 border-b border-border">
-                <span>Age</span>
-                <span>Followers</span>
+                <span>Idade</span>
+                <span>Seguidores</span>
                 <span>%</span>
               </div>
               <div className="space-y-2 mt-2 text-sm">
@@ -602,8 +602,8 @@ export default function Followers() {
             {/* Gender Column */}
             <div>
               <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground pb-2 border-b border-border">
-                <span>Gender</span>
-                <span>Followers</span>
+                <span>Gênero</span>
+                <span>Seguidores</span>
                 <span>%</span>
               </div>
               <div className="space-y-2 mt-2 text-sm">

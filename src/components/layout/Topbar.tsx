@@ -22,9 +22,9 @@ import { DateRange } from "react-day-picker";
 const pageNames: Record<string, string> = {
   "/": "Dashboard",
   "/overview": "Dashboard",
-  "/followers": "Followers",
-  "/content": "Content",
-  "/time": "Time",
+  "/followers": "Seguidores",
+  "/content": "Conteúdo",
+  "/time": "Tempo",
 };
 
 export function Topbar() {
@@ -124,7 +124,7 @@ export function Topbar() {
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1.5">
               <p className="text-sm font-medium">{accountName}</p>
-              <p className="text-xs text-muted-foreground">Instagram Business Account</p>
+              <p className="text-xs text-muted-foreground">Conta Business do Instagram</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => refresh()}>
