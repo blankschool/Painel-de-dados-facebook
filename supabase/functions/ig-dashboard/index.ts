@@ -956,6 +956,29 @@ serve(async (req) => {
           }
         }
 
+        // Also fetch views for previous period
+        try {
+          const prevViewsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: 'views',
+            period: 'day',
+            since: prevSince,
+            until: prevUntil,
+          });
+          const prevViewsData = (prevViewsJson as { data?: unknown[] }).data;
+          if (Array.isArray(prevViewsData)) {
+            for (const metric of prevViewsData) {
+              const metricData = metric as { name?: string; values?: Array<{ value?: number }> };
+              if (metricData.name === 'views' && metricData.values) {
+                const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+                previousPeriodInsights['impressions'] = total;
+                console.log(`[ig-dashboard] Previous period views (as impressions): ${total}`);
+              }
+            }
+          }
+        } catch (prevViewsErr) {
+          console.log('[ig-dashboard] Previous period views metric not available:', prevViewsErr instanceof Error ? prevViewsErr.message : String(prevViewsErr));
+        }
+
         console.log('[ig-dashboard] Account insights (previous):', previousPeriodInsights);
 
         // Calculate comparison metrics
