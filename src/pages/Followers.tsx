@@ -139,12 +139,12 @@ export default function Followers() {
   // Parse Genders
   const genders = useMemo(() => {
     const genderLabels: Record<string, string> = {
-      "M": "Masculino",
-      "F": "Feminino",
-      "U": "Não informado",
-      "male": "Masculino",
-      "female": "Feminino",
-      "unknown": "Não informado",
+      "M": "♂ Masculino",
+      "F": "♀ Feminino",
+      "U": "⚪ Não informado",
+      "male": "♂ Masculino",
+      "female": "♀ Feminino",
+      "unknown": "⚪ Não informado",
     };
     
     // Try audience_gender_age first
