@@ -41,8 +41,10 @@ export function DateRangePicker({
 
   const handlePresetSelect = (days: string) => {
     const daysNum = parseInt(days);
-    const to = endOfDay(new Date());
-    const from = startOfDay(subDays(new Date(), daysNum - 1));
+    const today = startOfDay(new Date());
+    const yesterday = subDays(today, 1);
+    const to = endOfDay(yesterday);  // End at yesterday (last complete day)
+    const from = startOfDay(subDays(yesterday, daysNum - 1));
     onDateChange({ from, to });
     setIsOpen(false);
   };
