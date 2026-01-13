@@ -138,7 +138,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
 
   return (
     <div className="filters-bar flex flex-wrap items-center gap-3 mb-4 md:mb-6">
-      {/* Left Section: Actions */}
+      {/* Left Section: Date Controls + Actions */}
       <div className="flex items-center gap-2">
         {/* Refresh Button with Tooltip */}
         <TooltipProvider>
@@ -173,13 +173,10 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
             <X className="h-3 w-3" />
           </Button>
         )}
-      </div>
 
-      {/* Separator */}
-      <div className="hidden sm:block w-px h-6 bg-border" />
+        {/* Separator */}
+        <div className="hidden sm:block w-px h-6 bg-border" />
 
-      {/* Center Section: Date Controls */}
-      <div className="flex items-center gap-2">
         {/* Quick Filters */}
         <div className="hidden md:flex items-center gap-1 bg-secondary/50 rounded-lg p-0.5">
           {quickFilters.map((preset) => (
