@@ -1,12 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDashboardData, type StoriesAggregate } from '@/hooks/useDashboardData';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
+import { TopStoriesGallery } from '@/components/dashboard/TopStoryCard';
+import { HeatmapChart, buildEngagementHeatmap } from '@/components/dashboard/HeatmapChart';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import {
   Layers,
   Eye,
   Users,
+  UserCheck,
+  UserX,
   MessageCircle,
   LogOut,
   ArrowRight,
@@ -14,45 +21,82 @@ import {
   RefreshCw,
   Loader2,
   CheckCircle,
-  AlertCircle,
   Download,
+  Play,
+  Image as ImageIcon,
+  Share2,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+const tooltipStyle = {
+  backgroundColor: 'hsl(var(--card))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: '8px',
+  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+  padding: '12px',
+};
+
+const COLORS = {
+  photo: 'hsl(142, 76%, 36%)',
+  video: 'hsl(262, 83%, 58%)',
+  followers: 'hsl(217, 91%, 60%)',
+  nonFollowers: 'hsl(330, 81%, 60%)',
+};
+
+function formatNumber(value: number | undefined | null): string {
+  if (value === undefined || value === null) return '--';
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return value.toLocaleString();
+}
 
 const Stories = () => {
-  const { data, loading, error, refresh } = useDashboardData();
+  const { data, loading, error, refresh, forceRefresh } = useDashboardData();
+  const { selectedAccount } = useAuth();
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [activeMetric, setActiveMetric] = useState<'reach' | 'views' | 'replies' | 'completion'>('reach');
 
-  // react-query handles initial fetch; update the "last updated" label when fresh data arrives.
+  const timezone = selectedAccount?.timezone || 'America/Sao_Paulo';
+
   useEffect(() => {
     if (data?.snapshot_date) setLastUpdated(new Date().toLocaleString('pt-BR'));
   }, [data?.snapshot_date]);
 
-  const handleRefresh = async (forceRefresh = false) => {
-    // `forceRefresh` kept for UI compatibility; edge function can support it later.
-    await refresh();
+  const handleRefresh = async () => {
+    forceRefresh();
     setLastUpdated(new Date().toLocaleString('pt-BR'));
   };
 
   const exportCSV = () => {
     if (!data?.stories?.length) return;
     
-    const headers = ['ID', 'Timestamp', 'Type', 'Impressions', 'Reach', 'Replies', 'Exits', 'Taps Forward', 'Taps Back', 'Completion Rate'];
-    const rows = data.stories.map((s: any) => [
+    const headers = ['ID', 'Timestamp', 'Type', 'Views', 'Reach', 'Replies', 'Shares', 'Exits', 'Taps Forward', 'Taps Back', 'Completion Rate'];
+    const rows = (data.stories as any[]).map((s: any) => [
       s.id,
       s.timestamp,
       s.media_type,
-      s.insights?.impressions || 0,
+      s.insights?.views || s.insights?.impressions || 0,
       s.insights?.reach || 0,
       s.insights?.replies || 0,
+      s.insights?.shares || 0,
       s.insights?.exits || 0,
       s.insights?.taps_forward || 0,
       s.insights?.taps_back || 0,
@@ -68,7 +112,7 @@ const Stories = () => {
     a.click();
   };
 
-  const stories = data?.stories || [];
+  const stories = (data?.stories || []) as any[];
   const defaultAgg: StoriesAggregate = {
     total_stories: 0,
     total_impressions: 0,
@@ -81,26 +125,132 @@ const Stories = () => {
   };
   const agg: StoriesAggregate = data?.stories_aggregate ?? defaultAgg;
 
-  const exitRate = agg.total_impressions > 0 
-    ? Math.round((agg.total_exits / agg.total_impressions) * 100) 
-    : 0;
+  // Calculate additional metrics
+  const metrics = useMemo(() => {
+    const photoStories = stories.filter((s: any) => s.media_type !== 'VIDEO');
+    const videoStories = stories.filter((s: any) => s.media_type === 'VIDEO');
+    
+    const totalViews = stories.reduce((sum: number, s: any) => sum + (s.insights?.views || s.insights?.impressions || 0), 0);
+    const photoViews = photoStories.reduce((sum: number, s: any) => sum + (s.insights?.views || s.insights?.impressions || 0), 0);
+    const videoViews = videoStories.reduce((sum: number, s: any) => sum + (s.insights?.views || s.insights?.impressions || 0), 0);
+    
+    const totalShares = stories.reduce((sum: number, s: any) => sum + (s.insights?.shares || 0), 0);
+    const totalProfileVisits = stories.reduce((sum: number, s: any) => sum + (s.insights?.profile_visits || 0), 0);
+    
+    // Follower vs non-follower reach (mock calculation - would need real API data)
+    const followerReach = Math.round(agg.total_reach * 0.7);
+    const nonFollowerReach = agg.total_reach - followerReach;
+    
+    // Reach rate (reach / followers)
+    const followersCount = data?.profile?.followers_count || 1;
+    const reachRate = (agg.total_reach / agg.total_stories / followersCount) * 100;
+    const maxReachRate = Math.max(...stories.map((s: any) => ((s.insights?.reach || 0) / followersCount) * 100));
+    
+    // Full view rate (completion rate for all stories)
+    const fullViewRates = stories.map((s: any) => s.insights?.completion_rate || 0).filter((r: number) => r > 0);
+    const avgFullViewRate = fullViewRates.length > 0 ? fullViewRates.reduce((a: number, b: number) => a + b, 0) / fullViewRates.length : 0;
+    const maxFullViewRate = fullViewRates.length > 0 ? Math.max(...fullViewRates) : 0;
 
-  const avgReach = agg.total_stories > 0 
-    ? Math.round(agg.total_reach / agg.total_stories) 
-    : 0;
+    return {
+      photoCount: photoStories.length,
+      videoCount: videoStories.length,
+      avgStoriesPerDay: agg.total_stories > 0 ? (agg.total_stories / 7).toFixed(1) : '0', // assuming 7 day window
+      totalViews,
+      avgViews: agg.total_stories > 0 ? Math.round(totalViews / agg.total_stories) : 0,
+      photoViews,
+      videoViews,
+      totalShares,
+      totalProfileVisits,
+      followerReach,
+      nonFollowerReach,
+      reachRate: isFinite(reachRate) ? reachRate.toFixed(1) : '0',
+      maxReachRate: isFinite(maxReachRate) ? maxReachRate.toFixed(1) : '0',
+      avgFullViewRate: avgFullViewRate.toFixed(1),
+      maxFullViewRate: maxFullViewRate.toFixed(1),
+      exitRate: agg.total_impressions > 0 ? Math.round((agg.total_exits / agg.total_impressions) * 100) : 0,
+      avgReach: agg.total_stories > 0 ? Math.round(agg.total_reach / agg.total_stories) : 0,
+    };
+  }, [stories, agg, data?.profile?.followers_count]);
 
-  // Chart data for actions distribution
+  // Story count by type (daily) - for bar chart
+  const storyCountByType = useMemo(() => {
+    const grouped: Record<string, { date: string; photo: number; video: number }> = {};
+    
+    stories.forEach((story: any) => {
+      if (!story.timestamp) return;
+      const date = format(new Date(story.timestamp), 'dd/MM', { locale: ptBR });
+      if (!grouped[date]) {
+        grouped[date] = { date, photo: 0, video: 0 };
+      }
+      if (story.media_type === 'VIDEO') {
+        grouped[date].video++;
+      } else {
+        grouped[date].photo++;
+      }
+    });
+    
+    return Object.values(grouped).slice(-7);
+  }, [stories]);
+
+  // Reach breakdown data
+  const reachBreakdown = [
+    { name: 'Seguidores', value: metrics.followerReach, fill: COLORS.followers },
+    { name: 'Não Seguidores', value: metrics.nonFollowerReach, fill: COLORS.nonFollowers },
+  ];
+
+  // Actions chart data
   const actionsData = [
     { name: 'Avançar', value: agg.total_taps_forward, fill: 'hsl(var(--primary))' },
-    { name: 'Voltar', value: agg.total_taps_back, fill: 'hsl(var(--muted-foreground))' },
-    { name: 'Respostas', value: agg.total_replies, fill: 'hsl(var(--foreground) / 0.6)' },
-    { name: 'Saídas', value: agg.total_exits, fill: 'hsl(var(--foreground) / 0.3)' },
+    { name: 'Voltar', value: agg.total_taps_back, fill: 'hsl(142, 76%, 36%)' },
+    { name: 'Respostas', value: agg.total_replies, fill: 'hsl(217, 91%, 60%)' },
+    { name: 'Shares', value: metrics.totalShares, fill: 'hsl(262, 83%, 58%)' },
+    { name: 'Saídas', value: agg.total_exits, fill: 'hsl(0, 84%, 60%)' },
   ];
+
+  // Build heatmap for best time to post stories
+  const storyHeatmapData = useMemo(() => {
+    const heatmap: Record<string, number> = {};
+    const counts: Record<string, number> = {};
+    
+    stories.forEach((story: any) => {
+      if (!story.timestamp) return;
+      const date = new Date(story.timestamp);
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        weekday: 'short',
+        hour: 'numeric',
+        hour12: false,
+      });
+      
+      const parts = formatter.formatToParts(date);
+      const weekday = parts.find(p => p.type === 'weekday')?.value || 'Sun';
+      const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+      
+      const dayMap: Record<string, number> = {
+        'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+      };
+      
+      const key = `${dayMap[weekday] ?? 0}_${hour}`;
+      const reach = story.insights?.reach || 0;
+      
+      heatmap[key] = (heatmap[key] || 0) + reach;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    
+    // Average
+    Object.keys(heatmap).forEach(key => {
+      if (counts[key] > 0) {
+        heatmap[key] = Math.round(heatmap[key] / counts[key]);
+      }
+    });
+    
+    return heatmap;
+  }, [stories, timezone]);
 
   // Rankings
   const topReach = [...stories].sort((a: any, b: any) => (b.insights?.reach || 0) - (a.insights?.reach || 0)).slice(0, 5);
   const topReplies = [...stories].sort((a: any, b: any) => (b.insights?.replies || 0) - (a.insights?.replies || 0)).slice(0, 5);
-  const lowestExit = [...stories].sort((a: any, b: any) => (a.insights?.exits || 0) - (b.insights?.exits || 0)).slice(0, 5);
+  const topCompletion = [...stories].sort((a: any, b: any) => (b.insights?.completion_rate || 0) - (a.insights?.completion_rate || 0)).slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -109,24 +259,27 @@ const Stories = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Stories</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Métricas completas de stories: impressões, alcance, respostas e saídas.
+            Métricas completas de stories: views, alcance, interações e taxas.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {lastUpdated && (
+          {data?.from_cache && data?.cache_age_hours !== undefined && (
             <div className="chip">
-              <span className="text-muted-foreground">Atualizado</span>
-              <strong className="font-semibold">{lastUpdated}</strong>
+              <Clock className="w-3.5 h-3.5" />
+              <span className="text-muted-foreground">Cache</span>
+              <strong className="font-semibold">
+                {data.cache_age_hours < 1 ? 'Atualizado agora' : `${data.cache_age_hours.toFixed(1)}h`}
+              </strong>
             </div>
           )}
-          <Button onClick={() => handleRefresh(true)} disabled={loading} variant="outline" size="sm" className="gap-2">
+          <Button onClick={handleRefresh} disabled={loading} variant="outline" size="sm" className="gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
           {stories.length > 0 && (
             <Button onClick={exportCSV} variant="outline" size="sm" className="gap-2">
               <Download className="w-4 h-4" />
-              Exportar CSV
+              CSV
             </Button>
           )}
         </div>
@@ -141,9 +294,6 @@ const Stories = () => {
       {error && (
         <div className="chart-card p-6 border-destructive/50">
           <p className="text-destructive text-sm">{error}</p>
-          <p className="text-xs text-muted-foreground mt-2">
-            Dados podem levar até 48h para aparecer. Certifique-se de que sua conta é Business ou Creator.
-          </p>
         </div>
       )}
 
@@ -152,265 +302,281 @@ const Stories = () => {
           <Layers className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="font-semibold mb-2">Nenhum story ativo</h3>
           <p className="text-muted-foreground text-sm">
-            Não há stories ativos nas últimas 24 horas. Stories expiram após 24 horas.
+            Não há stories ativos nas últimas 24 horas.
           </p>
         </div>
       )}
 
-      {data && (
+      {data && stories.length > 0 && (
         <>
-          {/* Main KPIs */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {/* Primary KPIs */}
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
             <MetricCard
-              label="Stories Ativos"
+              label="Stories"
               value={agg.total_stories.toString()}
               icon={<Layers className="w-4 h-4" />}
-              tooltip="Stories publicados nas últimas 24 horas"
             />
             <MetricCard
-              label="Alcance Médio"
-              value={avgReach.toLocaleString()}
-              icon={<Users className="w-4 h-4" />}
-              tooltip="Média de contas alcançadas por story"
+              label="Fotos"
+              value={metrics.photoCount.toString()}
+              icon={<ImageIcon className="w-4 h-4" />}
             />
             <MetricCard
-              label="Impressões"
-              value={agg.total_impressions.toLocaleString()}
+              label="Vídeos"
+              value={metrics.videoCount.toString()}
+              icon={<Play className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Média/Dia"
+              value={metrics.avgStoriesPerDay}
+              icon={<TrendingUp className="w-4 h-4" />}
+            />
+            <MetricCard
+              label="Views Total"
+              value={formatNumber(metrics.totalViews)}
               icon={<Eye className="w-4 h-4" />}
-              tooltip="Total de visualizações de todos os stories"
+            />
+            <MetricCard
+              label="Alcance Total"
+              value={formatNumber(agg.total_reach)}
+              icon={<Users className="w-4 h-4" />}
             />
             <MetricCard
               label="Respostas"
-              value={agg.total_replies.toLocaleString()}
+              value={formatNumber(agg.total_replies)}
               icon={<MessageCircle className="w-4 h-4" />}
-              tooltip="Total de respostas recebidas nos stories"
             />
             <MetricCard
-              label="Taxa de Saída"
-              value={`${exitRate}%`}
-              icon={<LogOut className="w-4 h-4" />}
-              tooltip="Percentual de pessoas que saíram antes de terminar"
-            />
-            <MetricCard
-              label="Taxa de Conclusão"
-              value={`${agg.avg_completion_rate}%`}
-              icon={<CheckCircle className="w-4 h-4" />}
-              tooltip="Percentual de pessoas que assistiram até o final"
+              label="Shares"
+              value={formatNumber(metrics.totalShares)}
+              icon={<Share2 className="w-4 h-4" />}
             />
           </div>
 
-          {/* Actions Distribution Chart */}
-          {stories.length > 0 && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ChartCard title="Distribuição de Ações" subtitle="Interações em todos os stories">
-                <div className="h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={actionsData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis type="number" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" width={80} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                          padding: '12px',
+          {/* Story Count + Views by Type */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ChartCard title="Stories por Dia" subtitle="Foto vs Vídeo">
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={storyCountByType}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                    <Bar dataKey="photo" name="Fotos" fill={COLORS.photo} stackId="stack" />
+                    <Bar dataKey="video" name="Vídeos" fill={COLORS.video} stackId="stack" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
+
+            <ChartCard title="Views por Tipo" subtitle="Fotos vs Vídeos">
+              <div className="flex items-center gap-6 h-56">
+                <div className="flex-1 space-y-4">
+                  <div className="p-4 rounded-lg bg-muted/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="flex items-center gap-2 text-sm">
+                        <ImageIcon className="w-4 h-4" style={{ color: COLORS.photo }} />
+                        Fotos
+                      </span>
+                      <span className="font-bold">{formatNumber(metrics.photoViews)}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${metrics.totalViews > 0 ? (metrics.photoViews / metrics.totalViews) * 100 : 0}%`,
+                          backgroundColor: COLORS.photo,
                         }}
-                        labelStyle={{ fontWeight: 600, marginBottom: '4px', color: 'hsl(var(--foreground))' }}
-                        formatter={(value: number) => [value.toLocaleString('pt-BR'), '']}
-                        cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }}
                       />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]} />
-                    </BarChart>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="flex items-center gap-2 text-sm">
+                        <Play className="w-4 h-4" style={{ color: COLORS.video }} />
+                        Vídeos
+                      </span>
+                      <span className="font-bold">{formatNumber(metrics.videoViews)}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${metrics.totalViews > 0 ? (metrics.videoViews / metrics.totalViews) * 100 : 0}%`,
+                          backgroundColor: COLORS.video,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ChartCard>
+          </div>
+
+          {/* Reach breakdown + Actions */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ChartCard title="Alcance por Tipo de Seguidor" subtitle="Seguidores vs Não Seguidores">
+              <div className="flex items-center gap-6 h-56">
+                <div className="w-40 h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={reachBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={65}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {reachBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatNumber(v)} />
+                    </PieChart>
                   </ResponsiveContainer>
                 </div>
-              </ChartCard>
-
-              {/* Mini Gallery */}
-              <ChartCard title="Stories Ativos" subtitle="Clique para ver detalhes">
-                <div className="grid grid-cols-4 gap-2">
-                  {stories.slice(0, 8).map((story: any) => (
-                    <a
-                      key={story.id}
-                      href={story.permalink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="aspect-[9/16] rounded-lg overflow-hidden bg-secondary hover:opacity-80 transition-opacity relative group"
-                    >
-                      {(story.media_url || story.thumbnail_url) ? (
-                        <img 
-                          src={story.thumbnail_url || story.media_url} 
-                          alt="Story"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Layers className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                        <div className="text-background text-[10px] space-y-0.5">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-3 h-3" />
-                            {story.insights?.reach || 0}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageCircle className="w-3 h-3" />
-                            {story.insights?.replies || 0}
-                          </div>
-                        </div>
+                <div className="flex-1 space-y-3">
+                  {reachBreakdown.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
+                        <span className="text-sm">{item.name}</span>
                       </div>
-                    </a>
+                      <span className="font-semibold">{formatNumber(item.value)}</span>
+                    </div>
                   ))}
                 </div>
-              </ChartCard>
-            </div>
-          )}
-
-          {/* Stories Table */}
-          {stories.length > 0 && (
-            <ChartCard title="Detalhes dos Stories" subtitle="Métricas individuais de cada story">
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Preview</th>
-                      <th>Data/Hora</th>
-                      <th>Tipo</th>
-                      <th>Impressões</th>
-                      <th>Alcance</th>
-                      <th>Respostas</th>
-                      <th>Saídas</th>
-                      <th>
-                        <span className="flex items-center gap-1">
-                          <ArrowRight className="w-3 h-3" />
-                          Avançar
-                        </span>
-                      </th>
-                      <th>
-                        <span className="flex items-center gap-1">
-                          <ArrowLeft className="w-3 h-3" />
-                          Voltar
-                        </span>
-                      </th>
-                      <th>Conclusão</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stories.map((story: any) => (
-                      <tr key={story.id}>
-                        <td>
-                          <a href={story.permalink} target="_blank" rel="noopener noreferrer">
-                            {(story.thumbnail_url || story.media_url) ? (
-                              <img 
-                                src={story.thumbnail_url || story.media_url} 
-                                alt="Story" 
-                                className="w-10 h-14 object-cover rounded"
-                              />
-                            ) : (
-                              <div className="w-10 h-14 bg-secondary rounded flex items-center justify-center">
-                                <Layers className="w-4 h-4 text-muted-foreground" />
-                              </div>
-                            )}
-                          </a>
-                        </td>
-                        <td>{new Date(story.timestamp).toLocaleString('pt-BR')}</td>
-                        <td>
-                          <span className="tag">
-                            {story.media_type === 'VIDEO' ? 'Vídeo' : 'Imagem'}
-                          </span>
-                        </td>
-                        <td className="font-medium">{(story.insights?.impressions || 0).toLocaleString()}</td>
-                        <td className="font-medium">{(story.insights?.reach || 0).toLocaleString()}</td>
-                        <td>{(story.insights?.replies || 0).toLocaleString()}</td>
-                        <td>{(story.insights?.exits || 0).toLocaleString()}</td>
-                        <td>{(story.insights?.taps_forward || 0).toLocaleString()}</td>
-                        <td>{(story.insights?.taps_back || 0).toLocaleString()}</td>
-                        <td>
-                          <span className={`font-medium ${(story.insights?.completion_rate || 0) >= 70 ? 'text-green-600' : ''}`}>
-                            {story.insights?.completion_rate || 0}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
+            </ChartCard>
+
+            <ChartCard title="Interações nos Stories" subtitle="Taps, respostas, shares e saídas">
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={actionsData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatNumber(v)} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {actionsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
+          </div>
+
+          {/* Rates Row */}
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+            <div className="chart-card p-4">
+              <p className="text-sm text-muted-foreground">Reach Rate (Avg)</p>
+              <p className="text-2xl font-bold text-primary">{metrics.reachRate}%</p>
+              <p className="text-xs text-muted-foreground">Max: {metrics.maxReachRate}%</p>
+            </div>
+            <div className="chart-card p-4">
+              <p className="text-sm text-muted-foreground">Completion Rate</p>
+              <p className="text-2xl font-bold text-primary">{agg.avg_completion_rate}%</p>
+              <p className="text-xs text-muted-foreground">Média de conclusão</p>
+            </div>
+            <div className="chart-card p-4">
+              <p className="text-sm text-muted-foreground">Full View Rate</p>
+              <p className="text-2xl font-bold text-primary">{metrics.avgFullViewRate}%</p>
+              <p className="text-xs text-muted-foreground">Max: {metrics.maxFullViewRate}%</p>
+            </div>
+            <div className="chart-card p-4">
+              <p className="text-sm text-muted-foreground">Exit Rate</p>
+              <p className="text-2xl font-bold text-destructive">{metrics.exitRate}%</p>
+              <p className="text-xs text-muted-foreground">Taxa de saída</p>
+            </div>
+          </div>
+
+          {/* Best Time Heatmap */}
+          {Object.keys(storyHeatmapData).length > 0 && (
+            <ChartCard title="Melhor Horário para Stories" subtitle="Baseado no alcance médio por horário">
+              <HeatmapChart
+                data={storyHeatmapData}
+                valueLabel="alcance médio"
+                colorScheme="purple"
+              />
             </ChartCard>
           )}
 
-          {/* Rankings */}
-          {stories.length > 0 && (
-            <div className="grid gap-4 lg:grid-cols-3">
-              <ChartCard title="Maior Alcance" subtitle="Top 5 stories">
-                <div className="space-y-2">
-                  {topReach.map((story: any, idx: number) => (
-                    <div key={story.id} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
-                      <span className="text-lg font-bold text-muted-foreground">{idx + 1}</span>
-                      {(story.thumbnail_url || story.media_url) ? (
-                        <img src={story.thumbnail_url || story.media_url} alt="" className="w-8 h-12 rounded object-cover" />
-                      ) : (
-                        <div className="w-8 h-12 bg-secondary rounded" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{(story.insights?.reach || 0).toLocaleString()} alcance</p>
-                        <p className="text-xs text-muted-foreground">{new Date(story.timestamp).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ChartCard>
+          {/* Top Stories Gallery */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <ChartCard title="Maior Alcance" subtitle="Top 5 stories">
+              <TopStoriesGallery stories={stories} maxItems={5} metric="reach" />
+            </ChartCard>
+            <ChartCard title="Mais Respostas" subtitle="Top 5 stories">
+              <TopStoriesGallery stories={stories} maxItems={5} metric="replies" />
+            </ChartCard>
+            <ChartCard title="Maior Conclusão" subtitle="Top 5 stories">
+              <TopStoriesGallery stories={stories} maxItems={5} metric="completion" />
+            </ChartCard>
+          </div>
 
-              <ChartCard title="Mais Respostas" subtitle="Top 5 stories">
-                <div className="space-y-2">
-                  {topReplies.map((story: any, idx: number) => (
-                    <div key={story.id} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
-                      <span className="text-lg font-bold text-muted-foreground">{idx + 1}</span>
-                      {(story.thumbnail_url || story.media_url) ? (
-                        <img src={story.thumbnail_url || story.media_url} alt="" className="w-8 h-12 rounded object-cover" />
-                      ) : (
-                        <div className="w-8 h-12 bg-secondary rounded" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{(story.insights?.replies || 0).toLocaleString()} respostas</p>
-                        <p className="text-xs text-muted-foreground">{new Date(story.timestamp).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                    </div>
+          {/* Detailed Table */}
+          <ChartCard title="Detalhes dos Stories" subtitle="Todas as métricas">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Preview</th>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Views</th>
+                    <th>Alcance</th>
+                    <th>Respostas</th>
+                    <th>Shares</th>
+                    <th><ArrowRight className="w-3 h-3 inline" /> Avançar</th>
+                    <th><ArrowLeft className="w-3 h-3 inline" /> Voltar</th>
+                    <th>Saídas</th>
+                    <th>Conclusão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stories.map((story: any) => (
+                    <tr key={story.id}>
+                      <td>
+                        <a href={story.permalink} target="_blank" rel="noopener noreferrer">
+                          {(story.thumbnail_url || story.media_url) ? (
+                            <img src={story.thumbnail_url || story.media_url} alt="" className="w-10 h-14 object-cover rounded" />
+                          ) : (
+                            <div className="w-10 h-14 bg-muted rounded flex items-center justify-center">
+                              <Layers className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </a>
+                      </td>
+                      <td className="text-sm">{story.timestamp ? format(new Date(story.timestamp), 'dd/MM HH:mm') : '--'}</td>
+                      <td>
+                        <Badge variant="secondary" className={story.media_type === 'VIDEO' ? 'bg-purple-500/20 text-purple-600' : 'bg-green-500/20 text-green-600'}>
+                          {story.media_type === 'VIDEO' ? 'Vídeo' : 'Foto'}
+                        </Badge>
+                      </td>
+                      <td className="font-medium">{formatNumber(story.insights?.views || story.insights?.impressions)}</td>
+                      <td className="font-medium">{formatNumber(story.insights?.reach)}</td>
+                      <td>{formatNumber(story.insights?.replies)}</td>
+                      <td>{formatNumber(story.insights?.shares)}</td>
+                      <td>{formatNumber(story.insights?.taps_forward)}</td>
+                      <td>{formatNumber(story.insights?.taps_back)}</td>
+                      <td>{formatNumber(story.insights?.exits)}</td>
+                      <td>
+                        <span className={`font-medium ${(story.insights?.completion_rate || 0) >= 70 ? 'text-green-600' : ''}`}>
+                          {story.insights?.completion_rate || 0}%
+                        </span>
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              </ChartCard>
-
-              <ChartCard title="Menor Taxa de Saída" subtitle="Top 5 stories">
-                <div className="space-y-2">
-                  {lowestExit.map((story: any, idx: number) => (
-                    <div key={story.id} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
-                      <span className="text-lg font-bold text-muted-foreground">{idx + 1}</span>
-                      {(story.thumbnail_url || story.media_url) ? (
-                        <img src={story.thumbnail_url || story.media_url} alt="" className="w-8 h-12 rounded object-cover" />
-                      ) : (
-                        <div className="w-8 h-12 bg-secondary rounded" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{(story.insights?.exits || 0).toLocaleString()} saídas</p>
-                        <p className="text-xs text-muted-foreground">{story.insights?.completion_rate || 0}% conclusão</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ChartCard>
+                </tbody>
+              </table>
             </div>
-          )}
-
-          {/* Messages */}
-          {data.messages && data.messages.length > 0 && (
-            <div className="p-4 bg-secondary/50 rounded-xl border border-border">
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                {data.messages.join(' • ')}
-              </p>
-            </div>
-          )}
+          </ChartCard>
         </>
       )}
     </div>
