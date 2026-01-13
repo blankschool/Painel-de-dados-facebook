@@ -33,13 +33,6 @@ type ConsolidatedMetrics = {
   reach: number;
   impressions: number;
   profile_views: number;
-  accounts_engaged: number;
-  website_clicks: number;
-  email_contacts: number;
-  phone_call_clicks: number;
-  text_message_clicks: number;
-  get_directions_clicks: number;
-  follower_count: number | null;
 };
 
 export type ExportPayload = {
@@ -77,15 +70,6 @@ export type ExportPayload = {
   consolidated_metrics: ConsolidatedMetrics;
   api_metadata: ApiMetadata;
   posts_daily_metrics: PostDailyMetricsRow[];
-  // Data coverage info
-  data_coverage: {
-    requested_days: number;
-    covered_days: number;
-    completeness_percent: number;
-    oldest_insight_date: string | null;
-    newest_insight_date: string | null;
-    note: string;
-  };
 };
 
 function formatDateOnly(date: Date | undefined | null): string | null {
@@ -193,14 +177,6 @@ export function buildExportPayload(params: {
   const totalReach = mediaFiltered.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalViews = mediaFiltered.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
   const totalEngagement = mediaFiltered.reduce((sum, item) => sum + getEngagement(item), 0);
-  const accountInsights = (data.account_insights ?? {}) as Record<string, number>;
-  const dailyInsights = data.daily_insights ?? [];
-  const lastDaily = dailyInsights.length ? dailyInsights[dailyInsights.length - 1] : null;
-  const followerCount = typeof lastDaily?.follower_count === "number"
-    ? lastDaily.follower_count
-    : typeof accountInsights['follower_count'] === "number"
-      ? accountInsights['follower_count']
-      : data.profile?.followers_count ?? null;
 
   const avgErValues = mediaFiltered
     .map((item) => getComputedNumber(item, "er"))
@@ -257,13 +233,6 @@ export function buildExportPayload(params: {
       reach: data.consolidated_reach ?? 0,
       impressions: data.consolidated_impressions ?? 0,
       profile_views: data.consolidated_profile_views ?? 0,
-      accounts_engaged: typeof accountInsights['accounts_engaged'] === "number" ? accountInsights['accounts_engaged'] : 0,
-      website_clicks: typeof accountInsights['website_clicks'] === "number" ? accountInsights['website_clicks'] : 0,
-      email_contacts: typeof accountInsights['email_contacts'] === "number" ? accountInsights['email_contacts'] : 0,
-      phone_call_clicks: typeof accountInsights['phone_call_clicks'] === "number" ? accountInsights['phone_call_clicks'] : 0,
-      text_message_clicks: typeof accountInsights['text_message_clicks'] === "number" ? accountInsights['text_message_clicks'] : 0,
-      get_directions_clicks: typeof accountInsights['get_directions_clicks'] === "number" ? accountInsights['get_directions_clicks'] : 0,
-      follower_count: followerCount,
     },
     api_metadata: {
       api_version: data.api_version ?? 'v24.0',
@@ -275,31 +244,6 @@ export function buildExportPayload(params: {
       request_id: data.request_id,
     },
     posts_daily_metrics: postsDailyMetrics,
-    // Data coverage info
-    data_coverage: (() => {
-      const dataCoverage = (data as any).data_coverage;
-      const dailyInsightsArr = data.daily_insights ?? [];
-      const requestedDays = dataCoverage?.requested_days ?? 
-        (dateRange?.from && dateRange?.to 
-          ? Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (24 * 60 * 60 * 1000))
-          : dailyInsightsArr.length);
-      const coveredDays = dataCoverage?.covered_days ?? dailyInsightsArr.length;
-      const completeness = dataCoverage?.completeness_percent ?? 
-        (requestedDays > 0 ? Math.round((coveredDays / requestedDays) * 100) : 100);
-      
-      return {
-        requested_days: requestedDays,
-        covered_days: coveredDays,
-        completeness_percent: completeness,
-        oldest_insight_date: dataCoverage?.oldest_insight_date ?? 
-          (dailyInsightsArr.length > 0 ? dailyInsightsArr[0].insight_date : null),
-        newest_insight_date: dataCoverage?.newest_insight_date ?? 
-          (dailyInsightsArr.length > 0 ? dailyInsightsArr[dailyInsightsArr.length - 1].insight_date : null),
-        note: completeness < 100 
-          ? 'Instagram only provides daily account metrics for the last 30 days. Historical data beyond 30 days uses aggregated post metrics.'
-          : 'Full daily account-level data coverage for the selected period.',
-      };
-    })(),
   };
 }
 
@@ -543,12 +487,6 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
   const profileName = payload.profile?.name || payload.profile?.username || "Instagram";
   const summary = payload.summary;
   const consolidated = payload.consolidated_metrics;
-  const accountEngagementRate =
-    typeof consolidated.accounts_engaged === "number" &&
-    typeof consolidated.follower_count === "number" &&
-    consolidated.follower_count > 0
-      ? (consolidated.accounts_engaged / consolidated.follower_count) * 100
-      : null;
 
   const topByReach = [...payload.media_filtered]
     .sort((a, b) => (getReach(b) ?? -1) - (getReach(a) ?? -1))
@@ -671,8 +609,6 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
           <div class="card"><div class="label">Alcance Total</div><div class="value">${consolidated.reach.toLocaleString()}</div></div>
           <div class="card"><div class="label">Impressões</div><div class="value">${consolidated.impressions.toLocaleString()}</div></div>
           <div class="card"><div class="label">Visitas ao Perfil</div><div class="value">${consolidated.profile_views.toLocaleString()}</div></div>
-          <div class="card"><div class="label">Contas Engajadas</div><div class="value">${consolidated.accounts_engaged.toLocaleString()}</div></div>
-          <div class="card"><div class="label">Taxa de Engajamento</div><div class="value">${accountEngagementRate?.toFixed(2) ?? "--"}%</div></div>
         </div>
 
         <h2>Resumo de Posts</h2>

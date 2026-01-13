@@ -9,7 +9,6 @@ export interface LogiKpiCardProps {
   trend?: { value: number; isPositive: boolean } | null;
   index?: number;
   tooltip?: string;
-  badge?: string;
   size?: 'default' | 'large';
   className?: string;
 }
@@ -21,7 +20,6 @@ export function LogiKpiCard({
   trend,
   index = 0,
   tooltip,
-  badge,
   size = 'default',
   className,
 }: LogiKpiCardProps) {
@@ -79,15 +77,10 @@ export function LogiKpiCard({
       </div>
 
       {/* Label */}
-      <div className="mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5 flex-wrap">
+      <div className="mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5">
         <span className="text-[9px] md:text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
           {label}
         </span>
-        {badge && (
-          <span className="text-[8px] md:text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">
-            {badge}
-          </span>
-        )}
         {tooltip && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>

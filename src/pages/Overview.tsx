@@ -4,7 +4,7 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, AlertTriangle, ChevronDown, Database } from "lucide-react";
+import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
@@ -13,13 +13,7 @@ import { usePostClick } from "@/hooks/usePostClick";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FiltersContext";
 import { LogiKpiCard, LogiKpiGrid } from "@/components/dashboard/LogiKpiCard";
-import { DataAuditTable } from "@/components/dashboard/DataAuditTable";
 import { buildPostDailyMetrics } from "@/lib/dashboardHelpers";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   LineChart,
   Line,
@@ -56,7 +50,6 @@ export default function Overview() {
   const { data, loading, error, forceRefresh } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
-  const accountInsights: Record<string, number> = data?.account_insights ?? {};
 
   // Apply filters to media using account's timezone
   const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
@@ -67,65 +60,32 @@ export default function Overview() {
   const cacheAgeHours = (data as any)?.cache_age_hours as number | undefined;
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
 
-  // Sort states and UI states
+  // Sort states
   const [daySort, setDaySort] = useState<SortOrder>("desc");
   const [topContentSort, setTopContentSort] = useState<SortOrder>("desc");
   const [topContentSortBy, setTopContentSortBy] = useState<"er" | "reach" | "likes">("er");
   const [engagementSort, setEngagementSort] = useState<SortOrder>("desc");
-  const [isAuditOpen, setIsAuditOpen] = useState(false);
 
   // Extract comparison metrics from API response
   const comparisonMetrics = data?.comparison_metrics;
-  const dailyInsights = data?.daily_insights ?? [];
-  const previousDailyInsights = data?.previous_daily_insights ?? [];
-  
-  // Data coverage info for incomplete data warnings
-  const dataCoverage = (data as any)?.data_coverage as {
-    requested_days?: number;
-    covered_days?: number;
-    completeness_percent?: number;
-    oldest_insight_date?: string | null;
-    newest_insight_date?: string | null;
-  } | undefined;
-  
-  const hasIncompleteData = dataCoverage && dataCoverage.completeness_percent !== undefined && dataCoverage.completeness_percent < 100;
 
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
   console.log(`[Overview] Comparison metrics:`, comparisonMetrics);
-  console.log(`[Overview] Data coverage:`, dataCoverage);
 
-  const totalViewsFromPosts = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
-  const totalReachFromPosts = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
+  const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
+  const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
   const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
-  const accountsEngaged = typeof accountInsights['accounts_engaged'] === "number" ? accountInsights['accounts_engaged'] : null;
-  const accountReach = data?.consolidated_reach ?? totalReachFromPosts;
-  const accountImpressions = data?.consolidated_impressions ?? totalViewsFromPosts;
   
-  // Use profile.followers_count (total followers) instead of daily_insights.follower_count (daily delta)
-  const latestFollowerCount = useMemo(() => {
-    // Priority: profile total followers (correct value for engagement rate)
-    if (typeof profile?.followers_count === "number" && profile.followers_count > 0) {
-      return profile.followers_count;
-    }
-    // Fallback to accountInsights if profile not available
-    if (typeof accountInsights['follower_count'] === "number" && accountInsights['follower_count'] > 0) {
-      return accountInsights['follower_count'];
-    }
-    return null;
-  }, [profile?.followers_count, accountInsights]);
-
-  // Engagement rate formula aligned with Minter: (Likes + Comments) / Followers × 100
-  const accountEngagementRate = useMemo(() => {
-    if (typeof latestFollowerCount === "number" && latestFollowerCount > 0) {
-      return ((totalLikes + totalComments) / latestFollowerCount) * 100;
-    }
-    return null;
-  }, [totalLikes, totalComments, latestFollowerCount]);
+  const avgEr = useMemo(() => {
+    const values = media.map((m) => getComputedNumber(m, "er")).filter((v): v is number => typeof v === "number");
+    if (values.length === 0) return null;
+    return values.reduce((s, v) => s + v, 0) / values.length;
+  }, [media]);
   
-  const avgReach = media.length ? Math.round(totalReachFromPosts / media.length) : null;
+  const avgReach = media.length ? Math.round(totalReach / media.length) : null;
 
   // Content counts
   const counts = useMemo(() => {
@@ -144,20 +104,8 @@ export default function Overview() {
     [media, dateRange, accountTimezone],
   );
 
-  // Performance over time data (prefer account daily insights, fallback to post metrics by day)
+  // Performance over time data (post metrics by day)
   const performanceData = useMemo(() => {
-    if (dailyInsights.length > 0) {
-      const current = dailyInsights;
-      const previous = previousDailyInsights;
-      const totalDays = current.length;
-      return current.map((row, index) => ({
-        date: row.insight_date,
-        dateLabel: formatDateForGraph(row.insight_date, totalDays),
-        reach: row.reach ?? 0,
-        reachPrev: previous[index]?.reach ?? null,
-      }));
-    }
-
     if (postDailyMetrics.length === 0) return [];
     const totalDays = postDailyMetrics.length;
     return postDailyMetrics.map((row) => ({
@@ -166,12 +114,9 @@ export default function Overview() {
       reach: row.reach,
       reachPrev: null,
     }));
-  }, [dailyInsights, previousDailyInsights, postDailyMetrics]);
+  }, [postDailyMetrics]);
 
-  const hasReachPrev = useMemo(
-    () => performanceData.some((item) => typeof item.reachPrev === "number" && item.reachPrev > 0),
-    [performanceData],
-  );
+  const hasReachPrev = false;
 
   // Performance by day of week (with sorting)
   const dayData = useMemo(() => {
@@ -272,23 +217,6 @@ export default function Overview() {
 
   return (
     <>
-      {/* Incomplete data warning banner */}
-      {hasIncompleteData && (
-        <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium text-foreground">Dados diários parciais</p>
-            <p className="text-muted-foreground">
-              O Instagram só disponibiliza métricas diárias de conta (alcance, engajamento) dos últimos 30 dias.
-              {dataCoverage?.oldest_insight_date && (
-                <> Dados disponíveis a partir de {new Date(dataCoverage.oldest_insight_date).toLocaleDateString('pt-BR')}.</>
-              )}
-              {' '}Para períodos mais longos, usamos dados acumulados dos posts.
-            </p>
-          </div>
-        </div>
-      )}
-      
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -333,39 +261,33 @@ export default function Overview() {
             value={profile?.followers_count?.toLocaleString("pt-BR") ?? "--"}
             icon={<Users className="w-5 h-5" />}
             index={0}
-            tooltip="Total de seguidores da conta (snapshot atual)"
+            tooltip="Total de seguidores da conta"
           />
           <LogiKpiCard
-            label="Alcance"
-            value={formatCompact(accountReach)}
+            label="Alcance Total"
+            value={formatCompact(totalReach)}
             icon={<Eye className="w-5 h-5" />}
             index={1}
-            tooltip={dailyInsights.length > 0 
-              ? "Soma do alcance diário no período. Nota: pode incluir contas repetidas entre dias."
-              : "Soma do alcance dos posts no período (não inclui stories/ads)."
-            }
-            badge={dailyInsights.length > 0 ? "soma diária" : "posts"}
+            tooltip="Contas únicas alcançadas pelos posts no período"
           />
           <LogiKpiCard
             label="Taxa de Engajamento"
-            value={formatPercent(accountEngagementRate)}
+            value={formatPercent(avgEr)}
             icon={<Target className="w-5 h-5" />}
             index={2}
-            tooltip="(Curtidas + Comentários) ÷ Seguidores × 100. Fórmula alinhada com Minter.io."
+            tooltip="Média de engajamento por post"
           />
           <LogiKpiCard
             label="Curtidas"
             value={formatCompact(totalLikes)}
             icon={<Heart className="w-5 h-5" />}
             index={3}
-            tooltip="Total de curtidas nos posts do período"
           />
           <LogiKpiCard
             label="Comentários"
             value={formatCompact(totalComments)}
             icon={<MessageCircle className="w-5 h-5" />}
             index={4}
-            tooltip="Total de comentários nos posts do período"
           />
         </LogiKpiGrid>
 
@@ -380,56 +302,25 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Visualizações"
-            value={formatCompact(accountImpressions)}
+            value={formatCompact(totalViews)}
             icon={<Play className="w-5 h-5" />}
             index={6}
-            tooltip={dailyInsights.length > 0 && dailyInsights.some(d => d.impressions != null)
-              ? "Soma das impressões diárias (visualizações totais) no período."
-              : "Soma das visualizações dos posts (plays + impressões). Não inclui stories/ads."
-            }
-            badge={dailyInsights.length > 0 && dailyInsights.some(d => d.impressions != null) ? "soma diária" : "posts"}
+            tooltip="Visualizações de posts no período"
           />
           <LogiKpiCard
             label="Salvamentos"
             value={formatCompact(totalSaves)}
             icon={<Bookmark className="w-5 h-5" />}
             index={7}
-            tooltip="Total de salvamentos nos posts do período"
           />
           <LogiKpiCard
             label="Alcance Médio"
             value={formatCompact(avgReach)}
             icon={<BarChart3 className="w-5 h-5" />}
             index={8}
-            tooltip="Média de alcance por publicação (baseado nos posts)"
+            tooltip="Média de alcance por publicação"
           />
         </LogiKpiGrid>
-
-        {/* Data Audit Section - Collapsible */}
-        <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between py-3 h-auto hover:bg-accent/50">
-              <div className="flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                <span className="font-medium">Diagnóstico de Dados</span>
-                {dailyInsights.length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {dailyInsights.length} dias
-                  </Badge>
-                )}
-              </div>
-              <ChevronDown className={`w-4 h-4 transition-transform ${isAuditOpen ? 'rotate-180' : ''}`} />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            <div className="card">
-              <DataAuditTable 
-                dailyInsights={dailyInsights} 
-                dateRange={dateRange}
-              />
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
 
         {/* Performance Over Time Chart */}
         <div className="chart-section">

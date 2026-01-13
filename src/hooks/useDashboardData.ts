@@ -21,14 +21,9 @@ export type DailyInsightRow = {
   insight_date: string;
   reach?: number;
   impressions?: number;
-  accounts_engaged?: number;
   profile_views?: number;
   follower_count?: number;
   website_clicks?: number;
-  email_contacts?: number;
-  phone_call_clicks?: number;
-  text_message_clicks?: number;
-  get_directions_clicks?: number;
 };
 
 export type ProfileSnapshot = {

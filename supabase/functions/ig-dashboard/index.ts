@@ -676,117 +676,6 @@ serve(async (req) => {
         cache.getProfileSnapshots(supabaseService, connectedAccount.id, sinceDate, untilDate),
       ]);
 
-      // Check if we need to backfill daily insights (if we have fewer days than expected)
-      const expectedDays = Math.min(30, Math.ceil((new Date(untilDate).getTime() - new Date(sinceDate).getTime()) / (24 * 60 * 60 * 1000)));
-      const hasEnoughInsights = cachedInsights.length >= Math.min(expectedDays, 30);
-      
-      // Calculate which dates are missing in the last 30 days
-      const today = new Date();
-      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const backfillSince = new Date(Math.max(thirtyDaysAgo.getTime(), new Date(sinceDate).getTime()));
-      const backfillUntil = new Date(Math.min(today.getTime(), new Date(untilDate + 'T23:59:59Z').getTime()));
-      
-      const cachedDates = new Set(cachedInsights.map((i: any) => i.insight_date));
-      const missingDates: string[] = [];
-      
-      for (let d = new Date(backfillSince); d <= backfillUntil; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (!cachedDates.has(dateStr)) {
-          missingDates.push(dateStr);
-        }
-      }
-
-      // Only backfill if we're missing more than 2 days in the last 30 days
-      if (missingDates.length > 2 && missingDates.length <= 30) {
-        console.log(`[ig-dashboard] 🔄 Backfilling ${missingDates.length} missing days of insights`);
-        
-        // Decrypt token for API calls
-        const accessToken = await decryptToken(connectedAccount.access_token);
-        const tokenType = detectTokenType(accessToken);
-        const GRAPH_BASE = getGraphBase(tokenType);
-        const businessIdForBackfill = connectedAccount.provider_account_id;
-        
-        // Backfill missing insights (max 30 days per API limitation)
-        const backfillSinceDate = missingDates[0];
-        const backfillUntilDate = missingDates[missingDates.length - 1];
-        
-        const backfillDailyMap: DailyInsightsMap = {};
-        
-        const collectBackfillMetrics = (payload: unknown) => {
-          const values = (payload as { data?: unknown[] }).data;
-          if (!Array.isArray(values)) return;
-          for (const metric of values) {
-            const metricData = metric as { name?: string; values?: InsightValue[] };
-            if (metricData.name && metricData.values) {
-              addDailyInsightValues(backfillDailyMap, metricData.name, metricData.values);
-            }
-          }
-        };
-
-        const fetchBackfillMetrics = async (metrics: string[], label: string) => {
-          try {
-            const json = await graphGet(`/${businessIdForBackfill}/insights`, accessToken, {
-              metric: metrics.join(','),
-              period: 'day',
-              since: backfillSinceDate,
-              until: backfillUntilDate,
-            }, GRAPH_BASE);
-            collectBackfillMetrics(json);
-            console.log(`[ig-dashboard] ✓ Backfill ${label} fetched`);
-          } catch (err) {
-            console.log(`[ig-dashboard] ⚠ Backfill ${label} not available:`, err instanceof Error ? err.message : String(err));
-          }
-        };
-
-        try {
-          await fetchBackfillMetrics(['reach', 'profile_views'], 'reach/profile_views');
-          await fetchBackfillMetrics(['impressions'], 'impressions');
-          await fetchBackfillMetrics(['accounts_engaged'], 'accounts_engaged');
-          await fetchBackfillMetrics(['follower_count'], 'follower_count');
-          await fetchBackfillMetrics(
-            ['website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks'],
-            'contact_clicks'
-          );
-
-          const backfilledInsights = Object.entries(backfillDailyMap)
-            .map(([insight_date, metrics]) => ({
-              account_id: connectedAccount.id,
-              insight_date,
-              reach: metrics.reach ?? null,
-              impressions: metrics.impressions ?? null,
-              accounts_engaged: metrics.accounts_engaged ?? null,
-              profile_views: metrics.profile_views ?? null,
-              website_clicks: metrics.website_clicks ?? null,
-              follower_count: metrics.follower_count ?? null,
-              email_contacts: metrics.email_contacts ?? null,
-              phone_call_clicks: metrics.phone_call_clicks ?? null,
-              text_message_clicks: metrics.text_message_clicks ?? null,
-              get_directions_clicks: metrics.get_directions_clicks ?? null,
-            }));
-
-          if (backfilledInsights.length > 0) {
-            const { error: upsertError } = await supabaseService
-              .from('instagram_daily_insights')
-              .upsert(backfilledInsights, { onConflict: 'account_id,insight_date' });
-
-            if (upsertError) {
-              console.error('[ig-dashboard] Failed to save backfilled insights:', upsertError);
-            } else {
-              console.log(`[ig-dashboard] ✅ Backfilled ${backfilledInsights.length} days of insights`);
-              // Merge backfilled data with cached data
-              for (const bf of backfilledInsights) {
-                if (!cachedDates.has(bf.insight_date)) {
-                  cachedInsights.push(bf);
-                }
-              }
-              cachedInsights.sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
-            }
-          }
-        } catch (backfillErr) {
-          console.error('[ig-dashboard] Backfill failed (non-critical):', backfillErr);
-        }
-      }
-
       if (cachedPosts.length > 0 && cachedProfile) {
         // Transform cached data to match API response format
         const mediaWithInsights = cachedPosts.map((post: any) => ({
@@ -815,33 +704,12 @@ serve(async (req) => {
 
         // Calculate consolidated metrics from cached daily insights
         const consolidatedMetrics = cachedInsights.reduce(
-          (acc: any, insight: any) => {
-            acc.reach += insight.reach || 0;
-            acc.impressions += insight.impressions || 0;
-            acc.profile_views += insight.profile_views || 0;
-            acc.accounts_engaged += insight.accounts_engaged || 0;
-            acc.website_clicks += insight.website_clicks || 0;
-            acc.text_message_clicks += insight.text_message_clicks || 0;
-            acc.email_contacts += insight.email_contacts || 0;
-            acc.phone_call_clicks += insight.phone_call_clicks || 0;
-            acc.get_directions_clicks += insight.get_directions_clicks || 0;
-            if (acc.follower_count === null && typeof insight.follower_count === "number") {
-              acc.follower_count = insight.follower_count;
-            }
-            return acc;
-          },
-          {
-            reach: 0,
-            impressions: 0,
-            profile_views: 0,
-            accounts_engaged: 0,
-            website_clicks: 0,
-            text_message_clicks: 0,
-            email_contacts: 0,
-            phone_call_clicks: 0,
-            get_directions_clicks: 0,
-            follower_count: null,
-          },
+          (acc: any, insight: any) => ({
+            reach: acc.reach + (insight.reach || 0),
+            impressions: acc.impressions + (insight.impressions || 0),
+            profile_views: acc.profile_views + (insight.profile_views || 0),
+          }),
+          { reach: 0, impressions: 0, profile_views: 0 }
         );
 
         const dailyInsights = cachedInsights
@@ -849,14 +717,9 @@ serve(async (req) => {
             insight_date: insight.insight_date,
             reach: insight.reach ?? 0,
             impressions: insight.impressions ?? 0,
-            accounts_engaged: insight.accounts_engaged ?? 0,
             profile_views: insight.profile_views ?? 0,
             follower_count: insight.follower_count ?? null,
             website_clicks: insight.website_clicks ?? 0,
-            email_contacts: insight.email_contacts ?? 0,
-            phone_call_clicks: insight.phone_call_clicks ?? 0,
-            text_message_clicks: insight.text_message_clicks ?? 0,
-            get_directions_clicks: insight.get_directions_clicks ?? 0,
           }))
           .sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
 
@@ -874,61 +737,23 @@ serve(async (req) => {
             insight_date: insight.insight_date,
             reach: insight.reach ?? 0,
             impressions: insight.impressions ?? 0,
-            accounts_engaged: insight.accounts_engaged ?? 0,
             profile_views: insight.profile_views ?? 0,
             follower_count: insight.follower_count ?? null,
             website_clicks: insight.website_clicks ?? 0,
-            email_contacts: insight.email_contacts ?? 0,
-            phone_call_clicks: insight.phone_call_clicks ?? 0,
-            text_message_clicks: insight.text_message_clicks ?? 0,
-            get_directions_clicks: insight.get_directions_clicks ?? 0,
           }))
           .sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
 
         const previousTotals = previousCachedInsights.reduce(
-          (acc: any, insight: any) => {
-            acc.reach += insight.reach || 0;
-            acc.impressions += insight.impressions || 0;
-            acc.profile_views += insight.profile_views || 0;
-            acc.accounts_engaged += insight.accounts_engaged || 0;
-            acc.website_clicks += insight.website_clicks || 0;
-            acc.text_message_clicks += insight.text_message_clicks || 0;
-            acc.email_contacts += insight.email_contacts || 0;
-            acc.phone_call_clicks += insight.phone_call_clicks || 0;
-            acc.get_directions_clicks += insight.get_directions_clicks || 0;
-            if (acc.follower_count === null && typeof insight.follower_count === "number") {
-              acc.follower_count = insight.follower_count;
-            }
-            return acc;
-          },
-          {
-            reach: 0,
-            impressions: 0,
-            profile_views: 0,
-            accounts_engaged: 0,
-            website_clicks: 0,
-            text_message_clicks: 0,
-            email_contacts: 0,
-            phone_call_clicks: 0,
-            get_directions_clicks: 0,
-            follower_count: null,
-          },
+          (acc: any, insight: any) => ({
+            reach: acc.reach + (insight.reach || 0),
+            impressions: acc.impressions + (insight.impressions || 0),
+            profile_views: acc.profile_views + (insight.profile_views || 0),
+          }),
+          { reach: 0, impressions: 0, profile_views: 0 },
         );
 
         const comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
-        const comparisonKeys = [
-          'reach',
-          'impressions',
-          'profile_views',
-          'accounts_engaged',
-          'website_clicks',
-          'text_message_clicks',
-          'email_contacts',
-          'phone_call_clicks',
-          'get_directions_clicks',
-          'follower_count',
-        ];
-        for (const metric of comparisonKeys) {
+        for (const metric of ['reach', 'impressions', 'profile_views'] as const) {
           const current = (consolidatedMetrics as Record<string, number>)[metric] || 0;
           const previous = (previousTotals as Record<string, number>)[metric] || 0;
           if (current === 0 && previous === 0) continue;
@@ -937,18 +762,7 @@ serve(async (req) => {
           comparisonMetrics[metric] = { current, previous, change, changePercent };
         }
 
-        // Calculate data coverage info
-        const requestedDays = Math.ceil((new Date(untilDate).getTime() - new Date(sinceDate).getTime()) / (24 * 60 * 60 * 1000));
-        const coveredDays = dailyInsights.length;
-        const dataCompleteness = requestedDays > 0 ? Math.round((coveredDays / requestedDays) * 100) : 100;
-        
         const duration = Date.now() - startedAt;
-        const messages: string[] = [`⚡ Loaded from cache (${cacheStatus.cacheAge?.toFixed(1)}h old)`];
-        
-        // Add warning if data is incomplete
-        if (dataCompleteness < 100 && requestedDays > 30) {
-          messages.push(`INCOMPLETE_DAILY_DATA: Dados diários de conta disponíveis apenas para os últimos 30 dias. Cobertura: ${dataCompleteness}%`);
-        }
 
         return new Response(
           JSON.stringify({
@@ -980,15 +794,7 @@ serve(async (req) => {
             previous_daily_insights: previousDailyInsights,
             comparison_metrics: comparisonMetrics,
             profile_snapshots: cachedSnapshots,
-            // Data coverage info
-            data_coverage: {
-              requested_days: requestedDays,
-              covered_days: coveredDays,
-              completeness_percent: dataCompleteness,
-              oldest_insight_date: dailyInsights.length > 0 ? dailyInsights[0].insight_date : null,
-              newest_insight_date: dailyInsights.length > 0 ? dailyInsights[dailyInsights.length - 1].insight_date : null,
-            },
-            messages,
+            messages: [`⚡ Loaded from cache (${cacheStatus.cacheAge?.toFixed(1)}h old)`],
           }),
           {
             status: 200,
@@ -1313,91 +1119,102 @@ serve(async (req) => {
       const currentDailyMap: DailyInsightsMap = {};
       const previousDailyMap: DailyInsightsMap = {};
 
-      const collectMetrics = (
-        payload: unknown,
-        targetTotals: Record<string, number>,
-        targetDaily: DailyInsightsMap,
-      ) => {
-        const values = (payload as { data?: unknown[] }).data;
-        if (!Array.isArray(values)) return;
-        for (const metric of values) {
+      // Fetch current period reach/profile_views (safe metrics)
+      const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+        metric: 'reach,profile_views',
+        period: 'day',
+        since: sinceDate,
+        until: untilDate,
+      });
+
+      const insightsData = (insightsJson as { data?: unknown[] }).data;
+      if (Array.isArray(insightsData)) {
+        for (const metric of insightsData) {
           const metricData = metric as { name?: string; values?: InsightValue[] };
           if (metricData.name && metricData.values) {
             const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
-            const lastValue = [...metricData.values].reverse().find((v) => typeof v.value === "number")?.value;
-            if (metricData.name === 'follower_count') {
-              if (typeof lastValue === 'number') {
-                targetTotals[metricData.name] = lastValue;
-              }
-            } else {
-              targetTotals[metricData.name] = total;
-            }
-            addDailyInsightValues(targetDaily, metricData.name, metricData.values);
+            accountInsights[metricData.name] = total;
+            addDailyInsightValues(currentDailyMap, metricData.name, metricData.values);
           }
         }
-      };
+      }
 
-      const fetchMetrics = async (
-        metrics: string[],
-        since: string,
-        until: string,
-        targetTotals: Record<string, number>,
-        targetDaily: DailyInsightsMap,
-        label: string,
-      ) => {
-        try {
-          const json = await graphGet(`/${businessId}/insights`, accessToken, {
-            metric: metrics.join(','),
-            period: 'day',
-            since,
-            until,
-          });
-          collectMetrics(json, targetTotals, targetDaily);
-        } catch (err) {
-          console.log(`[ig-dashboard] ${label} not available:`, err instanceof Error ? err.message : String(err));
+      // Attempt impressions (may be unavailable depending on permissions)
+      try {
+        const impressionsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: 'impressions',
+          period: 'day',
+          since: sinceDate,
+          until: untilDate,
+        });
+        const impressionsData = (impressionsJson as { data?: unknown[] }).data;
+        if (Array.isArray(impressionsData)) {
+          for (const metric of impressionsData) {
+            const metricData = metric as { name?: string; values?: InsightValue[] };
+            if (metricData.name && metricData.values) {
+              const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
+              accountInsights[metricData.name] = total;
+              addDailyInsightValues(currentDailyMap, metricData.name, metricData.values);
+            }
+          }
         }
-      };
-
-      await fetchMetrics(['reach', 'profile_views'], sinceDate, untilDate, accountInsights, currentDailyMap, 'reach/profile_views');
-      await fetchMetrics(['impressions'], sinceDate, untilDate, accountInsights, currentDailyMap, 'impressions');
-      await fetchMetrics(['accounts_engaged'], sinceDate, untilDate, accountInsights, currentDailyMap, 'accounts_engaged');
-      await fetchMetrics(['follower_count'], sinceDate, untilDate, accountInsights, currentDailyMap, 'follower_count');
-      await fetchMetrics(
-        ['website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks'],
-        sinceDate,
-        untilDate,
-        accountInsights,
-        currentDailyMap,
-        'contact_clicks',
-      );
+      } catch (impErr) {
+        console.log('[ig-dashboard] Impressions not available for current period:', impErr instanceof Error ? impErr.message : String(impErr));
+      }
 
       dailyInsights = mapDailyInsights(currentDailyMap) as cache.DailyInsightRecord[];
-      if (typeof accountInsights.follower_count !== "number" && typeof profile.followers_count === "number") {
-        accountInsights.follower_count = profile.followers_count;
-      }
 
       console.log('[ig-dashboard] Account insights (current):', accountInsights);
 
       // Fetch previous period insights for comparison
       try {
-        await fetchMetrics(['reach', 'profile_views'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'reach/profile_views (prev)');
-        await fetchMetrics(['impressions'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'impressions (prev)');
-        await fetchMetrics(['accounts_engaged'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'accounts_engaged (prev)');
-        await fetchMetrics(['follower_count'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'follower_count (prev)');
-        await fetchMetrics(
-          ['website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks'],
-          prevSince,
-          prevUntil,
-          previousPeriodInsights,
-          previousDailyMap,
-          'contact_clicks (prev)',
-        );
+        const prevInsightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: 'reach,profile_views',
+          period: 'day',
+          since: prevSince,
+          until: prevUntil,
+        });
+
+        const prevInsightsData = (prevInsightsJson as { data?: unknown[] }).data;
+        if (Array.isArray(prevInsightsData)) {
+          for (const metric of prevInsightsData) {
+            const metricData = metric as { name?: string; values?: InsightValue[] };
+            if (metricData.name && metricData.values) {
+              const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
+              previousPeriodInsights[metricData.name] = total;
+              addDailyInsightValues(previousDailyMap, metricData.name, metricData.values);
+            }
+          }
+        }
+
+        // Attempt impressions for previous period
+        try {
+          const prevImpressionsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: 'impressions',
+            period: 'day',
+            since: prevSince,
+            until: prevUntil,
+          });
+          const prevImpressionsData = (prevImpressionsJson as { data?: unknown[] }).data;
+          if (Array.isArray(prevImpressionsData)) {
+            for (const metric of prevImpressionsData) {
+              const metricData = metric as { name?: string; values?: InsightValue[] };
+              if (metricData.name && metricData.values) {
+                const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
+                previousPeriodInsights[metricData.name] = total;
+                addDailyInsightValues(previousDailyMap, metricData.name, metricData.values);
+              }
+            }
+          }
+        } catch (prevImpErr) {
+          console.log('[ig-dashboard] Impressions not available for previous period:', prevImpErr instanceof Error ? prevImpErr.message : String(prevImpErr));
+        }
 
         previousDailyInsights = mapDailyInsights(previousDailyMap) as cache.DailyInsightRecord[];
 
         console.log('[ig-dashboard] Account insights (previous):', previousPeriodInsights);
 
-        const comparisonKeys = ['reach', 'impressions', 'profile_views', 'accounts_engaged', 'website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks', 'follower_count'].filter(
+        const comparisonKeys = ['reach', 'impressions', 'profile_views'].filter(
           (metric) => metric in accountInsights || metric in previousPeriodInsights,
         );
 
