@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { Sun, Moon, User, Settings, LogOut, ChevronDown, Download } from "lucide-react";
+import { Sun, Moon, User, Settings, LogOut, ChevronDown, Download, Menu, X } from "lucide-react";
 import { useFilters } from "@/contexts/FiltersContext";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,11 @@ import {
   exportJson,
   exportPdf,
 } from "@/utils/exportData";
+
+interface TopbarProps {
+  onMenuClick?: () => void;
+  sidebarOpen?: boolean;
+}
 
 const pageMeta: Record<string, { title: string; subtitle: string }> = {
   "/": {
@@ -77,9 +82,13 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
     title: "Análise Avançada",
     subtitle: "Leituras profundas de performance e eficiência.",
   },
+  "/comparisons": {
+    title: "Comparativos",
+    subtitle: "Compare períodos e identifique tendências.",
+  },
 };
 
-export function Topbar() {
+export function Topbar({ onMenuClick, sidebarOpen }: TopbarProps) {
   const location = useLocation();
   const { filters, getDateRangeFromPreset } = useFilters();
   const { data, refresh, loading } = useDashboardData();
@@ -129,10 +138,21 @@ export function Topbar() {
 
   return (
     <header className="header">
-      <div className="header-left pl-12 md:pl-0">
-        <span className="page-hero-kicker text-[10px] md:text-[11px]">Relatório do Instagram</span>
-        <h1 className="page-title text-xl md:text-[28px]">{meta.title}</h1>
-        <p className="page-hero-subtitle text-xs md:text-sm hidden sm:block">{meta.subtitle}</p>
+      <div className="header-left">
+        {/* Mobile Menu Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden h-9 w-9 shrink-0 mr-2"
+          onClick={onMenuClick}
+        >
+          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </Button>
+        <div className="flex flex-col">
+          <span className="page-hero-kicker text-[10px] md:text-[11px]">Relatório do Instagram</span>
+          <h1 className="page-title text-xl md:text-[28px]">{meta.title}</h1>
+          <p className="page-hero-subtitle text-xs md:text-sm hidden sm:block">{meta.subtitle}</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
