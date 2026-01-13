@@ -613,6 +613,16 @@ serve(async (req) => {
 
     console.log('[ig-dashboard] Cache status:', cacheStatus);
 
+    // Force refresh if the date range includes today and cache is older than 1 hour
+    const today = new Date().toISOString().split('T')[0];
+    const includesCurrentDay = untilDate >= today;
+    const cacheOlderThan1Hour = cacheStatus.cacheAge !== null && cacheStatus.cacheAge > 1;
+    
+    if (includesCurrentDay && cacheOlderThan1Hour && !body.forceRefresh) {
+      console.log(`[ig-dashboard] Auto-refresh: period includes today (${today}) and cache is ${cacheStatus.cacheAge?.toFixed(1)}h old`);
+      cacheStatus.shouldRefresh = true;
+    }
+
     // If cache is fresh, return cached data immediately
     if (cacheStatus.hasCachedData && !cacheStatus.shouldRefresh) {
       console.log(`[ig-dashboard] ⚡ Using cached data (${cacheStatus.cacheAge?.toFixed(1)}h old)`);
