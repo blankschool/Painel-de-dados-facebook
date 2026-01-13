@@ -582,6 +582,11 @@ export default function Overview() {
                                      row.likes;
                 const barWidth = maxTopContentValue > 0 ? (currentValue / maxTopContentValue) * 100 : 0;
                 
+                // Format post date
+                const postDate = row.item.timestamp 
+                  ? new Date(row.item.timestamp).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+                  : null;
+                
                 return (
                   <div 
                     onClick={() => handlePostClick(row.item)}
@@ -589,18 +594,23 @@ export default function Overview() {
                     key={row.item.id ?? index}
                   >
                     <span className="item-rank">{index + 1}.</span>
-                    <div className="relative">
-                      <div
-                        className="item-preview teal"
-                        style={
-                          row.item.thumbnail_url || row.item.media_url
-                            ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
-                            : undefined
-                        }
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
-                        <ExternalLink className="w-4 h-4 text-white" />
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <div
+                          className="item-preview teal"
+                          style={
+                            row.item.thumbnail_url || row.item.media_url
+                              ? { backgroundImage: `url(${row.item.thumbnail_url || row.item.media_url})`, backgroundSize: "cover" }
+                              : undefined
+                          }
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                          <ExternalLink className="w-4 h-4 text-white" />
+                        </div>
                       </div>
+                      {postDate && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{postDate}</span>
+                      )}
                     </div>
                     <div className="item-engagement">
                       <span className="engagement-value">
