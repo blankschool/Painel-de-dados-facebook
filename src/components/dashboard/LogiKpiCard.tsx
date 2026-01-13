@@ -82,13 +82,18 @@ export function LogiKpiCard({
           {label}
         </span>
         {tooltip && (
-          <Tooltip>
+          <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
               <button className="text-muted-foreground/50 hover:text-muted-foreground transition-colors hidden md:inline-flex">
                 <HelpCircle className="h-3 w-3" />
               </button>
             </TooltipTrigger>
-            <TooltipContent className="max-w-[240px] text-xs">
+            <TooltipContent 
+              className="max-w-[280px] text-xs z-[9999]" 
+              side="top" 
+              sideOffset={8}
+              avoidCollisions={true}
+            >
               {tooltip}
             </TooltipContent>
           </Tooltip>
