@@ -136,5 +136,6 @@ export function useDashboardData() {
     data: query.data ?? null,
     refresh: query.refetch,
     forceRefresh,
+    lastUpdated: query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null,
   };
 }
