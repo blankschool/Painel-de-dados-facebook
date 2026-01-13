@@ -19,6 +19,10 @@ export function Sidebar({ isOpen = false, onClose, isCollapsed = false, onToggle
     href: "/overview",
     icon: "chart"
   }, {
+    label: "Comparativos",
+    href: "/comparisons",
+    icon: "comparisons"
+  }, {
     label: "Performance",
     href: "/performance",
     icon: "performance"
@@ -85,6 +89,12 @@ export function Sidebar({ isOpen = false, onClose, isCollapsed = false, onToggle
               <svg viewBox="0 0 24 24">
                 <path d="M3 3v18h18" />
                 <path d="M18 9l-5 5-4-4-3 3" />
+              </svg>
+            )}
+            {item.icon === "comparisons" && (
+              <svg viewBox="0 0 24 24">
+                <path d="M3 6h18M3 12h18M3 18h18" />
+                <path d="M8 6v12M16 6v12" />
               </svg>
             )}
             {item.icon === "users" && (
