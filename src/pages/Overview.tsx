@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { formatDateForGraph, getWeekdayInTimezone } from "@/utils/dateFormat";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target } from "lucide-react";
+import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, TrendingUp, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FiltersContext";
 import { LogiKpiCard, LogiKpiGrid } from "@/components/dashboard/LogiKpiCard";
 import { buildPostDailyMetrics } from "@/lib/dashboardHelpers";
+import { cn } from "@/lib/utils";
 import {
   LineChart,
   Line,
@@ -59,6 +60,7 @@ export default function Overview() {
   const fromCache = (data as any)?.from_cache === true;
   const cacheAgeHours = (data as any)?.cache_age_hours as number | undefined;
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
+  const topContentRef = useRef<HTMLDivElement>(null);
 
   // Sort states
   const [daySort, setDaySort] = useState<SortOrder>("desc");
@@ -104,19 +106,74 @@ export default function Overview() {
     [media, dateRange, accountTimezone],
   );
 
-  // Performance over time data (post metrics by day)
+  // Performance over time data with month comparison
   const performanceData = useMemo(() => {
     if (postDailyMetrics.length === 0) return [];
-    const totalDays = postDailyMetrics.length;
-    return postDailyMetrics.map((row) => ({
-      date: row.date,
-      dateLabel: formatDateForGraph(row.date, totalDays),
-      reach: row.reach,
-      reachPrev: null,
-    }));
-  }, [postDailyMetrics]);
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    
+    // Get all media from the full data (not just filtered)
+    const allMediaItems = data?.media ?? [];
+    const allMetrics = buildPostDailyMetrics(allMediaItems, undefined, accountTimezone);
+    
+    // Group by day of month for current month
+    const currentMonthData: Record<number, number> = {};
+    const prevMonthData: Record<number, number> = {};
+    
+    allMetrics.forEach((row) => {
+      const date = new Date(row.date);
+      const dayOfMonth = date.getDate();
+      
+      if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+        currentMonthData[dayOfMonth] = (currentMonthData[dayOfMonth] || 0) + row.reach;
+      } else if (date.getMonth() === prevMonth && date.getFullYear() === prevYear) {
+        prevMonthData[dayOfMonth] = (prevMonthData[dayOfMonth] || 0) + row.reach;
+      }
+    });
+    
+    // Create aligned data for comparison
+    const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const result: Array<{ day: number; date: string; dateLabel: string; reach: number; reachPrev: number | null }> = [];
+    
+    for (let day = 1; day <= daysInCurrentMonth; day++) {
+      const currentReach = currentMonthData[day] || 0;
+      const prevReach = prevMonthData[day] || null;
+      
+      // Only include days that have data in either month
+      if (currentReach > 0 || (prevReach !== null && prevReach > 0)) {
+        result.push({
+          day,
+          date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+          dateLabel: `${day}`,
+          reach: currentReach,
+          reachPrev: prevReach,
+        });
+      }
+    }
+    
+    return result;
+  }, [postDailyMetrics, data?.media, accountTimezone]);
 
-  const hasReachPrev = false;
+  const hasReachPrev = performanceData.some(d => d.reachPrev !== null && d.reachPrev > 0);
+
+  // Get month names for legend
+  const monthNames = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.toLocaleDateString('pt-BR', { month: 'short' });
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = prevDate.toLocaleDateString('pt-BR', { month: 'short' });
+    return { current: currentMonth, prev: prevMonth };
+  }, []);
+
+  // Scroll to top content handler
+  const scrollToTopContent = (sortBy?: 'reach' | 'er' | 'likes') => {
+    if (sortBy) setTopContentSortBy(sortBy);
+    topContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Performance by day of week (with sorting)
   const dayData = useMemo(() => {
@@ -246,7 +303,8 @@ export default function Overview() {
             value={formatCompact(totalReach)}
             icon={<Eye className="w-5 h-5" />}
             index={1}
-            tooltip="Contas únicas alcançadas pelos posts no período"
+            tooltip="Clique para ver posts ordenados por alcance"
+            onClick={() => scrollToTopContent('reach')}
           />
           <LogiKpiCard
             label="Taxa de Engajamento"
@@ -296,7 +354,8 @@ export default function Overview() {
             value={formatCompact(avgReach)}
             icon={<BarChart3 className="w-5 h-5" />}
             index={8}
-            tooltip="Média de alcance por publicação"
+            tooltip="Clique para ver posts ordenados por alcance"
+            onClick={() => scrollToTopContent('reach')}
           />
         </LogiKpiGrid>
 
@@ -305,13 +364,14 @@ export default function Overview() {
           <div className="chart-header">
             <div>
               <h3 className="chart-title">Desempenho ao Longo do Tempo</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Comparação mês atual vs anterior</p>
               <div className="chart-legend mt-2">
                 <div className="legend-item">
-                  <span className="legend-dot solid" /> Alcance
+                  <span className="legend-dot solid" /> {monthNames.current}
                 </div>
                 {hasReachPrev && (
                   <div className="legend-item">
-                    <span className="legend-dot dashed" /> Alcance (mês anterior)
+                    <span className="legend-dot dashed" /> {monthNames.prev}
                   </div>
                 )}
               </div>
@@ -377,123 +437,145 @@ export default function Overview() {
           {/* Performance By Day Of Week */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Desempenho por Dia da Semana</h3>
+              <div>
+                <h3 className="card-title">Desempenho por Dia da Semana</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Alcance total por dia</p>
+              </div>
               <SortToggle 
                 sortOrder={daySort} 
                 onToggle={() => setDaySort(o => o === "desc" ? "asc" : "desc")} 
               />
             </div>
-            <div className="h-52">
+            <div className="space-y-2">
               {dayData.some((d) => d.value > 0) ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dayData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis
-                      dataKey="day"
-                      tick={{ fontSize: 10 }}
-                      stroke="hsl(var(--muted-foreground))"
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10 }}
-                      stroke="hsl(var(--muted-foreground))"
-                      tickFormatter={(value) => formatCompact(value)}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      labelStyle={{ fontWeight: 600, marginBottom: "4px", color: "hsl(var(--foreground))" }}
-                      formatter={(value: number) => [value.toLocaleString("pt-BR"), "Alcance Total"]}
-                      labelFormatter={(_, payload) => {
-                        const item = payload?.[0]?.payload;
-                        return item?.dayFull || "";
-                      }}
-                      cursor={{ fill: "hsl(var(--accent))", opacity: 0.3 }}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="hsl(var(--primary))"
-                      radius={[4, 4, 0, 0]}
-                      cursor="pointer"
-                      onClick={(data) => handleDayBarClick(data)}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <>
+                  {dayData.map((item, index) => {
+                    const isBestDay = index === 0 && daySort === "desc";
+                    const maxValue = Math.max(...dayData.map(d => d.value));
+                    const percentage = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+                    
+                    return (
+                      <div 
+                        key={item.day}
+                        onClick={() => handleDayBarClick(item)}
+                        className={cn(
+                          "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all hover:bg-accent/50",
+                          isBestDay && "ring-1 ring-primary/30 bg-accent/30"
+                        )}
+                      >
+                        <span className={cn(
+                          "w-10 text-xs font-medium",
+                          isBestDay && "text-primary font-semibold"
+                        )}>
+                          {item.day}
+                        </span>
+                        <div className="flex-1 h-6 bg-secondary rounded-md overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full transition-all duration-500",
+                              isBestDay 
+                                ? "bg-gradient-to-r from-primary/80 to-primary" 
+                                : "bg-muted-foreground/40"
+                            )}
+                            style={{ width: `${Math.max(5, percentage)}%` }}
+                          />
+                        </div>
+                        <span className={cn(
+                          "w-16 text-right text-xs font-medium",
+                          isBestDay && "text-primary font-semibold"
+                        )}>
+                          {formatCompact(item.value)}
+                        </span>
+                        <span className="w-6 text-[10px] text-muted-foreground text-center">
+                          ({item.posts.length})
+                        </span>
+                        {isBestDay && (
+                          <Trophy className="w-3.5 h-3.5 text-primary" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
                   Nenhum dado disponível
                 </div>
               )}
             </div>
           </div>
 
-          {/* Engagement Breakdown */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="card-title">Detalhamento de Engajamento</h3>
+              <div>
+                <h3 className="card-title">Detalhamento de Engajamento</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Feed vs Reels</p>
+              </div>
               <SortToggle 
                 sortOrder={engagementSort} 
                 onToggle={() => setEngagementSort(o => o === "desc" ? "asc" : "desc")} 
               />
             </div>
-            <div className="engagement-chart">
+            
+            {/* Visual Cards */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
               {engagementData.map((item) => (
                 <div 
-                  key={item.type} 
-                  className="engagement-bar-container group relative mt-3 first:mt-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  key={item.type}
                   onClick={() => handleEngagementBarClick(item)}
+                  className="p-3 rounded-xl bg-secondary/50 cursor-pointer hover:bg-accent/50 transition-colors group"
                 >
-                  <span className="engagement-label">{item.type}</span>
-                  <div className="engagement-bar-bg">
-                    <div className="engagement-bar-fill transition-all duration-500" style={{ width: `${item.percentage}%` }} />
+                  <div className="flex items-center gap-2 mb-2">
+                    {item.type === "FEED" ? (
+                      <ImageIcon className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Play className="w-4 h-4 text-primary" />
+                    )}
+                    <span className="text-xs font-medium">{item.type === "FEED" ? "Feed" : "Reels"}</span>
+                    <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                   </div>
-                  <span className="text-xs text-muted-foreground ml-2">{item.percentage.toFixed(0)}%</span>
-                  {/* Click hint */}
-                  <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
-                  {/* Tooltip */}
-                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    <div className="bg-popover border border-border text-popover-foreground px-3 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg">
-                      <span className="font-semibold">{item.value.toLocaleString("pt-BR")}</span> interações • Clique para ver
-                    </div>
-                  </div>
+                  <div className="text-xl font-bold">{item.percentage.toFixed(0)}%</div>
+                  <div className="text-xs text-muted-foreground">{formatCompact(item.value)} interações</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">{item.posts.length} publicações</div>
                 </div>
               ))}
-              <div className="engagement-scale mt-2">
-                <span>0%</span>
-                <span>25%</span>
-                <span>50%</span>
-                <span>75%</span>
-                <span>100%</span>
+            </div>
+
+            {/* Comparison Bar */}
+            <div className="h-3 rounded-full overflow-hidden flex bg-secondary">
+              {engagementData.map((item, i) => (
+                <div 
+                  key={item.type}
+                  className={cn(
+                    "h-full transition-all duration-500",
+                    i === 0 ? "bg-primary" : "bg-muted-foreground/60"
+                  )}
+                  style={{ width: `${item.percentage}%` }}
+                />
+              ))}
+            </div>
+            
+            {/* Stats Row */}
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              <div className="text-center p-2 rounded-lg bg-secondary/30">
+                <ImageIcon className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                <span className="block text-xs text-muted-foreground">Posts</span>
+                <span className="block text-sm font-semibold">{counts.posts}</span>
               </div>
-              <div className="engagement-stats">
-                <div className="stat-box">
-                  <div className="stat-icon">
-                    <ImageIcon className="w-5 h-5" />
-                  </div>
-                  <span className="stat-label">Posts</span>
-                  <span className="stat-value">{counts.posts}</span>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-icon">
-                    <Play className="w-5 h-5" />
-                  </div>
-                  <span className="stat-label">Reels</span>
-                  <span className="stat-value">{counts.reels || "-"}</span>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-icon">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <span className="stat-label">Stories</span>
-                  <span className="stat-value">{counts.stories || "-"}</span>
-                </div>
+              <div className="text-center p-2 rounded-lg bg-secondary/30">
+                <Play className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                <span className="block text-xs text-muted-foreground">Reels</span>
+                <span className="block text-sm font-semibold">{counts.reels || "-"}</span>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-secondary/30">
+                <Clock className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                <span className="block text-xs text-muted-foreground">Stories</span>
+                <span className="block text-sm font-semibold">{counts.stories || "-"}</span>
               </div>
             </div>
           </div>
 
           {/* Top Performing Content - Shows all posts (1 per day) */}
-          <div className="card">
+          <div className="card" ref={topContentRef}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>

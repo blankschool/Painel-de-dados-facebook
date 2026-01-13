@@ -11,6 +11,7 @@ export interface LogiKpiCardProps {
   tooltip?: string;
   size?: 'default' | 'large';
   className?: string;
+  onClick?: () => void;
 }
 
 export function LogiKpiCard({
@@ -22,16 +23,20 @@ export function LogiKpiCard({
   tooltip,
   size = 'default',
   className,
+  onClick,
 }: LogiKpiCardProps) {
   const isLarge = size === 'large';
   const staggerClass = `stagger-${Math.min(index + 1, 8)}`;
+  const isClickable = !!onClick;
 
   return (
     <article
+      onClick={onClick}
       className={cn(
         "group relative rounded-xl md:rounded-2xl border border-border/50 bg-card/85 p-3 md:p-5 transition-all duration-200 backdrop-blur-sm",
         "animate-fade-in-up hover-lift",
         staggerClass,
+        isClickable && "cursor-pointer hover:ring-2 hover:ring-primary/20",
         className
       )}
     >
