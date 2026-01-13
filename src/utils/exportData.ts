@@ -37,8 +37,8 @@ export type ExportPayload = {
   stories_aggregate: IgDashboardResponse["stories_aggregate"] | null | undefined;
   demographics: IgDashboardResponse["demographics"] | null | undefined;
   online_followers: IgDashboardResponse["online_followers"] | null | undefined;
-  account_insights: (IgDashboardResponse & { account_insights?: Record<string, number> }).account_insights | undefined;
-  comparison_metrics: (IgDashboardResponse & { comparison_metrics?: Record<string, unknown> }).comparison_metrics | undefined;
+  account_insights: Record<string, number> | undefined;
+  comparison_metrics: Record<string, unknown> | undefined;
   messages: IgDashboardResponse["messages"] | null | undefined;
 };
 
