@@ -669,12 +669,106 @@ serve(async (req) => {
     if (cacheStatus.hasCachedData && !cacheStatus.shouldRefresh) {
       console.log(`[ig-dashboard] ⚡ Using cached data (${cacheStatus.cacheAge?.toFixed(1)}h old)`);
 
+      // Fetch cached data and demographics/online_followers in parallel
+      // Demographics and online_followers are "lifetime" metrics that should always be fetched fresh
       const [cachedPosts, cachedInsights, cachedProfile, cachedSnapshots] = await Promise.all([
         cache.getCachedPosts(supabaseService, connectedAccount.id, sinceDate, untilDate),
         cache.getCachedDailyInsights(supabaseService, connectedAccount.id, sinceDate, untilDate),
         cache.getCachedProfile(supabaseService, connectedAccount.id),
         cache.getProfileSnapshots(supabaseService, connectedAccount.id, sinceDate, untilDate),
       ]);
+
+      // Fetch demographics (lifetime metrics - always fetch fresh even from cache)
+      const demographics: Record<string, unknown> = {};
+      const breakdownTypes = ["age", "gender", "country", "city"];
+
+      for (const breakdownType of breakdownTypes) {
+        try {
+          const demoJson = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: "follower_demographics",
+            period: "lifetime",
+            metric_type: "total_value",
+            breakdown: breakdownType,
+          }, GRAPH_BASE);
+
+          const demoData = (demoJson as { data?: unknown[] }).data;
+          if (Array.isArray(demoData) && demoData.length > 0) {
+            const metric = demoData[0] as { total_value?: { breakdowns?: unknown[] } };
+            if (metric.total_value?.breakdowns) {
+              const breakdowns = metric.total_value.breakdowns as Array<{
+                results?: Array<{ dimension_values?: string[]; value?: number }>;
+              }>;
+
+              for (const breakdown of breakdowns) {
+                const results = breakdown.results || [];
+                const values: Record<string, number> = {};
+                for (const result of results) {
+                  const key = result.dimension_values?.join(".") || result.dimension_values?.[0] || "";
+                  if (key && result.value) values[key] = result.value;
+                }
+                if (Object.keys(values).length > 0) demographics[`audience_${breakdownType}`] = values;
+              }
+            }
+          }
+        } catch (err) {
+          console.log(`[ig-dashboard] [cache] Demographics ${breakdownType} fetch failed:`, err);
+        }
+      }
+
+      // Fallback to engaged_audience_demographics if follower_demographics is empty
+      if (Object.keys(demographics).length === 0) {
+        for (const breakdownType of breakdownTypes) {
+          try {
+            const demoJson = await graphGet(`/${businessId}/insights`, accessToken, {
+              metric: "engaged_audience_demographics",
+              period: "lifetime",
+              metric_type: "total_value",
+              breakdown: breakdownType,
+            }, GRAPH_BASE);
+
+            const demoData = (demoJson as { data?: unknown[] }).data;
+            if (Array.isArray(demoData) && demoData.length > 0) {
+              const metric = demoData[0] as { total_value?: { breakdowns?: unknown[] } };
+              if (metric.total_value?.breakdowns) {
+                const breakdowns = metric.total_value.breakdowns as Array<{
+                  results?: Array<{ dimension_values?: string[]; value?: number }>;
+                }>;
+
+                for (const breakdown of breakdowns) {
+                  const results = breakdown.results || [];
+                  const values: Record<string, number> = {};
+                  for (const result of results) {
+                    const key = result.dimension_values?.join(".") || result.dimension_values?.[0] || "";
+                    if (key && result.value) values[key] = result.value;
+                  }
+                  if (Object.keys(values).length > 0) demographics[`audience_${breakdownType}`] = values;
+                }
+              }
+            }
+          } catch (err) {
+            console.log(`[ig-dashboard] [cache] Engaged demographics ${breakdownType} fetch failed:`, err);
+          }
+        }
+      }
+
+      // Fetch online followers (lifetime metric - always fetch fresh even from cache)
+      let onlineFollowers: Record<string, number> = {};
+      try {
+        const onlineJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: "online_followers",
+          period: "lifetime",
+        }, GRAPH_BASE);
+        const onlineData = (onlineJson as { data?: unknown[] }).data;
+        if (Array.isArray(onlineData) && onlineData.length > 0) {
+          const metric = onlineData[0] as { values?: Array<{ value?: Record<string, number> }> };
+          if (metric.values && metric.values.length > 0) onlineFollowers = metric.values[0].value || {};
+        }
+      } catch (err) {
+        console.log(`[ig-dashboard] [cache] Online followers fetch failed:`, err);
+        onlineFollowers = {};
+      }
+
+      console.log(`[ig-dashboard] [cache] Demographics keys: ${Object.keys(demographics).join(', ')}, Online followers: ${Object.keys(onlineFollowers).length} hours`);
 
       if (cachedPosts.length > 0 && cachedProfile) {
         // Transform cached data to match API response format
@@ -794,6 +888,8 @@ serve(async (req) => {
             previous_daily_insights: previousDailyInsights,
             comparison_metrics: comparisonMetrics,
             profile_snapshots: cachedSnapshots,
+            demographics,
+            online_followers: onlineFollowers,
             messages: [`⚡ Loaded from cache (${cacheStatus.cacheAge?.toFixed(1)}h old)`],
           }),
           {
