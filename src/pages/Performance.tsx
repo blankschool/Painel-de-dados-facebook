@@ -41,17 +41,9 @@ const Performance = () => {
   const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
   const media = useFilteredMedia(allMedia, timezone);
 
-  // Sort states
+  // Sort states - must be before any conditional returns
   const [typeSort, setTypeSort] = useState<SortOrder>("desc");
   const [summarySort, setSummarySort] = useState<SortOrder>("desc");
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   // Calculate performance metrics from media
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count || 0), 0);
@@ -63,33 +55,40 @@ const Performance = () => {
     : '0';
 
   // Media type distribution from filtered media
-  const mediaTypeDistribution = media.reduce<Record<string, number>>((acc, item) => {
-    const type = item.media_type || 'UNKNOWN';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {});
-  const mediaTypeData = Object.entries(mediaTypeDistribution)
-    .map(([type, count]) => ({
-      name: MEDIA_TYPE_LABELS[type] || type,
-      value: count as number,
-      type,
-    }))
-    .filter(item => item.value > 0)
-    .sort((a, b) => b.value - a.value);
+  const mediaTypeDistribution = useMemo(() => {
+    return media.reduce<Record<string, number>>((acc, item) => {
+      const type = item.media_type || 'UNKNOWN';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+  }, [media]);
+
+  const mediaTypeData = useMemo(() => {
+    return Object.entries(mediaTypeDistribution)
+      .map(([type, count]) => ({
+        name: MEDIA_TYPE_LABELS[type] || type,
+        value: count as number,
+        type,
+      }))
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [mediaTypeDistribution]);
 
   const totalMedia = mediaTypeData.reduce((sum, item) => sum + item.value, 0);
 
   // Interaction breakdown
-  const interactionBreakdown = [
-    { type: 'Curtidas', value: totalLikes },
-    { type: 'Comentários', value: totalComments },
-  ].filter((i) => i.value > 0);
+  const interactionBreakdownWithPct = useMemo(() => {
+    const interactionBreakdown = [
+      { type: 'Curtidas', value: totalLikes },
+      { type: 'Comentários', value: totalComments },
+    ].filter((i) => i.value > 0);
 
-  const interactionTotal = interactionBreakdown.reduce((s, i) => s + i.value, 0) || 1;
-  const interactionBreakdownWithPct = interactionBreakdown.map((i) => ({
-    ...i,
-    percentage: Math.round((i.value / interactionTotal) * 100),
-  }));
+    const interactionTotal = interactionBreakdown.reduce((s, i) => s + i.value, 0) || 1;
+    return interactionBreakdown.map((i) => ({
+      ...i,
+      percentage: Math.round((i.value / interactionTotal) * 100),
+    }));
+  }, [totalLikes, totalComments]);
 
   // Performance by media type with sorting
   const performanceByType = useMemo(() => {
@@ -121,6 +120,15 @@ const Performance = () => {
     ];
     return items.sort((a, b) => summarySort === "desc" ? b.total - a.total : a.total - b.total);
   }, [totalLikes, totalComments, avgLikes, avgComments, media, summarySort]);
+
+  // Loading state AFTER all hooks
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
