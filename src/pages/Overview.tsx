@@ -430,7 +430,7 @@ export default function Overview() {
         </div>
 
         {/* Bottom Row: Day of Week + Engagement Breakdown + Top Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Performance By Day Of Week */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">

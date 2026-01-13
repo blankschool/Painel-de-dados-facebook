@@ -27,6 +27,17 @@ body {
   height: 100vh;
   z-index: 100;
   backdrop-filter: blur(12px);
+  transition: transform 0.3s ease;
+}
+
+/* Mobile: hide sidebar by default */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
 }
 .logo {
   display: flex;
@@ -143,6 +154,13 @@ body {
   padding: 0;
   background: transparent;
 }
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
 .header {
   background: hsl(var(--background) / 0.92);
   padding: 20px 32px;
@@ -155,6 +173,19 @@ body {
   top: 0;
   z-index: 50;
   backdrop-filter: blur(12px);
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    padding: 16px;
+    gap: 16px;
+  }
+  .header > div:last-child {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
 }
 .header-left {
   display: flex;
@@ -382,6 +413,13 @@ body {
   border: 1px solid hsl(var(--border));
   backdrop-filter: blur(12px);
 }
+
+@media (max-width: 768px) {
+  .chart-section {
+    padding: 16px;
+    border-radius: 16px;
+  }
+}
 .chart-header {
   display: flex;
   align-items: center;
@@ -498,6 +536,13 @@ body {
   grid-template-columns: 1fr 1fr 1fr;
   gap: 24px;
 }
+
+@media (max-width: 1024px) {
+  .bottom-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
 .card {
   background: hsl(var(--card) / 0.85);
   border-radius: 24px;
@@ -505,6 +550,13 @@ body {
   box-shadow: var(--shadow-card);
   border: 1px solid hsl(var(--border));
   backdrop-filter: blur(12px);
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 16px;
+    border-radius: 16px;
+  }
 }
 .card-title {
   font-family: var(--font-display);
@@ -640,7 +692,7 @@ body {
 }
 .top-content-header {
   display: grid;
-  grid-template-columns: 24px 60px 1fr;
+  grid-template-columns: 24px auto 1fr;
   gap: 12px;
   font-size: 11px;
   color: hsl(var(--muted-foreground));
@@ -649,9 +701,21 @@ body {
 }
 .top-content-item {
   display: grid;
-  grid-template-columns: 24px 60px 1fr;
+  grid-template-columns: 24px auto 1fr;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 480px) {
+  .top-content-header,
+  .top-content-item {
+    grid-template-columns: 20px auto 1fr;
+    gap: 8px;
+  }
+  .item-preview {
+    width: 40px;
+    height: 40px;
+  }
 }
 .item-rank {
   font-size: 13px;

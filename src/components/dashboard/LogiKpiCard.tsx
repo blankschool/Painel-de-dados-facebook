@@ -29,32 +29,34 @@ export function LogiKpiCard({
   return (
     <article
       className={cn(
-        "group relative rounded-2xl border border-border/50 bg-card/85 p-5 transition-all duration-200 backdrop-blur-sm",
+        "group relative rounded-xl md:rounded-2xl border border-border/50 bg-card/85 p-3 md:p-5 transition-all duration-200 backdrop-blur-sm",
         "animate-fade-in-up hover-lift",
         staggerClass,
         className
       )}
     >
       {/* Icon Container - Circular */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/80 text-foreground transition-transform duration-200 group-hover:scale-110">
-          {icon}
+      <div className="flex items-start justify-between mb-2 md:mb-4">
+        <div className="flex h-9 w-9 md:h-12 md:w-12 items-center justify-center rounded-full bg-accent/80 text-foreground transition-transform duration-200 group-hover:scale-110">
+          <span className="[&>svg]:h-4 [&>svg]:w-4 md:[&>svg]:h-5 md:[&>svg]:w-5">
+            {icon}
+          </span>
         </div>
         
         {/* Trend Badge */}
         {trend && (
           <div
             className={cn(
-              "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
+              "flex items-center gap-0.5 md:gap-1 rounded-full px-1.5 md:px-2.5 py-0.5 md:py-1 text-[10px] md:text-xs font-semibold",
               trend.isPositive
                 ? "bg-success/10 text-success"
                 : "bg-destructive/10 text-destructive"
             )}
           >
             {trend.isPositive ? (
-              <TrendingUp className="h-3 w-3" />
+              <TrendingUp className="h-2.5 w-2.5 md:h-3 md:w-3" />
             ) : (
-              <TrendingDown className="h-3 w-3" />
+              <TrendingDown className="h-2.5 w-2.5 md:h-3 md:w-3" />
             )}
             <span>
               {trend.isPositive ? '+' : ''}
@@ -68,21 +70,21 @@ export function LogiKpiCard({
       <div
         className={cn(
           "font-bold tracking-tight text-foreground transition-colors",
-          isLarge ? "text-4xl" : "text-3xl"
+          isLarge ? "text-2xl md:text-4xl" : "text-xl md:text-3xl"
         )}
       >
         {value}
       </div>
 
       {/* Label */}
-      <div className="mt-1.5 flex items-center gap-1.5">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+      <div className="mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5">
+        <span className="text-[9px] md:text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
           {label}
         </span>
         {tooltip && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+              <button className="text-muted-foreground/50 hover:text-muted-foreground transition-colors hidden md:inline-flex">
                 <HelpCircle className="h-3 w-3" />
               </button>
             </TooltipTrigger>

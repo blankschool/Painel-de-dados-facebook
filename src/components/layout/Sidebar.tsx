@@ -3,7 +3,12 @@ import { useTheme } from "next-themes";
 import blankLogo from "@/assets/blank-logo.png";
 import blankLogoDark from "@/assets/blank-logo-dark.png";
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const location = useLocation();
   const { resolvedTheme } = useTheme();
   const navItems = [{
@@ -51,13 +56,27 @@ export function Sidebar() {
     href: "/time",
     icon: "time"
   }];
-  return <aside className="sidebar">
+
+  const handleNavClick = () => {
+    // Close sidebar on mobile after navigation
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  return (
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="logo">
         <img src={resolvedTheme === "dark" ? blankLogoDark : blankLogo} alt="Blank" className="h-8 w-auto" />
       </div>
       <nav className="nav-menu">
         {navItems.map(item => (
-          <Link key={item.href} to={item.href} className={`nav-item ${location.pathname === item.href ? "active" : ""}`}>
+          <Link 
+            key={item.href} 
+            to={item.href} 
+            className={`nav-item ${location.pathname === item.href ? "active" : ""}`}
+            onClick={handleNavClick}
+          >
             {item.icon === "chart" && (
               <svg viewBox="0 0 24 24">
                 <path d="M3 3v18h18" />
@@ -135,6 +154,6 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
-      
-    </aside>;
+    </aside>
+  );
 }
