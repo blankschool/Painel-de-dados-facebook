@@ -1,5 +1,5 @@
 import type { DateRange } from "react-day-picker";
-import type { IgDashboardResponse } from "@/hooks/useDashboardData";
+import type { IgDashboardResponse, DailyInsightRow, ProfileSnapshot } from "@/hooks/useDashboardData";
 import type { FiltersState } from "@/contexts/FiltersContext";
 import type { IgMediaItem } from "@/utils/ig";
 import { getComputedNumber, getEngagement, getReach, getSaves, getShares, getViews } from "@/utils/ig";
@@ -16,6 +16,22 @@ type ExportSummary = {
   total_shares: number;
   avg_er: number | null;
   avg_reach: number | null;
+};
+
+type ApiMetadata = {
+  api_version: string;
+  token_type: string;
+  from_cache: boolean;
+  cache_age_hours: number | undefined;
+  snapshot_date: string;
+  duration_ms: number | undefined;
+  request_id: string | undefined;
+};
+
+type ConsolidatedMetrics = {
+  reach: number;
+  impressions: number;
+  profile_views: number;
 };
 
 export type ExportPayload = {
@@ -38,8 +54,20 @@ export type ExportPayload = {
   demographics: IgDashboardResponse["demographics"] | null | undefined;
   online_followers: IgDashboardResponse["online_followers"] | null | undefined;
   account_insights: Record<string, number> | undefined;
-  comparison_metrics: Record<string, unknown> | undefined;
+  previous_period_insights: Record<string, number> | undefined;
+  comparison_metrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> | undefined;
   messages: IgDashboardResponse["messages"] | null | undefined;
+  // Novos campos para exportação completa
+  daily_insights: DailyInsightRow[];
+  previous_daily_insights: DailyInsightRow[];
+  profile_snapshots: ProfileSnapshot[];
+  top_posts_by_score: IgMediaItem[];
+  top_posts_by_reach: IgMediaItem[];
+  top_reels_by_views: IgMediaItem[];
+  top_reels_by_score: IgMediaItem[];
+  media_type_distribution: Record<string, number> | undefined;
+  consolidated_metrics: ConsolidatedMetrics;
+  api_metadata: ApiMetadata;
 };
 
 function formatDateOnly(date: Date | undefined | null): string | null {
@@ -183,9 +211,33 @@ export function buildExportPayload(params: {
     stories_aggregate: data.stories_aggregate,
     demographics: data.demographics,
     online_followers: data.online_followers,
-    account_insights: (data as { account_insights?: Record<string, number> }).account_insights,
-    comparison_metrics: (data as { comparison_metrics?: Record<string, unknown> }).comparison_metrics,
+    account_insights: data.account_insights,
+    previous_period_insights: data.previous_period_insights,
+    comparison_metrics: data.comparison_metrics,
     messages: data.messages,
+    // Novos campos para exportação completa
+    daily_insights: data.daily_insights ?? [],
+    previous_daily_insights: data.previous_daily_insights ?? [],
+    profile_snapshots: data.profile_snapshots ?? [],
+    top_posts_by_score: data.top_posts_by_score ?? [],
+    top_posts_by_reach: data.top_posts_by_reach ?? [],
+    top_reels_by_views: data.top_reels_by_views ?? [],
+    top_reels_by_score: data.top_reels_by_score ?? [],
+    media_type_distribution: data.media_type_distribution,
+    consolidated_metrics: {
+      reach: data.consolidated_reach ?? 0,
+      impressions: data.consolidated_impressions ?? 0,
+      profile_views: data.consolidated_profile_views ?? 0,
+    },
+    api_metadata: {
+      api_version: data.api_version ?? 'v24.0',
+      token_type: data.token_type ?? 'unknown',
+      from_cache: data.from_cache ?? false,
+      cache_age_hours: data.cache_age_hours,
+      snapshot_date: data.snapshot_date ?? '',
+      duration_ms: data.duration_ms,
+      request_id: data.request_id,
+    },
   };
 }
 
@@ -315,6 +367,7 @@ export function exportCsvBundle(payload: ExportPayload, baseName: string) {
       }))
     : [];
 
+  // Download existing CSVs
   downloadCsv(`${baseName}_meta.csv`, metaRows);
   downloadCsv(`${baseName}_summary.csv`, summaryRows);
   if (profileRows.length) downloadCsv(`${baseName}_profile.csv`, profileRows);
@@ -323,6 +376,86 @@ export function exportCsvBundle(payload: ExportPayload, baseName: string) {
   if (storiesRows.length) downloadCsv(`${baseName}_stories.csv`, storiesRows);
   if (demographicsRows.length) downloadCsv(`${baseName}_demographics.csv`, demographicsRows);
   if (onlineRows.length) downloadCsv(`${baseName}_online_followers.csv`, onlineRows);
+
+  // NEW: Daily Insights
+  if (payload.daily_insights.length) {
+    downloadCsv(`${baseName}_daily_insights.csv`, payload.daily_insights as Record<string, unknown>[]);
+  }
+
+  // NEW: Previous Daily Insights
+  if (payload.previous_daily_insights.length) {
+    downloadCsv(`${baseName}_previous_daily_insights.csv`, payload.previous_daily_insights as Record<string, unknown>[]);
+  }
+
+  // NEW: Profile Snapshots (followers over time)
+  if (payload.profile_snapshots.length) {
+    downloadCsv(`${baseName}_profile_snapshots.csv`, payload.profile_snapshots as Record<string, unknown>[]);
+  }
+
+  // NEW: Top Posts by Score
+  if (payload.top_posts_by_score.length) {
+    downloadCsv(`${baseName}_top_posts_by_score.csv`, payload.top_posts_by_score.map((item) => flattenObject(item)));
+  }
+
+  // NEW: Top Posts by Reach
+  if (payload.top_posts_by_reach.length) {
+    downloadCsv(`${baseName}_top_posts_by_reach.csv`, payload.top_posts_by_reach.map((item) => flattenObject(item)));
+  }
+
+  // NEW: Top Reels by Views
+  if (payload.top_reels_by_views.length) {
+    downloadCsv(`${baseName}_top_reels_by_views.csv`, payload.top_reels_by_views.map((item) => flattenObject(item)));
+  }
+
+  // NEW: Top Reels by Score
+  if (payload.top_reels_by_score.length) {
+    downloadCsv(`${baseName}_top_reels_by_score.csv`, payload.top_reels_by_score.map((item) => flattenObject(item)));
+  }
+
+  // NEW: Media Type Distribution
+  if (payload.media_type_distribution) {
+    const distRows = Object.entries(payload.media_type_distribution).map(([type, count]) => ({
+      media_type: type,
+      count,
+    }));
+    downloadCsv(`${baseName}_media_type_distribution.csv`, distRows);
+  }
+
+  // NEW: Consolidated Metrics
+  downloadCsv(`${baseName}_consolidated_metrics.csv`, [payload.consolidated_metrics]);
+
+  // NEW: Comparison Metrics
+  if (payload.comparison_metrics && Object.keys(payload.comparison_metrics).length) {
+    const compRows = Object.entries(payload.comparison_metrics).map(([metric, values]) => ({
+      metric,
+      current: values.current,
+      previous: values.previous,
+      change: values.change,
+      change_percent: values.changePercent,
+    }));
+    downloadCsv(`${baseName}_comparison_metrics.csv`, compRows);
+  }
+
+  // NEW: Account Insights
+  if (payload.account_insights && Object.keys(payload.account_insights).length) {
+    const insightRows = Object.entries(payload.account_insights).map(([metric, value]) => ({
+      metric,
+      value,
+    }));
+    downloadCsv(`${baseName}_account_insights.csv`, insightRows);
+  }
+
+  // NEW: Previous Period Insights
+  if (payload.previous_period_insights && Object.keys(payload.previous_period_insights).length) {
+    const prevInsightRows = Object.entries(payload.previous_period_insights).map(([metric, value]) => ({
+      metric,
+      value,
+    }));
+    downloadCsv(`${baseName}_previous_period_insights.csv`, prevInsightRows);
+  }
+
+  // NEW: API Metadata
+  downloadCsv(`${baseName}_api_metadata.csv`, [payload.api_metadata]);
 }
 
 function escapeHtml(value: string): string {
@@ -345,6 +478,7 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
 
   const profileName = payload.profile?.name || payload.profile?.username || "Instagram";
   const summary = payload.summary;
+  const consolidated = payload.consolidated_metrics;
 
   const topByReach = [...payload.media_filtered]
     .sort((a, b) => (getReach(b) ?? -1) - (getReach(a) ?? -1))
@@ -371,6 +505,50 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
       })
       .join("");
 
+  // Render comparison metrics
+  const renderComparisonRows = () => {
+    if (!payload.comparison_metrics) return "";
+    return Object.entries(payload.comparison_metrics)
+      .map(([metric, values]) => `
+        <tr>
+          <td>${escapeHtml(metric)}</td>
+          <td>${values.current.toLocaleString()}</td>
+          <td>${values.previous.toLocaleString()}</td>
+          <td style="color: ${values.change >= 0 ? '#16a34a' : '#dc2626'}">${values.change >= 0 ? '+' : ''}${values.change.toLocaleString()}</td>
+          <td style="color: ${values.changePercent >= 0 ? '#16a34a' : '#dc2626'}">${values.changePercent >= 0 ? '+' : ''}${values.changePercent.toFixed(1)}%</td>
+        </tr>
+      `)
+      .join("");
+  };
+
+  // Render media type distribution
+  const renderMediaTypeDistribution = () => {
+    if (!payload.media_type_distribution) return "";
+    return Object.entries(payload.media_type_distribution)
+      .map(([type, count]) => `
+        <div class="card">
+          <div class="label">${escapeHtml(type)}</div>
+          <div class="value">${count}</div>
+        </div>
+      `)
+      .join("");
+  };
+
+  // Render top reels
+  const renderTopReels = (reels: IgMediaItem[]) =>
+    reels.slice(0, 5).map((item) => {
+      const caption = item.caption ? escapeHtml(item.caption.slice(0, 60)) : "";
+      return `
+        <tr>
+          <td>${item.timestamp ? escapeHtml(item.timestamp.slice(0, 10)) : ""}</td>
+          <td>${getViews(item)?.toLocaleString() ?? 0}</td>
+          <td>${getReach(item)?.toLocaleString() ?? 0}</td>
+          <td>${getEngagement(item).toLocaleString()}</td>
+          <td>${caption}</td>
+        </tr>
+      `;
+    }).join("");
+
   win.document.open();
   win.document.write(`
     <html>
@@ -382,13 +560,15 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
           h2 { margin: 24px 0 8px; font-size: 16px; }
           .meta { color: #555; font-size: 12px; margin-bottom: 16px; }
           .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+          .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
           .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
           .label { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
           .value { font-size: 18px; font-weight: 600; margin-top: 4px; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
           th, td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
           th { background: #f9fafb; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
           .filters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .page-break { page-break-before: always; margin-top: 32px; }
         </style>
       </head>
       <body>
@@ -416,21 +596,53 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
           </div>
         </div>
 
-        <h2>Resumo</h2>
+        <h2>Métricas Consolidadas da Conta</h2>
         <div class="grid">
-          <div class="card"><div class="label">Posts</div><div class="value">${summary.total_posts}</div></div>
-          <div class="card"><div class="label">Alcance</div><div class="value">${summary.total_reach}</div></div>
-          <div class="card"><div class="label">Visualizações</div><div class="value">${summary.total_views}</div></div>
-          <div class="card"><div class="label">Engajamento</div><div class="value">${summary.total_engagement}</div></div>
-          <div class="card"><div class="label">Curtidas</div><div class="value">${summary.total_likes}</div></div>
-          <div class="card"><div class="label">Comentários</div><div class="value">${summary.total_comments}</div></div>
-          <div class="card"><div class="label">Salvamentos</div><div class="value">${summary.total_saves}</div></div>
-          <div class="card"><div class="label">Compartilhamentos</div><div class="value">${summary.total_shares}</div></div>
-          <div class="card"><div class="label">ER Médio</div><div class="value">${summary.avg_er?.toFixed(2) ?? "--"}%</div></div>
-          <div class="card"><div class="label">Alcance Médio</div><div class="value">${summary.avg_reach ?? "--"}</div></div>
+          <div class="card"><div class="label">Alcance Total</div><div class="value">${consolidated.reach.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Impressões</div><div class="value">${consolidated.impressions.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Visitas ao Perfil</div><div class="value">${consolidated.profile_views.toLocaleString()}</div></div>
         </div>
 
-        <h2>Top Posts por Alcance</h2>
+        <h2>Resumo de Posts</h2>
+        <div class="grid">
+          <div class="card"><div class="label">Posts</div><div class="value">${summary.total_posts}</div></div>
+          <div class="card"><div class="label">Alcance</div><div class="value">${summary.total_reach.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Visualizações</div><div class="value">${summary.total_views.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Engajamento</div><div class="value">${summary.total_engagement.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Curtidas</div><div class="value">${summary.total_likes.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Comentários</div><div class="value">${summary.total_comments.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Salvamentos</div><div class="value">${summary.total_saves.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Compartilhamentos</div><div class="value">${summary.total_shares.toLocaleString()}</div></div>
+          <div class="card"><div class="label">ER Médio</div><div class="value">${summary.avg_er?.toFixed(2) ?? "--"}%</div></div>
+          <div class="card"><div class="label">Alcance Médio</div><div class="value">${summary.avg_reach?.toLocaleString() ?? "--"}</div></div>
+        </div>
+
+        ${payload.media_type_distribution ? `
+        <h2>Distribuição por Tipo de Mídia</h2>
+        <div class="grid-4">
+          ${renderMediaTypeDistribution()}
+        </div>
+        ` : ''}
+
+        ${payload.comparison_metrics && Object.keys(payload.comparison_metrics).length ? `
+        <h2>Comparação com Período Anterior</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th>Atual</th>
+              <th>Anterior</th>
+              <th>Variação</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderComparisonRows()}
+          </tbody>
+        </table>
+        ` : ''}
+
+        <h2 class="page-break">Top Posts por Alcance</h2>
         <table>
           <thead>
             <tr>
@@ -463,6 +675,30 @@ export function exportPdf(payload: ExportPayload, baseName: string) {
             ${renderTopRows(topByEngagement)}
           </tbody>
         </table>
+
+        ${payload.top_reels_by_views.length ? `
+        <h2>Top Reels por Views</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Views</th>
+              <th>Alcance</th>
+              <th>Engajamento</th>
+              <th>Legenda</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderTopReels(payload.top_reels_by_views)}
+          </tbody>
+        </table>
+        ` : ''}
+
+        <div class="meta" style="margin-top: 32px; font-size: 10px; color: #9ca3af;">
+          API: ${escapeHtml(payload.api_metadata.api_version)} · Token: ${escapeHtml(payload.api_metadata.token_type)} · 
+          Cache: ${payload.api_metadata.from_cache ? 'Sim' : 'Não'}${payload.api_metadata.cache_age_hours ? ` (${payload.api_metadata.cache_age_hours.toFixed(1)}h)` : ''} · 
+          Request ID: ${escapeHtml(payload.api_metadata.request_id || '—')}
+        </div>
       </body>
     </html>
   `);
