@@ -192,7 +192,7 @@ const Posts = () => {
       {/* Summary + Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          Análise de {posts.length.toLocaleString()} posts{allPosts.length !== posts.length ? ` (filtrado de ${allPosts.length.toLocaleString()})` : ''}. Rankings usam Score (ponderado) e métricas normalizadas quando disponíveis.
+          Análise de {posts.length.toLocaleString()} posts{allPosts.length !== posts.length ? ` (filtrado de ${allPosts.length.toLocaleString()})` : ''}. Rankings usam Interações (curtidas + comentários + salvamentos + compartilhamentos) e métricas normalizadas quando disponíveis.
         </p>
         <div className="flex items-center gap-3">
           {lastUpdated && (
@@ -265,13 +265,13 @@ const Posts = () => {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              label="Score total"
+              label="Interações totais"
               value={totalScore > 0 ? totalScore.toLocaleString() : '--'}
               icon={<TrendingUp className="w-4 h-4" />}
-              tooltip="Score ponderado: likes×1 + comments×2 + saves×3 + shares×4."
+              tooltip="Interações: curtidas + comentários + salvamentos + compartilhamentos."
             />
             <MetricCard
-              label="Score médio/post"
+              label="Interações médias/post"
               value={posts.length > 0 ? Math.round(totalScore / posts.length).toLocaleString() : '--'}
               icon={<TrendingUp className="w-4 h-4" />}
             />
@@ -335,7 +335,7 @@ const Posts = () => {
             </ChartCard>
 
             {/* Top 10 Performance */}
-            <ChartCard title="Top 10 Posts" subtitle={`Ordenado por ${sortBy === 'score' ? 'Score' : sortBy}`}>
+            <ChartCard title="Top 10 Posts" subtitle={`Ordenado por ${sortBy === 'score' ? 'Interações' : sortBy}`}>
               <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={top10}>
@@ -354,7 +354,7 @@ const Posts = () => {
                       formatter={(value: number) => [value.toLocaleString('pt-BR'), '']}
                       cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }}
                     />
-                    <Bar dataKey="score" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} name="Score" />
+                    <Bar dataKey="score" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} name="Interações" />
                     <Bar dataKey="likes" fill="hsl(var(--muted-foreground))" radius={[2, 2, 0, 0]} name="Curtidas" />
                     <Bar dataKey="saves" fill="hsl(var(--foreground) / 0.4)" radius={[2, 2, 0, 0]} name="Salvos" />
                   </BarChart>
@@ -368,7 +368,7 @@ const Posts = () => {
             <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)} className="w-full">
               <TabsList className="mb-4">
                 <TabsTrigger value="score" className="gap-1">
-                  <TrendingUp className="w-3 h-3" /> Score
+                  <TrendingUp className="w-3 h-3" /> Interações
                 </TabsTrigger>
                 <TabsTrigger value="engagement" className="gap-1">
                   <TrendingUp className="w-3 h-3" /> Engajamento
@@ -405,7 +405,7 @@ const Posts = () => {
                       <th>Legenda</th>
                       <th>Tipo</th>
                       <th>Data</th>
-                      <th>Score</th>
+                      <th>Interações</th>
                       <th>ER</th>
                       <th>Curtidas</th>
                       <th>Comentários</th>

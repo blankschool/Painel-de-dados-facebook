@@ -3,6 +3,12 @@
  * Aligned with Instagram Graph API standards
  */
 
+import { addDays, startOfDay } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
+import type { IgMediaItem } from '@/utils/ig';
+import { getEngagement, getReach, getSaves, getShares, getViews } from '@/utils/ig';
+import { getDateKeyInTimezone } from '@/utils/dateFormat';
+
 /**
  * Calculate percentage change in followers
  */
@@ -70,10 +76,7 @@ export function findBestTimeFromEngagement(
   for (const post of posts) {
     if (!post.timestamp) continue;
     const hour = new Date(post.timestamp).getHours();
-    const engagement =
-      (post.like_count ?? 0) +
-      (post.comments_count ?? 0) +
-      (post.insights?.saved ?? 0);
+    const engagement = (post.like_count ?? 0) + (post.comments_count ?? 0);
     const er = (engagement / followersCount) * 100;
 
     if (!hourBuckets[hour]) {
@@ -182,10 +185,7 @@ export function calculateEngagementByMediaType(
 
   for (const item of media) {
     const type = item.media_type || 'UNKNOWN';
-    const engagement =
-      (item.like_count ?? 0) +
-      (item.comments_count ?? 0) +
-      (item.insights?.saved ?? 0);
+    const engagement = (item.like_count ?? 0) + (item.comments_count ?? 0);
     const er = followersCount > 0 ? (engagement / followersCount) * 100 : 0;
 
     if (!buckets[type]) {
@@ -253,8 +253,7 @@ export function formatTime(hour: number): string {
 }
 
 /**
- * Get the best performing post for each day
- * This aligns with Minter.io's approach of showing 1 post per day
+ * Get the best performing post for each day (optional helper)
  */
 export function getBestPostPerDay<
   T extends {
@@ -309,14 +308,10 @@ export function getBestPostPerDay<
       if (metric === 'engagement') {
         aValue =
           (a.like_count ?? 0) +
-          (a.comments_count ?? 0) +
-          (a.insights?.saved ?? 0) +
-          (a.insights?.shares ?? 0);
+          (a.comments_count ?? 0);
         bValue =
           (b.like_count ?? 0) +
-          (b.comments_count ?? 0) +
-          (b.insights?.saved ?? 0) +
-          (b.insights?.shares ?? 0);
+          (b.comments_count ?? 0);
       } else if (metric === 'reach') {
         aValue =
           (a.computed?.reach as number) ??
@@ -353,6 +348,92 @@ export function getBestPostPerDay<
     const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
     return bTime - aTime;
   });
+}
+
+export type PostDailyMetricsRow = {
+  date: string;
+  posts: number;
+  likes: number;
+  comments: number;
+  saves: number;
+  shares: number;
+  reach: number;
+  views: number;
+  engagement: number;
+};
+
+export function buildPostDailyMetrics(
+  posts: IgMediaItem[],
+  dateRange: DateRange | undefined,
+  timezone: string = 'America/Sao_Paulo',
+): PostDailyMetricsRow[] {
+  if (!posts.length && !dateRange?.from) return [];
+
+  const buckets = new Map<string, PostDailyMetricsRow>();
+  let minDate: Date | null = null;
+  let maxDate: Date | null = null;
+
+  for (const post of posts) {
+    if (!post.timestamp) continue;
+    const timestamp = new Date(post.timestamp);
+    if (Number.isNaN(timestamp.getTime())) continue;
+
+    if (!minDate || timestamp < minDate) minDate = timestamp;
+    if (!maxDate || timestamp > maxDate) maxDate = timestamp;
+
+    const key = getDateKeyInTimezone(timestamp, timezone);
+    const row = buckets.get(key) ?? {
+      date: key,
+      posts: 0,
+      likes: 0,
+      comments: 0,
+      saves: 0,
+      shares: 0,
+      reach: 0,
+      views: 0,
+      engagement: 0,
+    };
+
+    row.posts += 1;
+    row.likes += post.like_count ?? 0;
+    row.comments += post.comments_count ?? 0;
+    row.saves += getSaves(post) ?? 0;
+    row.shares += getShares(post) ?? 0;
+    row.reach += getReach(post) ?? 0;
+    row.views += getViews(post) ?? 0;
+    row.engagement += getEngagement(post);
+
+    buckets.set(key, row);
+  }
+
+  const rangeStart = dateRange?.from ?? minDate;
+  const rangeEnd = dateRange?.to ?? maxDate;
+  if (!rangeStart || !rangeEnd) return Array.from(buckets.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  let cursor = startOfDay(rangeStart);
+  const end = startOfDay(rangeEnd);
+
+  while (cursor <= end) {
+    const midday = new Date(cursor);
+    midday.setHours(12, 0, 0, 0);
+    const key = getDateKeyInTimezone(midday, timezone);
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        date: key,
+        posts: 0,
+        likes: 0,
+        comments: 0,
+        saves: 0,
+        shares: 0,
+        reach: 0,
+        views: 0,
+        engagement: 0,
+      });
+    }
+    cursor = addDays(cursor, 1);
+  }
+
+  return Array.from(buckets.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**

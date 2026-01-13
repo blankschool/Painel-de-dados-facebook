@@ -80,13 +80,19 @@ export function getViews(item: IgMediaItem): number | null {
 export function getEngagement(item: IgMediaItem): number {
   const likes = item.like_count ?? 0;
   const comments = item.comments_count ?? 0;
-  const saves = getSaves(item) ?? 0;
-  const shares = getShares(item) ?? 0;
-  return likes + comments + saves + shares;
+  return likes + comments;
 }
 
 export function getScore(item: IgMediaItem): number {
   return getComputedNumber(item, "score") ?? 0;
+}
+
+export function getInteractions(item: IgMediaItem): number {
+  const likes = item.like_count ?? 0;
+  const comments = item.comments_count ?? 0;
+  const saves = getSaves(item) ?? 0;
+  const shares = getShares(item) ?? 0;
+  return likes + comments + saves + shares;
 }
 
 export function filterMediaByDateRange(media: IgMediaItem[], range: DateRange | undefined): IgMediaItem[] {

@@ -460,15 +460,17 @@ function computeMediaMetrics(
   const views = viewsPick.value;
   const shares = sharesPick.value;
 
-  const engagement = likes + comments + (saves ?? 0) + (shares ?? 0);
-  const score = likes * 1 + comments * 2 + (saves ?? 0) * 3 + (shares ?? 0) * 4;
+  const engagement = likes + comments;
+  const interactions = engagement + (saves ?? 0) + (shares ?? 0);
+  const totalInteractions = typeof totalInteractionsPick.value === "number" ? totalInteractionsPick.value : interactions;
+  const score = interactions;
 
   const followers = typeof followersCount === "number" && followersCount > 0 ? followersCount : null;
 
   const er = followers ? (engagement / followers) * 100 : null;
   const reachRate = followers && typeof reach === "number" ? (reach / followers) * 100 : null;
   const viewsRate = typeof reach === "number" && reach > 0 && typeof views === "number" ? (views / reach) * 100 : null;
-  const interactionsPer1000Reach = typeof reach === "number" && reach > 0 ? (engagement / reach) * 1000 : null;
+  const interactionsPer1000Reach = typeof reach === "number" && reach > 0 ? (totalInteractions / reach) * 1000 : null;
 
   const expectsViews = true;
 
@@ -490,8 +492,7 @@ function computeMediaMetrics(
   }
   if (typeof views === "number") normalizedInsights.views = views;
   if (typeof shares === "number") normalizedInsights.shares = shares;
-  if (typeof totalInteractionsPick.value === "number")
-    normalizedInsights.total_interactions = totalInteractionsPick.value;
+  if (typeof totalInteractions === "number") normalizedInsights.total_interactions = totalInteractions;
 
   const computed: ComputedMetrics = {
     likes,
@@ -501,7 +502,7 @@ function computeMediaMetrics(
     reach,
     views,
     views_source: viewsPick.source,
-    total_interactions: totalInteractionsPick.value,
+    total_interactions: totalInteractions,
     engagement,
     score,
     er,

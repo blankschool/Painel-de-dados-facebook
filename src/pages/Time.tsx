@@ -3,6 +3,7 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatPercent, getComputedNumber, getReach, type IgMediaItem } from "@/utils/ig";
+import { getWeekdayInTimezone } from "@/utils/dateFormat";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
@@ -15,6 +16,16 @@ function formatCompact(value: number | null): string {
   if (value >= 1000000) return `${(value / 1000000).toFixed(1).replace(".", ",")} mi`;
   if (value >= 1000) return `${(value / 1000).toFixed(1).replace(".", ",")} mil`;
   return value.toLocaleString();
+}
+
+function getMonthLabelInTimezone(date: Date | string, timezone: string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, month: "short", year: "numeric" }).format(d);
+  } catch {
+    return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+  }
 }
 
 export default function Time() {
@@ -48,11 +59,11 @@ export default function Time() {
     const buckets = Array.from({ length: 7 }, () => ({ reach: 0, count: 0, posts: [] as IgMediaItem[] }));
     for (const item of media) {
       if (!item.timestamp) continue;
-      const dt = new Date(item.timestamp);
+      const dayIndex = getWeekdayInTimezone(item.timestamp, timezone);
       const reach = getReach(item) ?? 0;
-      buckets[dt.getDay()].reach += reach;
-      buckets[dt.getDay()].count += 1;
-      buckets[dt.getDay()].posts.push(item);
+      buckets[dayIndex].reach += reach;
+      buckets[dayIndex].count += 1;
+      buckets[dayIndex].posts.push(item);
     }
     const max = Math.max(...buckets.map((b) => b.reach), 1);
     const rawData = buckets.map((bucket, idx) => ({
@@ -75,8 +86,8 @@ export default function Time() {
     const buckets: Record<string, { reach: number; likes: number; comments: number; ers: number[]; posts: IgMediaItem[] }> = {};
     for (const item of media) {
       if (!item.timestamp) continue;
-      const d = new Date(item.timestamp);
-      const key = `${d.toLocaleDateString("pt-BR", { month: "short" })}. de ${d.getFullYear()}`;
+      const key = getMonthLabelInTimezone(item.timestamp, timezone);
+      if (!key) continue;
       if (!buckets[key]) buckets[key] = { reach: 0, likes: 0, comments: 0, ers: [], posts: [] };
       buckets[key].reach += getReach(item) ?? 0;
       buckets[key].likes += item.like_count ?? 0;

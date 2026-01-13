@@ -263,11 +263,7 @@ export function buildEngagementHeatmap(
     const hour = parseInt(hourPart, 10);
     const key = `${dayIndex}_${hour}`;
 
-    const engagement = 
-      (post.like_count || 0) + 
-      (post.comments_count || 0) + 
-      (post.insights?.saved || 0) + 
-      (post.insights?.shares || 0);
+    const engagement = (post.like_count || 0) + (post.comments_count || 0);
 
     heatmapData[key] = (heatmapData[key] || 0) + engagement;
     countData[key] = (countData[key] || 0) + 1;

@@ -3,7 +3,8 @@ import type { IgDashboardResponse, DailyInsightRow, ProfileSnapshot } from "@/ho
 import type { FiltersState } from "@/contexts/FiltersContext";
 import type { IgMediaItem } from "@/utils/ig";
 import { getComputedNumber, getEngagement, getReach, getSaves, getShares, getViews } from "@/utils/ig";
-import { getBestPostPerDay } from "@/lib/dashboardHelpers";
+import { buildPostDailyMetrics, getBestPostPerDay, type PostDailyMetricsRow } from "@/lib/dashboardHelpers";
+import { getDateKeyInTimezone, getWeekdayInTimezone } from "@/utils/dateFormat";
 
 type ExportSummary = {
   total_posts: number;
@@ -68,6 +69,7 @@ export type ExportPayload = {
   media_type_distribution: Record<string, number> | undefined;
   consolidated_metrics: ConsolidatedMetrics;
   api_metadata: ApiMetadata;
+  posts_daily_metrics: PostDailyMetricsRow[];
 };
 
 function formatDateOnly(date: Date | undefined | null): string | null {
@@ -92,18 +94,19 @@ export function filterMediaForExport(
   media: IgMediaItem[],
   filters: FiltersState,
   dateRange: DateRange | undefined,
+  timezone: string,
 ): IgMediaItem[] {
   if (!media || media.length === 0) return [];
   let filtered = [...media];
 
   if (dateRange?.from || dateRange?.to) {
-    const startDate = dateRange.from ? new Date(dateRange.from) : null;
-    const endDate = dateRange.to ? new Date(dateRange.to) : null;
+    const startKey = dateRange.from ? getDateKeyInTimezone(dateRange.from, timezone) : null;
+    const endKey = dateRange.to ? getDateKeyInTimezone(dateRange.to, timezone) : null;
     filtered = filtered.filter((item) => {
       if (!item.timestamp) return false;
-      const itemDate = new Date(item.timestamp);
-      if (startDate && itemDate < startDate) return false;
-      if (endDate && itemDate > endDate) return false;
+      const itemKey = getDateKeyInTimezone(item.timestamp, timezone);
+      if (startKey && itemKey < startKey) return false;
+      if (endKey && itemKey > endKey) return false;
       return true;
     });
   }
@@ -111,8 +114,8 @@ export function filterMediaForExport(
   if (filters.dayFilter !== "all") {
     filtered = filtered.filter((item) => {
       if (!item.timestamp) return false;
-      const itemDate = new Date(item.timestamp);
-      return matchesDayFilter(itemDate.getDay(), filters.dayFilter);
+      const dayIndex = getWeekdayInTimezone(item.timestamp, timezone);
+      return matchesDayFilter(dayIndex, filters.dayFilter);
     });
   }
 
@@ -162,9 +165,10 @@ export function buildExportPayload(params: {
 }): ExportPayload {
   const { data, filters, dateRange, timezone } = params;
   const media = data.media ?? [];
-  const mediaFilteredRaw = filterMediaForExport(media, filters, dateRange);
+  const mediaFilteredRaw = filterMediaForExport(media, filters, dateRange, timezone);
   const mediaBestPerDay = getBestPostPerDay(mediaFilteredRaw, "engagement", timezone);
-  const mediaFiltered = mediaBestPerDay;
+  const mediaFiltered = filters.dayFilter === "best" ? mediaBestPerDay : mediaFilteredRaw;
+  const postsDailyMetrics = buildPostDailyMetrics(mediaFiltered, dateRange, timezone);
 
   const totalLikes = mediaFiltered.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = mediaFiltered.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
@@ -239,6 +243,7 @@ export function buildExportPayload(params: {
       duration_ms: data.duration_ms,
       request_id: data.request_id,
     },
+    posts_daily_metrics: postsDailyMetrics,
   };
 }
 
@@ -346,6 +351,7 @@ export function exportCsvBundle(payload: ExportPayload, baseName: string) {
   const profileRows = payload.profile ? [payload.profile] : [];
   const mediaRows = payload.media_filtered.map((item) => flattenObject(item));
   const bestPerDayRows = payload.media_best_per_day.map((item) => flattenObject(item));
+  const postsDailyRows = payload.posts_daily_metrics.map((row) => ({ ...row }));
 
   const storiesRows = Array.isArray(payload.stories)
     ? payload.stories.map((story) => flattenObject(story as Record<string, unknown>))
@@ -374,6 +380,7 @@ export function exportCsvBundle(payload: ExportPayload, baseName: string) {
   if (profileRows.length) downloadCsv(`${baseName}_profile.csv`, profileRows);
   if (mediaRows.length) downloadCsv(`${baseName}_media.csv`, mediaRows);
   if (bestPerDayRows.length) downloadCsv(`${baseName}_media_best_per_day.csv`, bestPerDayRows);
+  if (postsDailyRows.length) downloadCsv(`${baseName}_posts_daily_metrics.csv`, postsDailyRows);
   if (storiesRows.length) downloadCsv(`${baseName}_stories.csv`, storiesRows);
   if (demographicsRows.length) downloadCsv(`${baseName}_demographics.csv`, demographicsRows);
   if (onlineRows.length) downloadCsv(`${baseName}_online_followers.csv`, onlineRows);

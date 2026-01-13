@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useFilters, type DayFilter } from '@/contexts/FiltersContext';
 import type { IgMediaItem } from '@/utils/ig';
 import { getBestPostPerDay } from '@/lib/dashboardHelpers';
+import { getDateKeyInTimezone, getWeekdayInTimezone } from '@/utils/dateFormat';
 
 // Check if day matches filter
 function matchesDayFilter(dayOfWeek: number, filter: DayFilter): boolean {
@@ -39,26 +40,30 @@ export function useFilteredMedia(
     const dateRange = getDateRangeFromPreset();
     const startDate = dateRange.from!;
     const endDate = dateRange.to!;
+    const startKey = getDateKeyInTimezone(startDate, timezone);
+    const endKey = getDateKeyInTimezone(endDate, timezone);
 
     console.log(`[useFilteredMedia] Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
     // Filter by date range
     filtered = filtered.filter((item) => {
       if (!item.timestamp) return false;
-      const itemDate = new Date(item.timestamp);
-      return itemDate >= startDate && itemDate <= endDate;
+      const itemKey = getDateKeyInTimezone(item.timestamp, timezone);
+      if (startKey && itemKey < startKey) return false;
+      if (endKey && itemKey > endKey) return false;
+      return true;
     });
 
     console.log(`[useFilteredMedia] After date filter: ${filtered.length} items`);
 
-    const useBestPerDay = options.bestPerDay ?? true;
+    const useBestPerDay = options.bestPerDay ?? filters.dayFilter === 'best';
 
     // Filter by day of week (skip when using best-per-day mode)
     if (filters.dayFilter !== 'all' && filters.dayFilter !== 'best') {
       filtered = filtered.filter((item) => {
         if (!item.timestamp) return false;
-        const itemDate = new Date(item.timestamp);
-        return matchesDayFilter(itemDate.getDay(), filters.dayFilter);
+        const dayIndex = getWeekdayInTimezone(item.timestamp, timezone);
+        return matchesDayFilter(dayIndex, filters.dayFilter);
       });
       console.log(`[useFilteredMedia] After day filter: ${filtered.length} items`);
     }

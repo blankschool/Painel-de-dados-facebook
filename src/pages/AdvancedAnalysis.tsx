@@ -22,6 +22,7 @@ import {
   isVideoNonReel,
   type IgMediaItem,
 } from "@/utils/ig";
+import { getHourInTimezone, getWeekdayInTimezone } from "@/utils/dateFormat";
 
 type MediaFilter = "all" | "reels" | "video" | "image" | "carousel";
 type OrderBy = "score" | "views" | "reach" | "er" | "interactions_per_1000_reach";
@@ -169,9 +170,8 @@ export default function AdvancedAnalysis() {
       if (!item.timestamp) continue;
       if (heatMetric === "views" && !isReel(item)) continue;
 
-      const dt = new Date(item.timestamp);
-      const day = dt.getDay();
-      const hour = dt.getHours();
+      const day = getWeekdayInTimezone(item.timestamp, timezone);
+      const hour = getHourInTimezone(item.timestamp, timezone);
       const key = `${day}-${hour}`;
 
       const prev = buckets.get(key) ?? { sum: 0, count: 0 };
@@ -199,8 +199,9 @@ export default function AdvancedAnalysis() {
     const scoreBuckets = new Map<string, { sum: number; count: number }>();
     for (const item of sorted) {
       if (!item.timestamp) continue;
-      const dt = new Date(item.timestamp);
-      const key = `${dt.getDay()}-${dt.getHours()}`;
+      const day = getWeekdayInTimezone(item.timestamp, timezone);
+      const hour = getHourInTimezone(item.timestamp, timezone);
+      const key = `${day}-${hour}`;
       const prev = scoreBuckets.get(key) ?? { sum: 0, count: 0 };
       prev.sum += getScore(item);
       prev.count += 1;
@@ -293,7 +294,7 @@ export default function AdvancedAnalysis() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Análise Avançada</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ranking completo com filtros e heatmap baseado em score. Export CSV respeita os filtros.
+            Ranking completo com filtros e heatmap baseado em interações. Export CSV respeita os filtros.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -306,8 +307,8 @@ export default function AdvancedAnalysis() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Itens no período" value={sorted.length.toLocaleString()} />
-        <MetricCard label="Score total" value={totals.totalScore > 0 ? totals.totalScore.toLocaleString() : "--"} />
-        <MetricCard label="ER médio" value={formatPercent(totals.avgEr)} tooltip="Engagement ÷ seguidores × 100 (quando seguidores disponível)." />
+        <MetricCard label="Interações totais" value={totals.totalScore > 0 ? totals.totalScore.toLocaleString() : "--"} />
+        <MetricCard label="ER médio" value={formatPercent(totals.avgEr)} tooltip="Engajamento ÷ seguidores × 100 (quando seguidores disponível)." />
         <MetricCard label="Interações / 1.000 alcance" value={totals.avgInteractionsPer1000 === null ? "--" : Math.round(totals.avgInteractionsPer1000).toLocaleString()} />
       </div>
 
@@ -334,7 +335,7 @@ export default function AdvancedAnalysis() {
                 <SelectValue placeholder="Ordenação" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="score">Score</SelectItem>
+                <SelectItem value="score">Interações</SelectItem>
                 <SelectItem value="views">Views</SelectItem>
                 <SelectItem value="reach">Reach</SelectItem>
                 <SelectItem value="er">ER</SelectItem>
@@ -352,7 +353,7 @@ export default function AdvancedAnalysis() {
                 <th>Preview</th>
                 <th>Tipo</th>
                 <th>Data</th>
-                <th>Score</th>
+                <th>Interações</th>
                 <th>ER</th>
                 <th>Likes</th>
                 <th>Comments</th>
@@ -410,10 +411,10 @@ export default function AdvancedAnalysis() {
           title="Heatmap dia x hora"
           subtitle={
             heatMetric === "score"
-              ? "Score médio"
+              ? "Interações médias"
               : heatMetric === "views"
                 ? "Views médio (apenas reels)"
-                : "Engagement médio"
+                : "Engajamento médio"
           }
           actions={
             <Select value={heatMetric} onValueChange={(v) => setHeatMetric(v as HeatMetric)}>
@@ -421,9 +422,9 @@ export default function AdvancedAnalysis() {
                 <SelectValue placeholder="Métrica" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="score">Score médio</SelectItem>
+                <SelectItem value="score">Interações médias</SelectItem>
                 <SelectItem value="views">Views médio (reels)</SelectItem>
-                <SelectItem value="engagement">Engagement médio</SelectItem>
+                <SelectItem value="engagement">Engajamento médio</SelectItem>
               </SelectContent>
             </Select>
           }
@@ -474,7 +475,7 @@ export default function AdvancedAnalysis() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Células mais escuras = melhor média. Baseado em horário local do navegador.
+              Células mais escuras = melhor média. Baseado no fuso da conta.
             </p>
           </div>
         </ChartCard>
@@ -485,15 +486,15 @@ export default function AdvancedAnalysis() {
               <span className="tag">Melhor janela</span>
               <span className="text-muted-foreground">
                 {insights.bestWindow
-                  ? `${weekdayShortPt(insights.bestWindow.day)} ${String(insights.bestWindow.hour).padStart(2, "0")}h (score médio ${insights.bestWindow.avg.toFixed(1)}, n=${insights.bestWindow.count})`
+                  ? `${weekdayShortPt(insights.bestWindow.day)} ${String(insights.bestWindow.hour).padStart(2, "0")}h (interações médias ${insights.bestWindow.avg.toFixed(1)}, n=${insights.bestWindow.count})`
                   : "Sem dados suficientes."}
               </span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="tag">Melhor formato (score)</span>
+              <span className="tag">Melhor formato (interações)</span>
               <span className="text-muted-foreground">
                 {insights.bestFormatScore
-                  ? `${insights.bestFormatScore.k}: score médio ${insights.bestFormatScore.avg.toFixed(1)} (n=${insights.bestFormatScore.count})`
+                  ? `${insights.bestFormatScore.k}: interações médias ${insights.bestFormatScore.avg.toFixed(1)} (n=${insights.bestFormatScore.count})`
                   : "Sem dados suficientes."}
               </span>
             </div>

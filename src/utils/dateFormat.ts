@@ -7,7 +7,7 @@
  * - Long periods (>365 days): "Jan 2026"
  */
 
-import { format, parseISO, startOfWeek, startOfMonth, isValid } from 'date-fns';
+import { format, parseISO, startOfWeek, isValid } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 
 export type DateGrouping = 'day' | 'week' | 'month' | 'year';
@@ -18,10 +18,14 @@ export type DateGrouping = 'day' | 'week' | 'month' | 'year';
  * @param totalDays - Total days in the viewing period
  * @returns Formatted date string
  */
+function toValidDate(value: Date | string): Date | null {
+  const d = typeof value === 'string' ? parseISO(value) : value;
+  return isValid(d) ? d : null;
+}
+
 export function formatDateForGraph(date: Date | string, totalDays: number): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
-  if (!isValid(d)) return '--';
+  const d = toValidDate(date);
+  if (!d) return '--';
   
   if (totalDays <= 365) {
     // Short to medium periods: "12 Jan"
@@ -38,9 +42,8 @@ export function formatDateForGraph(date: Date | string, totalDays: number): stri
  * @returns Full formatted date string
  */
 export function formatDateForTooltip(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
-  if (!isValid(d)) return '--';
+  const d = toValidDate(date);
+  if (!d) return '--';
   
   return format(d, 'dd MMM yyyy', { locale: enUS });
 }
@@ -52,11 +55,61 @@ export function formatDateForTooltip(date: Date | string): string {
  * @returns Date key in YYYY-MM-DD format
  */
 export function getDateKey(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
-  if (!isValid(d)) return '';
-  
+  const d = toValidDate(date);
+  if (!d) return '';
   return format(d, 'yyyy-MM-dd');
+}
+
+export function getDateKeyInTimezone(date: Date | string, timezone: string): string {
+  const d = toValidDate(date);
+  if (!d) return '';
+  try {
+    return new Intl.DateTimeFormat('sv-SE', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    return format(d, 'yyyy-MM-dd');
+  }
+}
+
+export function getWeekdayInTimezone(date: Date | string, timezone: string): number {
+  const d = toValidDate(date);
+  if (!d) return 0;
+  try {
+    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short' }).format(d);
+    const map: Record<string, number> = {
+      Sun: 0,
+      Mon: 1,
+      Tue: 2,
+      Wed: 3,
+      Thu: 4,
+      Fri: 5,
+      Sat: 6,
+    };
+    return map[weekday] ?? d.getDay();
+  } catch {
+    return d.getDay();
+  }
+}
+
+export function getHourInTimezone(date: Date | string, timezone: string): number {
+  const d = toValidDate(date);
+  if (!d) return 0;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const hourPart = parts.find((p) => p.type === 'hour')?.value ?? '0';
+    const hour = Number(hourPart);
+    return Number.isFinite(hour) ? hour : d.getHours();
+  } catch {
+    return d.getHours();
+  }
 }
 
 /**
@@ -65,9 +118,8 @@ export function getDateKey(date: Date | string): string {
  * @returns Week start key in YYYY-MM-DD format
  */
 export function getWeekKey(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
-  if (!isValid(d)) return '';
+  const d = toValidDate(date);
+  if (!d) return '';
   
   const weekStart = startOfWeek(d, { weekStartsOn: 0 }); // Sunday
   return format(weekStart, 'yyyy-MM-dd');
@@ -79,9 +131,8 @@ export function getWeekKey(date: Date | string): string {
  * @returns Month key in YYYY-MM format
  */
 export function getMonthKey(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
-  if (!isValid(d)) return '';
+  const d = toValidDate(date);
+  if (!d) return '';
   
   return format(d, 'yyyy-MM');
 }
@@ -104,9 +155,8 @@ export function getRecommendedGrouping(totalDays: number): DateGrouping {
  * @returns Formatted week string
  */
 export function formatWeekLabel(weekStartDate: Date | string): string {
-  const d = typeof weekStartDate === 'string' ? parseISO(weekStartDate) : weekStartDate;
-  
-  if (!isValid(d)) return '--';
+  const d = toValidDate(weekStartDate);
+  if (!d) return '--';
   
   return format(d, 'dd MMM', { locale: enUS });
 }
@@ -117,9 +167,8 @@ export function formatWeekLabel(weekStartDate: Date | string): string {
  * @returns Formatted month string
  */
 export function formatMonthLabel(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
-  if (!isValid(d)) return '--';
+  const d = toValidDate(date);
+  if (!d) return '--';
   
   return format(d, 'MMM yyyy', { locale: enUS });
 }
@@ -145,11 +194,10 @@ export function createGraphDataPoint(
   value: number,
   totalDays: number
 ): GraphDataPoint {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  
+  const d = toValidDate(date);
   return {
-    x: formatDateForGraph(d, totalDays),
+    x: d ? formatDateForGraph(d, totalDays) : '--',
     y: value,
-    timestamp: isValid(d) ? format(d, 'yyyy-MM-dd') : '',
+    timestamp: d ? format(d, 'yyyy-MM-dd') : '',
   };
 }

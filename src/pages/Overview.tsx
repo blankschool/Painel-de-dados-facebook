@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { formatDateForGraph, getDateKey } from "@/utils/dateFormat";
+import { formatDateForGraph, getWeekdayInTimezone } from "@/utils/dateFormat";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
@@ -11,8 +11,9 @@ import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortTo
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFilters } from "@/contexts/FiltersContext";
 import { LogiKpiCard, LogiKpiGrid } from "@/components/dashboard/LogiKpiCard";
-import { CircularProgress } from "@/components/dashboard/CircularProgress";
+import { buildPostDailyMetrics } from "@/lib/dashboardHelpers";
 import {
   LineChart,
   Line,
@@ -45,6 +46,7 @@ const tooltipStyle = {
 
 export default function Overview() {
   const { selectedAccount } = useAuth();
+  const { getDateRangeFromPreset } = useFilters();
   const { data, loading, error, forceRefresh } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
@@ -66,8 +68,6 @@ export default function Overview() {
 
   // Extract comparison metrics from API response
   const comparisonMetrics = data?.comparison_metrics;
-  const dailyInsights = data?.daily_insights ?? [];
-  const previousDailyInsights = data?.previous_daily_insights ?? [];
 
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
@@ -75,8 +75,6 @@ export default function Overview() {
 
   const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
   const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
-  const consolidatedReach = typeof data?.consolidated_reach === "number" ? data.consolidated_reach : totalReach;
-  const consolidatedImpressions = typeof data?.consolidated_impressions === "number" ? data.consolidated_impressions : totalViews;
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
   const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
@@ -100,61 +98,35 @@ export default function Overview() {
     };
   }, [media, data?.stories?.length]);
 
-  // Performance over time data (prefer daily insights, fallback to grouped posts)
+  const dateRange = getDateRangeFromPreset();
+  const postDailyMetrics = useMemo(
+    () => buildPostDailyMetrics(media, dateRange, accountTimezone),
+    [media, dateRange, accountTimezone],
+  );
+
+  // Performance over time data (post metrics by day)
   const performanceData = useMemo(() => {
-    if (dailyInsights.length > 0) {
-      const current = dailyInsights.slice(-30);
-      const previous = previousDailyInsights.slice(-current.length);
-      const totalDays = current.length;
-
-      return current.map((row, index) => ({
-        date: row.insight_date,
-        dateLabel: formatDateForGraph(row.insight_date, totalDays),
-        reach: row.reach ?? 0,
-        reachPrev: previous[index]?.reach ?? null,
-      }));
-    }
-
-    const grouped: Record<string, { reach: number }> = {};
-
-    for (const item of media) {
-      if (!item.timestamp) continue;
-      const date = new Date(item.timestamp);
-      // Use local timezone format to avoid UTC shift issues
-      const dateKey = getDateKey(date);
-      const reach = getReach(item) ?? 0;
-
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = { reach: 0 };
-      }
-      grouped[dateKey].reach += reach;
-    }
-
-    const entries = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).slice(-30);
-    const totalDays = entries.length;
-
-    return entries.map(([date, values]) => ({
-      date,
-      dateLabel: formatDateForGraph(date, totalDays),
-      reach: values.reach,
+    if (postDailyMetrics.length === 0) return [];
+    const totalDays = postDailyMetrics.length;
+    return postDailyMetrics.map((row) => ({
+      date: row.date,
+      dateLabel: formatDateForGraph(row.date, totalDays),
+      reach: row.reach,
       reachPrev: null,
     }));
-  }, [dailyInsights, previousDailyInsights, media]);
+  }, [postDailyMetrics]);
 
-  const hasReachPrev = useMemo(
-    () => performanceData.some((item) => typeof item.reachPrev === "number" && item.reachPrev > 0),
-    [performanceData],
-  );
+  const hasReachPrev = false;
 
   // Performance by day of week (with sorting)
   const dayData = useMemo(() => {
     const buckets = Array.from({ length: 7 }, () => ({ reach: 0, posts: [] as IgMediaItem[] }));
     for (const item of media) {
       if (!item.timestamp) continue;
-      const dt = new Date(item.timestamp);
+      const dayIndex = getWeekdayInTimezone(item.timestamp, accountTimezone);
       const reach = getReach(item) ?? 0;
-      buckets[dt.getDay()].reach += reach;
-      buckets[dt.getDay()].posts.push(item);
+      buckets[dayIndex].reach += reach;
+      buckets[dayIndex].posts.push(item);
     }
     const rawData = buckets.map((bucket, idx) => ({
       day: dayLabels[idx],
@@ -293,14 +265,10 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Alcance Total"
-            value={formatCompact(consolidatedReach)}
+            value={formatCompact(totalReach)}
             icon={<Eye className="w-5 h-5" />}
-            trend={comparisonMetrics?.reach ? { 
-              value: comparisonMetrics.reach.changePercent, 
-              isPositive: comparisonMetrics.reach.change > 0 
-            } : null}
             index={1}
-            tooltip="Contas únicas alcançadas no período"
+            tooltip="Contas únicas alcançadas pelos posts no período"
           />
           <LogiKpiCard
             label="Taxa de Engajamento"
@@ -334,13 +302,10 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Visualizações"
-            value={formatCompact(consolidatedImpressions)}
+            value={formatCompact(totalViews)}
             icon={<Play className="w-5 h-5" />}
-            trend={comparisonMetrics?.impressions ? { 
-              value: comparisonMetrics.impressions.changePercent, 
-              isPositive: comparisonMetrics.impressions.change > 0 
-            } : null}
             index={6}
+            tooltip="Visualizações de posts no período"
           />
           <LogiKpiCard
             label="Salvamentos"
