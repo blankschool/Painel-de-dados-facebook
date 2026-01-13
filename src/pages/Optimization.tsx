@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useFilteredMedia } from '@/hooks/useFilteredMedia';
 import { useAuth } from '@/contexts/AuthContext';
@@ -173,6 +173,12 @@ const Optimization = () => {
   const hasOnlineData = Object.keys(onlineHeatmapData).length > 0;
   const hasEngagementData = Object.keys(engagementHeatmapData).length > 0;
 
+  useEffect(() => {
+    if (!hasOnlineData && activeHeatmap === 'online') {
+      setActiveHeatmap('engagement');
+    }
+  }, [hasOnlineData, activeHeatmap]);
+
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -246,35 +252,27 @@ const Optimization = () => {
       >
         <Tabs value={activeHeatmap} onValueChange={(v) => setActiveHeatmap(v as 'online' | 'engagement')}>
           <TabsList className="mb-4">
-            <TabsTrigger value="online" className="gap-2">
-              <Clock className="w-4 h-4" />
-              Seguidores Online
-            </TabsTrigger>
+            {hasOnlineData && (
+              <TabsTrigger value="online" className="gap-2">
+                <Clock className="w-4 h-4" />
+                Seguidores Online
+              </TabsTrigger>
+            )}
             <TabsTrigger value="engagement" className="gap-2">
               <TrendingUp className="w-4 h-4" />
               Engajamento
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="online">
-            {hasOnlineData ? (
+          {hasOnlineData && (
+            <TabsContent value="online">
               <HeatmapChart
                 data={onlineHeatmapData}
                 valueLabel="seguidores online"
                 colorScheme="blue"
               />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Info className="w-10 h-10 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">
-                  Dados de seguidores online não disponíveis.
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Esta métrica requer uma conta Business/Creator conectada.
-                </p>
-              </div>
-            )}
-          </TabsContent>
+            </TabsContent>
+          )}
 
           <TabsContent value="engagement">
             {hasEngagementData ? (

@@ -9,8 +9,6 @@ import {
   Clock,
   Eye,
   Users,
-  UserCheck,
-  UserX,
   TrendingUp,
   Loader2,
   Instagram,
@@ -54,7 +52,8 @@ const Profile = () => {
   };
 
   const dailyInsights = data?.daily_insights ?? [];
-  const consolidatedProfileViews = typeof data?.consolidated_profile_views === "number" ? data.consolidated_profile_views : null;
+  const consolidatedProfileViews =
+    typeof data?.consolidated_profile_views === 'number' ? data.consolidated_profile_views : null;
 
   const profileVisitsData = useMemo(() => {
     if (!dailyInsights.length) return [];
@@ -64,8 +63,22 @@ const Profile = () => {
     }));
   }, [dailyInsights]);
 
+  const hasProfileVisits = useMemo(() => {
+    if (!profileVisitsData.length) {
+      return typeof consolidatedProfileViews === 'number' && consolidatedProfileViews > 0;
+    }
+    return profileVisitsData.some((row) => row.visits > 0);
+  }, [profileVisitsData, consolidatedProfileViews]);
+
   // Calculate totals from the data
   const totals = useMemo(() => {
+    if (!hasProfileVisits) {
+      return {
+        totalVisits: null,
+        maxVisits: null,
+        avgVisits: null,
+      };
+    }
     if (!profileVisitsData.length) {
       return {
         totalVisits: consolidatedProfileViews,
@@ -85,7 +98,7 @@ const Profile = () => {
   }, [profileVisitsData, consolidatedProfileViews]);
 
   const visitRate =
-    profile?.followers_count && typeof totals.totalVisits === "number"
+    profile?.followers_count && typeof totals.totalVisits === 'number'
       ? (totals.totalVisits / profile.followers_count) * 100
       : null;
 
@@ -186,133 +199,80 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard
-          label="Visitas ao Perfil"
-          value={formatNumber(totals.totalVisits)}
-          icon={<Eye className="w-4 h-4" />}
-          tooltip="Total de visitas ao perfil no período"
-        />
-        <MetricCard
-          label="Máx. Visitas/Dia"
-          value={formatNumber(totals.maxVisits)}
-          icon={<TrendingUp className="w-4 h-4" />}
-          tooltip="Maior número de visitas em um único dia"
-        />
-        <MetricCard
-          label="Média Visitas/Dia"
-          value={formatNumber(totals.avgVisits)}
-          icon={<Eye className="w-4 h-4" />}
-          tooltip="Média de visitas diárias ao perfil"
-        />
-        <MetricCard
-          label="Taxa de Visita"
-          value={visitRate !== null ? `${visitRate.toFixed(1)}%` : "--"}
-          icon={<Users className="w-4 h-4" />}
-          tooltip="Visitas ao perfil ÷ seguidores × 100"
-        />
-      </div>
+      {hasProfileVisits && (
+        <>
+          {/* KPI Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard
+              label="Visitas ao Perfil"
+              value={formatNumber(totals.totalVisits)}
+              icon={<Eye className="w-4 h-4" />}
+              tooltip="Total de visitas ao perfil no período"
+            />
+            <MetricCard
+              label="Máx. Visitas/Dia"
+              value={formatNumber(totals.maxVisits)}
+              icon={<TrendingUp className="w-4 h-4" />}
+              tooltip="Maior número de visitas em um único dia"
+            />
+            <MetricCard
+              label="Média Visitas/Dia"
+              value={formatNumber(totals.avgVisits)}
+              icon={<Eye className="w-4 h-4" />}
+              tooltip="Média de visitas diárias ao perfil"
+            />
+            <MetricCard
+              label="Taxa de Visita"
+              value={visitRate !== null ? `${visitRate.toFixed(1)}%` : '--'}
+              icon={<Users className="w-4 h-4" />}
+              tooltip="Visitas ao perfil ÷ seguidores × 100"
+            />
+          </div>
 
-      {/* Profile Visits Chart */}
-      <ChartCard
-        title="Visitas ao Perfil"
-        subtitle="Visualizações diárias do seu perfil"
-      >
-        <div className="h-64">
-          {profileVisitsData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={profileVisitsData}>
-                <defs>
-                  <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  stroke="hsl(var(--muted-foreground))"
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10 }}
-                  stroke="hsl(var(--muted-foreground))"
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Area
-                  type="monotone"
-                  dataKey="visits"
-                  name="Visitas"
-                  stroke="hsl(var(--primary))"
-                  fill="url(#visitsGradient)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-              <Eye className="w-10 h-10 mb-2 opacity-60" />
-              <p className="text-sm font-medium">Sem dados de visitas</p>
-              <p className="text-xs">Aguardando histórico diário do Instagram.</p>
-            </div>
+          {/* Profile Visits Chart */}
+          {profileVisitsData.length > 0 && (
+            <ChartCard
+              title="Visitas ao Perfil"
+              subtitle="Visualizações diárias do seu perfil"
+            >
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={profileVisitsData}>
+                    <defs>
+                      <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11 }}
+                      stroke="hsl(var(--muted-foreground))"
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      stroke="hsl(var(--muted-foreground))"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Area
+                      type="monotone"
+                      dataKey="visits"
+                      name="Visitas"
+                      stroke="hsl(var(--primary))"
+                      fill="url(#visitsGradient)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
           )}
-        </div>
-      </ChartCard>
-
-      {/* Views breakdown + Reach Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Views by Follower Status */}
-        <ChartCard
-          title="Views por Tipo de Seguidor"
-          subtitle="Seguidores vs Não Seguidores"
-        >
-          <div className="flex h-64 flex-col items-center justify-center text-muted-foreground text-center">
-            <UserCheck className="w-10 h-10 mb-2 opacity-60" />
-            <p className="text-sm font-medium">Breakdown indisponível</p>
-            <p className="text-xs max-w-xs">
-              O Instagram não fornece esta divisão para todas as contas.
-            </p>
-          </div>
-        </ChartCard>
-
-        {/* Reach Distribution Pie */}
-        <ChartCard
-          title="Distribuição de Alcance"
-          subtitle="Proporção de visualizações por tipo"
-        >
-          <div className="flex h-64 flex-col items-center justify-center text-muted-foreground text-center">
-            <UserX className="w-10 h-10 mb-2 opacity-60" />
-            <p className="text-sm font-medium">Sem dados suficientes</p>
-            <p className="text-xs max-w-xs">
-              Ative métricas avançadas para visualizar esta divisão.
-            </p>
-          </div>
-        </ChartCard>
-      </div>
-
-      {/* Accounts Engaged */}
-      <ChartCard
-        title="Contas Engajadas"
-        subtitle="Contas únicas que interagiram com seu conteúdo"
-      >
-        <div className="flex h-48 flex-col items-center justify-center text-muted-foreground text-center">
-          <Users className="w-10 h-10 mb-2 opacity-60" />
-          <p className="text-sm font-medium">Métrica indisponível</p>
-          <p className="text-xs max-w-xs">
-            O Instagram não fornece contas engajadas para este período.
-          </p>
-        </div>
-      </ChartCard>
-
-      {/* Note about data */}
-      <div className="p-4 rounded-lg bg-muted/30 text-sm text-muted-foreground">
-        <strong>Nota:</strong> Algumas métricas dependem do Instagram Insights e podem levar alguns
-        dias para aparecer. Quando houver histórico suficiente, os gráficos serão preenchidos.
-      </div>
+        </>
+      )}
     </div>
   );
 };

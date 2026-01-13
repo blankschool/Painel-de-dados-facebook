@@ -14,11 +14,8 @@ const Audience = () => {
   
   const profile = data?.profile;
   const demographics = (data?.demographics || {}) as Record<string, Record<string, number>>;
-  const onlineFollowers = (data?.online_followers || {}) as Record<string, number>;
 
   const hasDemographics = demographics.audience_gender_age || demographics.audience_country || demographics.audience_city;
-  const hasOnlineData = Object.keys(onlineFollowers).length > 0;
-
   // Process gender data from demographics - only if real data exists
   const genderData = useMemo(() => {
     if (!demographics.audience_gender_age) return [];
@@ -187,12 +184,6 @@ const Audience = () => {
           tooltip="Total de publicações no perfil."
           tag="All time"
         />
-        <MetricCard
-          label="Engagement Rate"
-          value="--"
-          tooltip="Taxa de engajamento requer dados históricos."
-          tag="Indisponível"
-        />
       </section>
 
       {/* No demographics data message */}
@@ -348,15 +339,6 @@ const Audience = () => {
         </section>
       )}
 
-      {/* Online Followers info */}
-      {!hasOnlineData && (
-        <div className="chart-card p-6">
-          <h3 className="text-sm font-semibold mb-2">Seguidores Online</h3>
-          <p className="text-sm text-muted-foreground">
-            Dados de atividade online não disponíveis. Acesse a página "Online" para mais detalhes quando conectar uma conta.
-          </p>
-        </div>
-      )}
     </div>
   );
 };
