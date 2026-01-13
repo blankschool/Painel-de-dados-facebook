@@ -119,6 +119,16 @@ async function graphGet(
 type InsightValue = { value?: unknown; end_time?: string };
 type DailyInsightsMap = Record<string, Record<string, number>>;
 
+// Maximum reasonable values for daily metrics (to catch cumulative values being stored as daily)
+const MAX_DAILY_VALUES: Record<string, number> = {
+  reach: 500000,      // Max 500k reach per day
+  impressions: 1000000, // Max 1M impressions per day
+  profile_views: 100000,
+  accounts_engaged: 100000,
+  website_clicks: 50000,
+  follower_count: 10000000, // 10M max followers
+};
+
 function addDailyInsightValues(
   map: DailyInsightsMap,
   metricName: string,
@@ -130,8 +140,17 @@ function addDailyInsightValues(
     const endTime = typeof entry?.end_time === "string" ? entry.end_time : null;
     if (!endTime) continue;
     const dateKey = new Date(endTime).toISOString().slice(0, 10);
+    
+    // Validate value is within reasonable daily range
+    const maxValue = MAX_DAILY_VALUES[metricName];
+    if (maxValue && value > maxValue) {
+      console.warn(`[ig-daily-sync] ⚠ Suspicious ${metricName} value ${value} for ${dateKey} exceeds max ${maxValue} - skipping`);
+      continue;
+    }
+    
     if (!map[dateKey]) map[dateKey] = {};
     map[dateKey][metricName] = value;
+    console.log(`[ig-daily-sync] Added ${metricName}=${value} for ${dateKey}`);
   }
 }
 
