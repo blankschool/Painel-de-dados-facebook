@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, ConnectedAccount } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useFacebookSDK } from '@/hooks/useFacebookSDK';
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
@@ -79,81 +79,6 @@ export default function Connect() {
   const [usingFacebookOAuth, setUsingFacebookOAuth] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isSDKLoaded, isLoading: isSDKLoading, loginStatus } = useFacebookSDK();
-
-  // Handle login status changes from FB SDK
-  const handleFacebookLogin = useCallback(async (accessToken: string) => {
-    if (isConnecting) return;
-    
-    setIsConnecting(true);
-    console.log('[Connect] Facebook login successful, exchanging token...');
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
-        body: {
-          access_token: accessToken,
-        },
-      });
-
-      if (error) {
-        console.error('[Connect] Edge function error:', error);
-        throw new Error(error.message || 'Erro ao processar autenticação');
-      }
-
-      if (data?.error) {
-        console.error('[Connect] Data error:', data.error);
-        throw new Error(data.error);
-      }
-
-      toast({
-        title: 'Sucesso!',
-        description: 'Conta do Instagram conectada com sucesso.',
-      });
-
-      await refreshConnectedAccounts();
-    } catch (err) {
-      console.error('[Connect] Error:', err);
-      toast({
-        title: 'Erro na conexão',
-        description: err instanceof Error ? err.message : 'Não foi possível conectar ao Facebook.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [isConnecting, refreshConnectedAccounts, toast]);
-
-  // Setup global callback for FB login button
-  useEffect(() => {
-    (window as any).checkLoginState = () => {
-      if (!window.FB) return;
-      
-      window.FB.getLoginStatus((response) => {
-        console.log('[Connect] FB login status callback:', response.status);
-        if (response.status === 'connected' && response.authResponse) {
-          handleFacebookLogin(response.authResponse.accessToken);
-        } else if (response.status === 'not_authorized') {
-          toast({
-            title: 'Acesso não autorizado',
-            description: 'Você precisa autorizar o app para continuar.',
-            variant: 'destructive',
-          });
-        }
-      });
-    };
-
-    return () => {
-      delete (window as any).checkLoginState;
-    };
-  }, [handleFacebookLogin, toast]);
-
-  // Re-render FB XFBML elements when SDK loads
-  useEffect(() => {
-    if (isSDKLoaded && window.FB) {
-      window.FB.XFBML?.parse();
-    }
-  }, [isSDKLoaded, connectedAccounts]);
-
   const handleDeleteAccount = async (account: ConnectedAccount) => {
     setDeletingAccountId(account.id);
     try {
@@ -362,15 +287,6 @@ export default function Connect() {
           </p>
         </div>
 
-        {/* Facebook Login Status Indicator */}
-        {loginStatus && loginStatus.status === 'connected' && !hasAccounts && (
-          <div className="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center gap-2">
-            <Facebook className="h-4 w-4 text-blue-500" />
-            <span className="text-sm text-blue-600 dark:text-blue-400">
-              Você está logado no Facebook. Clique para conectar o Instagram.
-            </span>
-          </div>
-        )}
 
         {/* Connected Accounts List */}
         {hasAccounts && (
