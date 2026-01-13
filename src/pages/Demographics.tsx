@@ -20,13 +20,16 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { getCountryName } from '@/utils/countryMapping';
 
 const Demographics = () => {
   const { data, loading, error } = useDashboardData();
   const demographics = (data?.demographics as any) ?? {};
 
+  // Check for new API structure: separate fields for age, gender, country, city
   const hasDemographics =
-    !!demographics?.audience_gender_age ||
+    !!demographics?.audience_age ||
+    !!demographics?.audience_gender ||
     !!demographics?.audience_country ||
     !!demographics?.audience_city;
 
@@ -38,46 +41,72 @@ const Demographics = () => {
     );
   }
 
-  // Only use real data. If it doesn't exist, keep arrays empty and show an empty state in the UI.
-  const ageData = demographics.audience_gender_age
-    ? (() => {
-        const ageGroups: Record<string, number> = {};
-        Object.entries(demographics.audience_gender_age).forEach(([key, value]) => {
-          const age = key.split('.')[1];
-          if (age) ageGroups[age] = (ageGroups[age] || 0) + (value as number);
-        });
-        return Object.entries(ageGroups).map(([range, value]) => ({ range, value }));
-      })()
+  // Process age data (format: { "13-17": 28, "18-24": 289, ... })
+  const ageData = demographics.audience_age
+    ? Object.entries(demographics.audience_age)
+        .filter(([_, value]) => (value as number) > 0)
+        .map(([range, value]) => ({ range, value: value as number }))
+        .sort((a, b) => {
+          // Sort by age range start
+          const aStart = parseInt(a.range.split('-')[0]) || 0;
+          const bStart = parseInt(b.range.split('-')[0]) || 0;
+          return aStart - bStart;
+        })
     : [];
 
-  const genderData = demographics.audience_gender_age
+  // Process gender data (format: { "F": 2296, "M": 5338, "U": 767 })
+  const genderData = demographics.audience_gender
     ? (() => {
-        const genders: Record<string, number> = { M: 0, F: 0 };
-        Object.entries(demographics.audience_gender_age).forEach(([key, value]) => {
-          const gender = key.split('.')[0];
-          if (gender === 'M' || gender === 'F') genders[gender] += value as number;
-        });
-        const total = genders.M + genders.F;
+        const genders = demographics.audience_gender as Record<string, number>;
+        const total = Object.values(genders).reduce((sum, val) => sum + val, 0);
         if (!total) return [];
-        return [
-          { name: 'Masculino', value: Math.round((genders.M / total) * 100), color: 'hsl(var(--muted-foreground))' },
-          { name: 'Feminino', value: Math.round((genders.F / total) * 100), color: 'hsl(var(--primary))' },
-        ];
+        const result = [];
+        if (genders.M && genders.M > 0) {
+          result.push({ name: 'Masculino', value: Math.round((genders.M / total) * 100), color: 'hsl(var(--muted-foreground))' });
+        }
+        if (genders.F && genders.F > 0) {
+          result.push({ name: 'Feminino', value: Math.round((genders.F / total) * 100), color: 'hsl(var(--primary))' });
+        }
+        if (genders.U && genders.U > 0) {
+          result.push({ name: 'Outro', value: Math.round((genders.U / total) * 100), color: 'hsl(var(--accent))' });
+        }
+        return result.filter(g => g.value > 0);
       })()
     : [];
 
+  // Process country data (format: { "BR": 7653, "US": 118, ... })
   const countryData = demographics.audience_country
-    ? Object.entries(demographics.audience_country)
-        .sort((a, b) => (b[1] as number) - (a[1] as number))
-        .slice(0, 10)
-        .map(([country, value]) => ({ country, value: value as number }))
+    ? (() => {
+        const countries = demographics.audience_country as Record<string, number>;
+        const total = Object.values(countries).reduce((sum, val) => sum + val, 0);
+        return Object.entries(countries)
+          .filter(([_, value]) => value > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([code, value]) => ({ 
+            country: getCountryName(code), 
+            code,
+            value: total > 0 ? Math.round((value / total) * 100) : 0,
+            rawValue: value
+          }));
+      })()
     : [];
 
+  // Process city data (format: { "São Paulo, SP": 1234, ... })
   const cityData = demographics.audience_city
-    ? Object.entries(demographics.audience_city)
-        .sort((a, b) => (b[1] as number) - (a[1] as number))
-        .slice(0, 10)
-        .map(([city, value]) => ({ city, value: value as number }))
+    ? (() => {
+        const cities = demographics.audience_city as Record<string, number>;
+        const total = Object.values(cities).reduce((sum, val) => sum + val, 0);
+        return Object.entries(cities)
+          .filter(([_, value]) => value > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([city, value]) => ({ 
+            city, 
+            value: total > 0 ? Math.round((value / total) * 100) : 0,
+            rawValue: value
+          }));
+      })()
     : [];
 
   const topAge = ageData.reduce<{ range: string; value: number } | null>((best, cur) => {
