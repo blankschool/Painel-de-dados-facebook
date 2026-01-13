@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +25,8 @@ export type IgDashboardResponse = {
   provider?: string;
   token_type?: 'IGAA' | 'EAA' | 'unknown';
   api_endpoint?: string;
+  from_cache?: boolean;
+  cache_age_hours?: number;
   profile?: {
     id: string;
     username?: string;
@@ -57,29 +59,35 @@ function toYmd(date: Date): string {
 export function useDashboardData() {
   const { getDateRangeFromPreset, filters } = useFilters();
   const { selectedAccount } = useAuth();
+  const [forceRefreshKey, setForceRefreshKey] = useState(0);
 
   const body = useMemo(() => {
     const dateRange = getDateRangeFromPreset();
     const since = dateRange.from ? toYmd(dateRange.from) : undefined;
     const until = dateRange.to ? toYmd(dateRange.to) : undefined;
+    const timezone = selectedAccount?.timezone || 'America/Sao_Paulo';
 
-    console.log(`[useDashboardData] Preset: ${filters.dateRangePreset}, Since: ${since}, Until: ${until}, Account: ${selectedAccount?.account_username}`);
+    console.log(`[useDashboardData] Preset: ${filters.dateRangePreset}, Since: ${since}, Until: ${until}, Timezone: ${timezone}`);
 
     return {
       since,
       until,
       accountId: selectedAccount?.id,
+      timezone,
     };
-  }, [getDateRangeFromPreset, filters.dateRangePreset, selectedAccount?.id, selectedAccount?.account_username]);
+  }, [getDateRangeFromPreset, filters.dateRangePreset, selectedAccount?.id, selectedAccount?.timezone]);
 
   const query = useQuery({
-    queryKey: ['ig-dashboard', body],
+    queryKey: ['ig-dashboard', body, forceRefreshKey],
     queryFn: async (): Promise<IgDashboardResponse> => {
-      console.log('[useDashboardData] Fetching data with body:', body);
-      const { data, error } = await supabase.functions.invoke('ig-dashboard', { body });
+      const isForceRefresh = forceRefreshKey > 0;
+      const requestBody = isForceRefresh ? { ...body, forceRefresh: true } : body;
+      
+      console.log('[useDashboardData] Fetching data with body:', requestBody, 'forceRefresh:', isForceRefresh);
+      const { data, error } = await supabase.functions.invoke('ig-dashboard', { body: requestBody });
       if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || 'Failed to fetch dashboard data');
-      console.log(`[useDashboardData] Received ${data.media?.length ?? 0} media items`);
+      console.log(`[useDashboardData] Received ${data.media?.length ?? 0} media items (from_cache: ${data.from_cache})`);
       return data as IgDashboardResponse;
     },
     enabled: !!selectedAccount?.id,
@@ -88,10 +96,17 @@ export function useDashboardData() {
     retry: 1,
   });
 
+  // Force refresh: increment key to trigger new request with forceRefresh: true
+  const forceRefresh = useCallback(() => {
+    console.log('[useDashboardData] Force refresh triggered');
+    setForceRefreshKey(k => k + 1);
+  }, []);
+
   return {
-    loading: query.isLoading,
+    loading: query.isLoading || query.isFetching,
     error: query.error ? (query.error as Error).message : null,
     data: query.data ?? null,
     refresh: query.refetch,
+    forceRefresh,
   };
 }
