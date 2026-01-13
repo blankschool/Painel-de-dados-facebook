@@ -273,10 +273,23 @@ export async function saveDailyInsights(
   }
 }
 
+export type DailyInsightRecord = {
+  insight_date: string;
+  reach?: number;
+  impressions?: number;
+  profile_views?: number;
+  website_clicks?: number;
+  follower_count?: number;
+  email_contacts?: number;
+  phone_call_clicks?: number;
+  text_message_clicks?: number;
+  get_directions_clicks?: number;
+};
+
 export async function saveDailyInsightsBatch(
   supabase: SupabaseClient,
   accountId: string,
-  insights: Array<{ insight_date: string; [key: string]: number }>,
+  insights: DailyInsightRecord[],
 ): Promise<void> {
   if (!insights.length) return;
 
