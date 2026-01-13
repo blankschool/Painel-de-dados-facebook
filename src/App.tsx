@@ -27,6 +27,7 @@ import Profile from "./pages/Profile";
 import AdvancedAnalysis from "./pages/AdvancedAnalysis";
 import Followers from "./pages/Followers";
 import Content from "./pages/Content";
+import Comparisons from "./pages/Comparisons";
 
 import MediaDetail from "./pages/MediaDetail";
 import Optimization from "./pages/Optimization";
@@ -60,6 +61,7 @@ const App = () => (
                   <Route element={<DashboardLayout />}>
                     <Route path="/" element={<Overview />} />
                     <Route path="/overview" element={<Overview />} />
+                    <Route path="/comparisons" element={<Comparisons />} />
                     <Route path="/followers" element={<Followers />} />
                     <Route path="/content" element={<Content />} />
                     
