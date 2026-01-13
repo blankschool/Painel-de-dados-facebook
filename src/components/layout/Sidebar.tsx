@@ -1,14 +1,17 @@
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import blankLogo from "@/assets/blank-logo.png";
 import blankLogoDark from "@/assets/blank-logo-dark.png";
 
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
+export function Sidebar({ isOpen = false, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const { resolvedTheme } = useTheme();
   const navItems = [{
@@ -58,17 +61,21 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   }];
 
   const handleNavClick = () => {
-    // Close sidebar on mobile after navigation
     if (onClose) {
       onClose();
     }
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="logo">
-        <img src={resolvedTheme === "dark" ? blankLogoDark : blankLogo} alt="Blank" className="h-8 w-auto" />
+        <img 
+          src={resolvedTheme === "dark" ? blankLogoDark : blankLogo} 
+          alt="Blank" 
+          className={`transition-all duration-200 ${isCollapsed ? 'h-6 w-auto' : 'h-8 w-auto'}`}
+        />
       </div>
+      
       <nav className="nav-menu">
         {navItems.map(item => (
           <Link 
@@ -76,6 +83,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             to={item.href} 
             className={`nav-item ${location.pathname === item.href ? "active" : ""}`}
             onClick={handleNavClick}
+            title={isCollapsed ? item.label : undefined}
           >
             {item.icon === "chart" && (
               <svg viewBox="0 0 24 24">
@@ -150,10 +158,23 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
             )}
-            <span>{item.label}</span>
+            {!isCollapsed && <span>{item.label}</span>}
           </Link>
         ))}
       </nav>
+
+      {/* Collapse Toggle Button - Desktop only */}
+      <button 
+        onClick={onToggleCollapse}
+        className="collapse-toggle hidden md:flex"
+        title={isCollapsed ? "Expandir menu" : "Recolher menu"}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="h-4 w-4" />
+        ) : (
+          <ChevronLeft className="h-4 w-4" />
+        )}
+      </button>
     </aside>
   );
 }
