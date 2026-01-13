@@ -104,12 +104,13 @@ export default function Overview() {
     return profile?.followers_count ?? null;
   }, [dailyInsights, accountInsights, profile?.followers_count]);
 
+  // Engagement rate formula aligned with Minter: (Likes + Comments) / Followers × 100
   const accountEngagementRate = useMemo(() => {
-    if (typeof accountsEngaged === "number" && typeof latestFollowerCount === "number" && latestFollowerCount > 0) {
-      return (accountsEngaged / latestFollowerCount) * 100;
+    if (typeof latestFollowerCount === "number" && latestFollowerCount > 0) {
+      return ((totalLikes + totalComments) / latestFollowerCount) * 100;
     }
     return null;
-  }, [accountsEngaged, latestFollowerCount]);
+  }, [totalLikes, totalComments, latestFollowerCount]);
   
   const avgReach = media.length ? Math.round(totalReachFromPosts / media.length) : null;
 
@@ -333,7 +334,7 @@ export default function Overview() {
             value={formatPercent(accountEngagementRate)}
             icon={<Target className="w-5 h-5" />}
             index={2}
-            tooltip="Percentual de seguidores que interagiram com posts, stories ou anúncios no período"
+            tooltip="(Curtidas + Comentários) ÷ Seguidores × 100. Fórmula alinhada com Minter.io."
           />
           <LogiKpiCard
             label="Curtidas"
