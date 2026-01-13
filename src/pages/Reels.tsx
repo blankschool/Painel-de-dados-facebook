@@ -187,12 +187,14 @@ const Reels = () => {
           </ChartCard>
 
           {/* Comparison Table */}
-          <ChartCard title="Comparativo de Métricas" subtitle="Análise detalhada dos reels">
+          <ChartCard title="Comparativo de Métricas" subtitle="Clique para abrir no Instagram">
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th className="w-16">Prévia</th>
                     <th>Reel</th>
+                    <th>Views</th>
                     <th>Curtidas</th>
                     <th>Comentários</th>
                     <th>Data</th>
@@ -200,11 +202,36 @@ const Reels = () => {
                 </thead>
                 <tbody>
                   {reels.slice(0, 10).map((reel, index) => (
-                    <tr key={reel.id}>
-                      <td className="font-medium">Reel {index + 1}</td>
-                      <td>{(reel.like_count || 0).toLocaleString()}</td>
-                      <td>{(reel.comments_count || 0).toLocaleString()}</td>
-                      <td className="text-xs">
+                    <tr 
+                      key={reel.id}
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => reel.permalink && window.open(reel.permalink, '_blank')}
+                    >
+                      <td>
+                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+                          {reel.thumbnail_url || reel.media_url ? (
+                            <img 
+                              src={reel.thumbnail_url || reel.media_url}
+                              alt={`Reel ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Play className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="font-medium max-w-[200px]">
+                        <p className="truncate text-sm">
+                          {reel.caption?.slice(0, 40) || `Reel ${index + 1}`}
+                          {reel.caption && reel.caption.length > 40 && "..."}
+                        </p>
+                      </td>
+                      <td className="text-sm">{getViews(reel)?.toLocaleString() ?? '--'}</td>
+                      <td className="text-sm">{(reel.like_count || 0).toLocaleString()}</td>
+                      <td className="text-sm">{(reel.comments_count || 0).toLocaleString()}</td>
+                      <td className="text-xs text-muted-foreground">
                         {reel.timestamp ? new Date(reel.timestamp).toLocaleDateString('pt-BR') : '--'}
                       </td>
                     </tr>
