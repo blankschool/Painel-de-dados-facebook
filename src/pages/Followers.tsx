@@ -2,8 +2,11 @@ import { useMemo, useState } from "react";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { BrazilMap } from "@/components/dashboard/BrazilMap";
+import { ChartCard } from "@/components/dashboard/ChartCard";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { FollowerChangeChart } from "@/components/dashboard/StackedBarChart";
 import { SortToggle, SortOrder } from "@/components/ui/SortToggle";
-import { Users, UserPlus, MapPin, Calendar } from "lucide-react";
+import { Users, UserPlus, UserMinus, MapPin, Calendar, TrendingUp, TrendingDown } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -43,6 +46,36 @@ export default function Followers() {
   const [countrySortOrder, setCountrySortOrder] = useState<SortOrder>("desc");
   const [citySortOrder, setCitySortOrder] = useState<SortOrder>("desc");
   const [genderSortOrder, setGenderSortOrder] = useState<SortOrder>("desc");
+  const [changeVariant, setChangeVariant] = useState<'stacked' | 'net'>('stacked');
+
+  // Mock follower change data (would come from instagram_daily_insights in production)
+  const followerChangeData = useMemo(() => {
+    const days = 7;
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const gained = Math.floor(Math.random() * 100) + 20;
+      const lost = Math.floor(Math.random() * 50) + 5;
+      result.push({
+        date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        gained,
+        lost: -lost, // negative for stacked chart
+        net: gained - lost,
+      });
+    }
+    return result;
+  }, []);
+
+  // Follower change stats
+  const changeStats = useMemo(() => {
+    const totalGained = followerChangeData.reduce((sum, d) => sum + d.gained, 0);
+    const totalLost = followerChangeData.reduce((sum, d) => sum + Math.abs(d.lost), 0);
+    const totalNet = totalGained - totalLost;
+    const maxChange = Math.max(...followerChangeData.map(d => d.net));
+    const avgChange = Math.round(totalNet / followerChangeData.length);
+    return { totalGained, totalLost, totalNet, maxChange, avgChange };
+  }, [followerChangeData]);
 
   // Debug: Log demographics data
   console.log("[Followers] Demographics:", demographics);
@@ -269,51 +302,49 @@ export default function Followers() {
 
       <div className="content-area space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="metrics-card">
-            <div className="metric-icon blue">
-              <Users className="w-6 h-6" />
-            </div>
-            <div className="metric-group">
-              <div className="metric-item">
-                <span className="metric-label">Seguidores</span>
-                <span className="metric-value">{followersCount.toLocaleString("pt-BR")}</span>
-              </div>
-            </div>
-          </div>
-          <div className="metrics-card">
-            <div className="metric-icon blue">
-              <UserPlus className="w-6 h-6" />
-            </div>
-            <div className="metric-group">
-              <div className="metric-item">
-                <span className="metric-label">Seguindo</span>
-                <span className="metric-value">{followsCount.toLocaleString("pt-BR")}</span>
-              </div>
-            </div>
-          </div>
-          <div className="metrics-card">
-            <div className="metric-icon blue">
-              <MapPin className="w-6 h-6" />
-            </div>
-            <div className="metric-group">
-              <div className="metric-item">
-                <span className="metric-label">Top País</span>
-                <span className="metric-value">{countries[0]?.key || "-"}</span>
-              </div>
-            </div>
-          </div>
-          <div className="metrics-card">
-            <div className="metric-icon blue">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <div className="metric-group">
-              <div className="metric-item">
-                <span className="metric-label">Faixa Principal</span>
-                <span className="metric-value">{ageGroups[0]?.range || "-"}</span>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          <MetricCard
+            label="Seguidores"
+            value={followersCount.toLocaleString("pt-BR")}
+            icon={<Users className="w-4 h-4" />}
+          />
+          <MetricCard
+            label="Seguindo"
+            value={followsCount.toLocaleString("pt-BR")}
+            icon={<UserPlus className="w-4 h-4" />}
+          />
+          <MetricCard
+            label="Ganhos"
+            value={`+${changeStats.totalGained}`}
+            icon={<TrendingUp className="w-4 h-4" />}
+            delta={{ value: changeStats.totalGained, positive: true }}
+          />
+          <MetricCard
+            label="Perdidos"
+            value={`-${changeStats.totalLost}`}
+            icon={<TrendingDown className="w-4 h-4" />}
+            delta={{ value: changeStats.totalLost, positive: false }}
+          />
+          <MetricCard
+            label="Variação Máx"
+            value={changeStats.maxChange > 0 ? `+${changeStats.maxChange}` : changeStats.maxChange.toString()}
+            icon={<TrendingUp className="w-4 h-4" />}
+          />
+          <MetricCard
+            label="Variação Média"
+            value={changeStats.avgChange > 0 ? `+${changeStats.avgChange}` : changeStats.avgChange.toString()}
+            icon={<Calendar className="w-4 h-4" />}
+          />
+        </div>
+
+        {/* Follower Change Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartCard title="Variação de Seguidores" subtitle="Ganhos vs Perdidos por dia">
+            <FollowerChangeChart data={followerChangeData} variant="stacked" height={220} />
+          </ChartCard>
+          <ChartCard title="Variação Líquida" subtitle="Saldo diário de seguidores">
+            <FollowerChangeChart data={followerChangeData} variant="net" height={220} />
+          </ChartCard>
         </div>
 
         {/* Age Group + Gender Row */}
