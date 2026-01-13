@@ -35,7 +35,7 @@ const GENDER_COLORS = [
 ];
 
 export default function Followers() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error } = useDashboardData();
   const demographics = (data?.demographics as Record<string, Record<string, number>> | undefined) ?? {};
   const profile = data?.profile;
   const followersCount = profile?.followers_count ?? 0;

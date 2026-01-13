@@ -18,7 +18,7 @@ function formatCompact(value: number | null): string {
 }
 
 export default function Time() {
-  const { data, loading } = useDashboardData();
+  const { data, loading, error } = useDashboardData();
   const { selectedAccount } = useAuth();
   const allMedia = data?.media ?? [];
   const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
