@@ -116,11 +116,14 @@ export default {
   			}
   		},
   		borderRadius: {
+  			'4xl': '1.25rem',      /* 20px - iOS 26 outer cards/sheets */
+  			'3xl': '1rem',         /* 16px - iOS 26 nested cards */
+  			'2xl': '0.875rem',     /* 14px - iOS 26 inner elements */
+  			xl: '0.75rem',         /* 12px - iOS 26 small nested */
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)',
-  			'2xl': '1rem',
-  			'3xl': '1.5rem'
+  			squircle: '22.3%',     /* iOS app icon style */
   		},
   		boxShadow: {
   			card: 'var(--shadow-card)',
