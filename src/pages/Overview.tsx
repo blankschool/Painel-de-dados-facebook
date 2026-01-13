@@ -68,6 +68,8 @@ export default function Overview() {
 
   // Extract comparison metrics from API response
   const comparisonMetrics = data?.comparison_metrics;
+  const dailyInsights = data?.daily_insights ?? [];
+  const previousDailyInsights = data?.previous_daily_insights ?? [];
 
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
@@ -104,8 +106,20 @@ export default function Overview() {
     [media, dateRange, accountTimezone],
   );
 
-  // Performance over time data (post metrics by day)
+  // Performance over time data (prefer account daily insights, fallback to post metrics by day)
   const performanceData = useMemo(() => {
+    if (dailyInsights.length > 0) {
+      const current = dailyInsights;
+      const previous = previousDailyInsights;
+      const totalDays = current.length;
+      return current.map((row, index) => ({
+        date: row.insight_date,
+        dateLabel: formatDateForGraph(row.insight_date, totalDays),
+        reach: row.reach ?? 0,
+        reachPrev: previous[index]?.reach ?? null,
+      }));
+    }
+
     if (postDailyMetrics.length === 0) return [];
     const totalDays = postDailyMetrics.length;
     return postDailyMetrics.map((row) => ({
@@ -114,9 +128,12 @@ export default function Overview() {
       reach: row.reach,
       reachPrev: null,
     }));
-  }, [postDailyMetrics]);
+  }, [dailyInsights, previousDailyInsights, postDailyMetrics]);
 
-  const hasReachPrev = false;
+  const hasReachPrev = useMemo(
+    () => performanceData.some((item) => typeof item.reachPrev === "number" && item.reachPrev > 0),
+    [performanceData],
+  );
 
   // Performance by day of week (with sorting)
   const dayData = useMemo(() => {
