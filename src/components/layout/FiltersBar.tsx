@@ -103,32 +103,32 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
   };
 
   return (
-    <div className="filters-bar flex flex-wrap items-center gap-3 mb-6">
+    <div className="filters-bar flex flex-wrap items-center gap-2 md:gap-3 mb-4 md:mb-6">
       {/* Filter Button with count */}
       <Button
         variant={activeFiltersCount > 0 ? "default" : "outline"}
         size="sm"
-        className="gap-2"
+        className="gap-1.5 md:gap-2 h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
         onClick={resetFilters}
         disabled={activeFiltersCount === 0}
       >
-        <Filter className="h-4 w-4" />
-        <span>Filtros</span>
+        <Filter className="h-3.5 w-3.5 md:h-4 md:w-4" />
+        <span className="hidden xs:inline">Filtros</span>
         {activeFiltersCount > 0 && (
-          <span className="ml-1 px-2 py-0.5 bg-primary-foreground/20 rounded-full text-xs">
+          <span className="ml-0.5 md:ml-1 px-1.5 md:px-2 py-0.5 bg-primary-foreground/20 rounded-full text-[10px] md:text-xs">
             {activeFiltersCount}
           </span>
         )}
       </Button>
 
       {/* Date Range Selector with actual date display */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 md:gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span>{getDateRangeDisplay()}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <button className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm" type="button">
+              <CalendarIcon className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+              <span className="max-w-[80px] md:max-w-none truncate">{getDateRangeDisplay()}</span>
+              <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-48">
@@ -148,9 +148,9 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           </DropdownMenuContent>
         </DropdownMenu>
         
-        {/* Actual date range display (like Minter.io) */}
+        {/* Actual date range display (like Minter.io) - hidden on mobile */}
         {getActualDateRange() && (
-          <span className="text-sm text-muted-foreground hidden sm:inline">
+          <span className="text-xs md:text-sm text-muted-foreground hidden md:inline">
             {getActualDateRange()}
           </span>
         )}
@@ -183,7 +183,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
             mode="range"
             selected={tempRange}
             onSelect={handleCustomSelect}
-            numberOfMonths={2}
+            numberOfMonths={1}
             locale={enUS}
             disabled={(date) => date > new Date()}
             className="pointer-events-auto"
@@ -215,12 +215,12 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
         </PopoverContent>
       </Popover>
 
-      {/* Day Filter */}
+      {/* Day Filter - hidden on very small screens */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
+          <button className="hidden sm:flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm" type="button">
             <span>{filters.dayFilter !== "all" ? selectedDay : "Dias"}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
@@ -240,13 +240,13 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Media Type Filter (conditional) */}
+      {/* Media Type Filter (conditional) - hidden on very small screens */}
       {showMediaType && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-sm" type="button">
+            <button className="hidden sm:flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm" type="button">
               <span>{filters.mediaType !== "all" ? selectedMediaType : "Tipo"}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -267,15 +267,15 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
         </DropdownMenu>
       )}
 
-      {/* Quick Filters - pushed to right */}
-      <div className="flex items-center gap-1 ml-auto">
+      {/* Quick Filters - pushed to right, hidden on small screens */}
+      <div className="hidden md:flex items-center gap-1 ml-auto">
         {quickFilters.map((preset) => (
           <button
             key={preset}
             type="button"
             onClick={() => setDateRangePreset(preset)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              "px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors",
               filters.dateRangePreset === preset
                 ? "bg-primary text-primary-foreground"
                 : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -292,10 +292,10 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           variant="ghost"
           size="sm"
           onClick={resetFilters}
-          className="gap-1 text-muted-foreground hover:text-foreground"
+          className="gap-1 text-muted-foreground hover:text-foreground h-8 px-2 text-xs md:text-sm"
         >
-          <X className="h-3.5 w-3.5" />
-          Limpar
+          <X className="h-3 w-3 md:h-3.5 md:w-3.5" />
+          <span className="hidden sm:inline">Limpar</span>
         </Button>
       )}
     </div>

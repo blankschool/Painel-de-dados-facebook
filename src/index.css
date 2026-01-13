@@ -296,6 +296,12 @@
     @apply ml-[72px] flex-1 min-h-screen;
   }
 
+  @media (max-width: 768px) {
+    .app-main {
+      @apply ml-0;
+    }
+  }
+
   .app-header {
     @apply sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur-md;
   }
@@ -308,6 +314,12 @@
     @apply px-6 py-6;
     max-width: var(--content-max-width);
     margin: 0 auto;
+  }
+
+  @media (max-width: 768px) {
+    .page-content {
+      @apply px-4 py-4;
+    }
   }
 
   .page-hero {
