@@ -41,8 +41,10 @@ export type IgDashboardResponse = {
   provider?: string;
   token_type?: 'IGAA' | 'EAA' | 'unknown';
   api_endpoint?: string;
+  api_version?: string;
   from_cache?: boolean;
   cache_age_hours?: number;
+  duration_ms?: number;
   profile?: {
     id: string;
     username?: string;
@@ -65,6 +67,7 @@ export type IgDashboardResponse = {
   demographics?: Record<string, unknown>;
   online_followers?: Record<string, number>;
   account_insights?: Record<string, number>;
+  previous_period_insights?: Record<string, number>;
   consolidated_reach?: number;
   consolidated_impressions?: number;
   consolidated_profile_views?: number;
@@ -72,6 +75,7 @@ export type IgDashboardResponse = {
   daily_insights?: DailyInsightRow[];
   previous_daily_insights?: DailyInsightRow[];
   profile_snapshots?: ProfileSnapshot[];
+  media_type_distribution?: Record<string, number>;
   messages?: string[];
 };
 
