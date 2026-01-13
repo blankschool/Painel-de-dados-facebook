@@ -5,7 +5,8 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
@@ -75,7 +76,7 @@ const tooltipStyle = {
 
 export default function Overview() {
   const { selectedAccount } = useAuth();
-  const { data, loading, error } = useDashboardData();
+  const { data, loading, error, refresh } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
 
@@ -256,12 +257,24 @@ export default function Overview() {
     <>
       <div className="flex items-center justify-between gap-4 mb-4">
         <FiltersBar />
-        {data?.token_type && (
-          <Badge variant="outline" className="flex items-center gap-1.5 shrink-0">
-            <Instagram className="w-3.5 h-3.5" />
-            {data.token_type === 'IGAA' ? 'Instagram Business Login' : 'Facebook Login'}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refresh()}
+            disabled={loading}
+            className="flex items-center gap-1.5"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
+          {data?.token_type && (
+            <Badge variant="outline" className="flex items-center gap-1.5 shrink-0">
+              <Instagram className="w-3.5 h-3.5" />
+              {data.token_type === 'IGAA' ? 'Instagram Business Login' : 'Facebook Login'}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="content-area space-y-6">
