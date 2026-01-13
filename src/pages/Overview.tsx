@@ -97,12 +97,18 @@ export default function Overview() {
   const accountReach = data?.consolidated_reach ?? totalReachFromPosts;
   const accountImpressions = data?.consolidated_impressions ?? totalViewsFromPosts;
   
+  // Use profile.followers_count (total followers) instead of daily_insights.follower_count (daily delta)
   const latestFollowerCount = useMemo(() => {
-    const lastDaily = dailyInsights.length ? dailyInsights[dailyInsights.length - 1] : null;
-    if (lastDaily && typeof lastDaily.follower_count === "number") return lastDaily.follower_count;
-    if (typeof accountInsights['follower_count'] === "number") return accountInsights['follower_count'];
-    return profile?.followers_count ?? null;
-  }, [dailyInsights, accountInsights, profile?.followers_count]);
+    // Priority: profile total followers (correct value for engagement rate)
+    if (typeof profile?.followers_count === "number" && profile.followers_count > 0) {
+      return profile.followers_count;
+    }
+    // Fallback to accountInsights if profile not available
+    if (typeof accountInsights['follower_count'] === "number" && accountInsights['follower_count'] > 0) {
+      return accountInsights['follower_count'];
+    }
+    return null;
+  }, [profile?.followers_count, accountInsights]);
 
   // Engagement rate formula aligned with Minter: (Likes + Comments) / Followers × 100
   const accountEngagementRate = useMemo(() => {
