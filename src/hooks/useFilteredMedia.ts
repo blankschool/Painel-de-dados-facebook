@@ -14,7 +14,15 @@ function matchesDayFilter(dayOfWeek: number, filter: DayFilter): boolean {
   }
 }
 
-export function useFilteredMedia(media: IgMediaItem[], timezone: string = 'America/Sao_Paulo') {
+type FilteredMediaOptions = {
+  bestPerDay?: boolean;
+};
+
+export function useFilteredMedia(
+  media: IgMediaItem[],
+  timezone: string = 'America/Sao_Paulo',
+  options: FilteredMediaOptions = {},
+) {
   const { filters, getDateRangeFromPreset } = useFilters();
 
   return useMemo(() => {
@@ -43,8 +51,10 @@ export function useFilteredMedia(media: IgMediaItem[], timezone: string = 'Ameri
 
     console.log(`[useFilteredMedia] After date filter: ${filtered.length} items`);
 
-    // Filter by day of week
-    if (filters.dayFilter !== 'all') {
+    const useBestPerDay = options.bestPerDay || filters.dayFilter === 'best';
+
+    // Filter by day of week (skip when using best-per-day mode)
+    if (filters.dayFilter !== 'all' && filters.dayFilter !== 'best') {
       filtered = filtered.filter((item) => {
         if (!item.timestamp) return false;
         const itemDate = new Date(item.timestamp);
@@ -75,11 +85,13 @@ export function useFilteredMedia(media: IgMediaItem[], timezone: string = 'Ameri
       console.log(`[useFilteredMedia] After search filter: ${filtered.length} items`);
     }
 
-    // Apply "best post per day" filter - only keep the best performing post from each day
-    // This aligns with Minter.io's approach of showing 1 post per day
-    const bestPerDay = getBestPostPerDay(filtered, 'engagement', timezone);
-    console.log(`[useFilteredMedia] After best-per-day filter: ${bestPerDay.length} items (from ${filtered.length})`);
+    // Apply "best post per day" filter only when requested
+    if (useBestPerDay) {
+      const bestPerDay = getBestPostPerDay(filtered, 'engagement', timezone);
+      console.log(`[useFilteredMedia] After best-per-day filter: ${bestPerDay.length} items (from ${filtered.length})`);
+      return bestPerDay;
+    }
 
-    return bestPerDay;
-  }, [media, filters, getDateRangeFromPreset, timezone]);
+    return filtered;
+  }, [media, filters, getDateRangeFromPreset, timezone, options.bestPerDay]);
 }

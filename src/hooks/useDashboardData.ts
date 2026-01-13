@@ -17,6 +17,22 @@ export type StoriesAggregate = {
   avg_completion_rate: number;
 };
 
+export type DailyInsightRow = {
+  insight_date: string;
+  reach?: number;
+  impressions?: number;
+  profile_views?: number;
+  follower_count?: number;
+  website_clicks?: number;
+};
+
+export type ProfileSnapshot = {
+  snapshot_date: string;
+  followers_count?: number;
+  follows_count?: number;
+  media_count?: number;
+};
+
 export type IgDashboardResponse = {
   success: boolean;
   error?: string;
@@ -48,6 +64,14 @@ export type IgDashboardResponse = {
   stories_aggregate?: StoriesAggregate;
   demographics?: Record<string, unknown>;
   online_followers?: Record<string, number>;
+  account_insights?: Record<string, number>;
+  consolidated_reach?: number;
+  consolidated_impressions?: number;
+  consolidated_profile_views?: number;
+  comparison_metrics?: Record<string, { current: number; previous: number; change: number; changePercent: number }>;
+  daily_insights?: DailyInsightRow[];
+  previous_daily_insights?: DailyInsightRow[];
+  profile_snapshots?: ProfileSnapshot[];
   messages?: string[];
 };
 

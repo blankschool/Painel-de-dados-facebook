@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
+import { useAuth } from "@/contexts/AuthContext";
 import { ChartCard } from "@/components/dashboard/ChartCard";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Button } from "@/components/ui/button";
@@ -39,10 +40,12 @@ function weekdayShortPt(day: number): string {
 
 export default function AdvancedAnalysis() {
   const { data, loading, error } = useDashboardData();
+  const { selectedAccount } = useAuth();
   const allMedia = data?.media ?? [];
   
   // Use the centralized filter hook
-  const media = useFilteredMedia(allMedia);
+  const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
+  const media = useFilteredMedia(allMedia, timezone);
 
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [orderBy, setOrderBy] = useState<OrderBy>("score");

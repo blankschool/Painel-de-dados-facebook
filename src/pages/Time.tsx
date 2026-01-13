@@ -6,6 +6,7 @@ import { formatPercent, getComputedNumber, getReach, type IgMediaItem } from "@/
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
+import { useAuth } from "@/contexts/AuthContext";
 
 const dayLabels = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
@@ -17,9 +18,11 @@ function formatCompact(value: number | null): string {
 }
 
 export default function Time() {
-  const { data, loading, error } = useDashboardData();
+  const { data, loading } = useDashboardData();
+  const { selectedAccount } = useAuth();
   const allMedia = data?.media ?? [];
-  const media = useFilteredMedia(allMedia);
+  const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
+  const media = useFilteredMedia(allMedia, timezone);
 
   // Post click handling
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");

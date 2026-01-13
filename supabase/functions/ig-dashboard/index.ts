@@ -268,16 +268,45 @@ function parseInsightsResponse(json: unknown): Record<string, number> {
   return out;
 }
 
+type DailyInsightsMap = Record<string, Record<string, number>>;
+type InsightValue = { value?: unknown; end_time?: string };
+
+function addDailyInsightValues(
+  map: DailyInsightsMap,
+  metricName: string,
+  values: InsightValue[] = [],
+) {
+  for (const entry of values) {
+    const value = typeof entry?.value === "number" && Number.isFinite(entry.value) ? entry.value : null;
+    if (value === null) continue;
+    const endTime = typeof entry?.end_time === "string" ? entry.end_time : null;
+    if (!endTime) continue;
+    const dateKey = new Date(endTime).toISOString().slice(0, 10);
+    if (!map[dateKey]) map[dateKey] = {};
+    map[dateKey][metricName] = value;
+  }
+}
+
+function mapDailyInsights(map: DailyInsightsMap) {
+  return Object.entries(map)
+    .map(([insight_date, metrics]) => ({ insight_date, ...metrics }))
+    .sort((a, b) => a.insight_date.localeCompare(b.insight_date));
+}
+
 function normalizeMediaInsights(raw: Record<string, number>): Record<string, number> {
   const saved = raw.saved ?? raw.saves;
   const shares = raw.shares;
   const reach = raw.reach;
-  const views = raw.views;
+  const plays = raw.plays;
+  const videoViews = raw.video_views;
+  const views = raw.views ?? plays ?? videoViews;
   const total_interactions = raw.total_interactions ?? raw.engagement;
 
   return {
     ...raw,
     ...(typeof views === "number" ? { views } : {}),
+    ...(typeof plays === "number" ? { plays } : {}),
+    ...(typeof videoViews === "number" ? { video_views: videoViews } : {}),
     ...(typeof reach === "number" ? { reach } : {}),
     ...(typeof saved === "number" ? { saved, saves: raw.saves ?? saved } : {}),
     ...(typeof shares === "number" ? { shares } : {}),
@@ -311,10 +340,17 @@ async function fetchMediaInsights(
     );
   } else if (isReel) {
     candidates.push(
+      "plays,reach,saved,shares,total_interactions",
+      "video_views,reach,saved,shares,total_interactions",
       "views,reach,saved,shares,total_interactions",
+      "plays,reach,saved,shares",
+      "video_views,reach,saved,shares",
       "views,reach,saved,shares",
-      "views,reach,saved,total_interactions",
+      "plays,reach,saved",
+      "video_views,reach,saved",
       "views,reach,saved",
+      "plays,reach",
+      "video_views,reach",
       "views,reach",
       "reach,saved,shares",
       "reach,saved",
@@ -322,10 +358,15 @@ async function fetchMediaInsights(
     );
   } else if (isVideo) {
     candidates.push(
+      "video_views,reach,saved,shares,total_interactions",
       "views,reach,saved,shares,total_interactions",
+      "video_views,reach,saved,total_interactions",
       "views,reach,saved,total_interactions",
+      "video_views,reach,saved,shares",
       "views,reach,saved,shares",
+      "video_views,reach,saved",
       "views,reach,saved",
+      "video_views,reach",
       "views,reach",
       "reach,saved,shares",
       "reach,saved",
@@ -410,7 +451,7 @@ function computeMediaMetrics(
 
   const savesPick = pickMetric(insightsRaw, ["saved", "saves"]);
   const reachPick = pickMetric(insightsRaw, ["reach"]);
-  const viewsPick = pickMetric(insightsRaw, ["views"]);
+  const viewsPick = pickMetric(insightsRaw, ["views", "plays", "video_views", "impressions"]);
   const sharesPick = pickMetric(insightsRaw, ["shares"]);
   const totalInteractionsPick = pickMetric(insightsRaw, ["total_interactions", "engagement"]);
 
@@ -627,10 +668,11 @@ serve(async (req) => {
     if (cacheStatus.hasCachedData && !cacheStatus.shouldRefresh) {
       console.log(`[ig-dashboard] ⚡ Using cached data (${cacheStatus.cacheAge?.toFixed(1)}h old)`);
 
-      const [cachedPosts, cachedInsights, cachedProfile] = await Promise.all([
+      const [cachedPosts, cachedInsights, cachedProfile, cachedSnapshots] = await Promise.all([
         cache.getCachedPosts(supabaseService, connectedAccount.id, sinceDate, untilDate),
         cache.getCachedDailyInsights(supabaseService, connectedAccount.id, sinceDate, untilDate),
         cache.getCachedProfile(supabaseService, connectedAccount.id),
+        cache.getProfileSnapshots(supabaseService, connectedAccount.id, sinceDate, untilDate),
       ]);
 
       if (cachedPosts.length > 0 && cachedProfile) {
@@ -669,6 +711,56 @@ serve(async (req) => {
           { reach: 0, impressions: 0, profile_views: 0 }
         );
 
+        const dailyInsights = cachedInsights
+          .map((insight: any) => ({
+            insight_date: insight.insight_date,
+            reach: insight.reach ?? 0,
+            impressions: insight.impressions ?? 0,
+            profile_views: insight.profile_views ?? 0,
+            follower_count: insight.follower_count ?? null,
+            website_clicks: insight.website_clicks ?? 0,
+          }))
+          .sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
+
+        const periodDuration = new Date(untilDate).getTime() - new Date(sinceDate).getTime();
+        const prevSince = new Date(new Date(sinceDate).getTime() - periodDuration).toISOString().split('T')[0];
+        const prevUntil = new Date(new Date(sinceDate).getTime() - 1).toISOString().split('T')[0];
+        const previousCachedInsights = await cache.getCachedDailyInsights(
+          supabaseService,
+          connectedAccount.id,
+          prevSince,
+          prevUntil,
+        );
+        const previousDailyInsights = previousCachedInsights
+          .map((insight: any) => ({
+            insight_date: insight.insight_date,
+            reach: insight.reach ?? 0,
+            impressions: insight.impressions ?? 0,
+            profile_views: insight.profile_views ?? 0,
+            follower_count: insight.follower_count ?? null,
+            website_clicks: insight.website_clicks ?? 0,
+          }))
+          .sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
+
+        const previousTotals = previousCachedInsights.reduce(
+          (acc: any, insight: any) => ({
+            reach: acc.reach + (insight.reach || 0),
+            impressions: acc.impressions + (insight.impressions || 0),
+            profile_views: acc.profile_views + (insight.profile_views || 0),
+          }),
+          { reach: 0, impressions: 0, profile_views: 0 },
+        );
+
+        const comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
+        for (const metric of ['reach', 'impressions', 'profile_views']) {
+          const current = consolidatedMetrics[metric] || 0;
+          const previous = previousTotals[metric] || 0;
+          if (current === 0 && previous === 0) continue;
+          const change = current - previous;
+          const changePercent = previous > 0 ? ((change / previous) * 100) : 0;
+          comparisonMetrics[metric] = { current, previous, change, changePercent };
+        }
+
         const duration = Date.now() - startedAt;
 
         return new Response(
@@ -693,9 +785,14 @@ serve(async (req) => {
             media: mediaWithInsights,
             posts: mediaWithInsights,
             total_posts: mediaWithInsights.length,
+            account_insights: consolidatedMetrics,
             consolidated_reach: consolidatedMetrics.reach,
             consolidated_impressions: consolidatedMetrics.impressions,
             consolidated_profile_views: consolidatedMetrics.profile_views,
+            daily_insights: dailyInsights,
+            previous_daily_insights: previousDailyInsights,
+            comparison_metrics: comparisonMetrics,
+            profile_snapshots: cachedSnapshots,
             messages: [`⚡ Loaded from cache (${cacheStatus.cacheAge?.toFixed(1)}h old)`],
           }),
           {
@@ -1005,6 +1102,8 @@ serve(async (req) => {
     let accountInsights: Record<string, number> = {};
     let previousPeriodInsights: Record<string, number> = {};
     let comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
+    let dailyInsights: Array<{ insight_date: string; [key: string]: number }> = [];
+    let previousDailyInsights: Array<{ insight_date: string; [key: string]: number }> = [];
 
     try {
       console.log(`[ig-dashboard] Fetching account insights from ${sinceDate} to ${untilDate}`);
@@ -1016,7 +1115,10 @@ serve(async (req) => {
 
       console.log(`[ig-dashboard] Previous period: ${prevSince} to ${prevUntil}`);
 
-      // Fetch current period insights
+      const currentDailyMap: DailyInsightsMap = {};
+      const previousDailyMap: DailyInsightsMap = {};
+
+      // Fetch current period reach/profile_views (safe metrics)
       const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
         metric: 'reach,profile_views',
         period: 'day',
@@ -1027,14 +1129,39 @@ serve(async (req) => {
       const insightsData = (insightsJson as { data?: unknown[] }).data;
       if (Array.isArray(insightsData)) {
         for (const metric of insightsData) {
-          const metricData = metric as { name?: string; values?: Array<{ value?: number }> };
+          const metricData = metric as { name?: string; values?: InsightValue[] };
           if (metricData.name && metricData.values) {
-            // Sum all daily values to get total for the period
-            const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+            const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
             accountInsights[metricData.name] = total;
+            addDailyInsightValues(currentDailyMap, metricData.name, metricData.values);
           }
         }
       }
+
+      // Attempt impressions (may be unavailable depending on permissions)
+      try {
+        const impressionsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+          metric: 'impressions',
+          period: 'day',
+          since: sinceDate,
+          until: untilDate,
+        });
+        const impressionsData = (impressionsJson as { data?: unknown[] }).data;
+        if (Array.isArray(impressionsData)) {
+          for (const metric of impressionsData) {
+            const metricData = metric as { name?: string; values?: InsightValue[] };
+            if (metricData.name && metricData.values) {
+              const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
+              accountInsights[metricData.name] = total;
+              addDailyInsightValues(currentDailyMap, metricData.name, metricData.values);
+            }
+          }
+        }
+      } catch (impErr) {
+        console.log('[ig-dashboard] Impressions not available for current period:', impErr instanceof Error ? impErr.message : String(impErr));
+      }
+
+      dailyInsights = mapDailyInsights(currentDailyMap);
 
       console.log('[ig-dashboard] Account insights (current):', accountInsights);
 
@@ -1050,18 +1177,47 @@ serve(async (req) => {
         const prevInsightsData = (prevInsightsJson as { data?: unknown[] }).data;
         if (Array.isArray(prevInsightsData)) {
           for (const metric of prevInsightsData) {
-            const metricData = metric as { name?: string; values?: Array<{ value?: number }> };
+            const metricData = metric as { name?: string; values?: InsightValue[] };
             if (metricData.name && metricData.values) {
-              const total = metricData.values.reduce((sum, v) => sum + (v.value ?? 0), 0);
+              const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
               previousPeriodInsights[metricData.name] = total;
+              addDailyInsightValues(previousDailyMap, metricData.name, metricData.values);
             }
           }
         }
 
+        // Attempt impressions for previous period
+        try {
+          const prevImpressionsJson = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: 'impressions',
+            period: 'day',
+            since: prevSince,
+            until: prevUntil,
+          });
+          const prevImpressionsData = (prevImpressionsJson as { data?: unknown[] }).data;
+          if (Array.isArray(prevImpressionsData)) {
+            for (const metric of prevImpressionsData) {
+              const metricData = metric as { name?: string; values?: InsightValue[] };
+              if (metricData.name && metricData.values) {
+                const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
+                previousPeriodInsights[metricData.name] = total;
+                addDailyInsightValues(previousDailyMap, metricData.name, metricData.values);
+              }
+            }
+          }
+        } catch (prevImpErr) {
+          console.log('[ig-dashboard] Impressions not available for previous period:', prevImpErr instanceof Error ? prevImpErr.message : String(prevImpErr));
+        }
+
+        previousDailyInsights = mapDailyInsights(previousDailyMap);
+
         console.log('[ig-dashboard] Account insights (previous):', previousPeriodInsights);
 
-        // Calculate comparison metrics
-        for (const metric of ['reach', 'impressions', 'profile_views']) {
+        const comparisonKeys = ['reach', 'impressions', 'profile_views'].filter(
+          (metric) => metric in accountInsights || metric in previousPeriodInsights,
+        );
+
+        for (const metric of comparisonKeys) {
           const current = accountInsights[metric] || 0;
           const previous = previousPeriodInsights[metric] || 0;
           const change = current - previous;
@@ -1110,14 +1266,20 @@ serve(async (req) => {
         mediaWithInsights
       );
 
-      // Save daily insights (today's snapshot)
-      const today = new Date().toISOString().split('T')[0];
-      await cache.saveDailyInsights(
-        supabaseService,
-        connectedAccount.id,
-        accountInsights,
-        today
-      );
+      // Save daily insights (one row per day)
+      if (dailyInsights.length > 0) {
+        const latestDate = dailyInsights[dailyInsights.length - 1]?.insight_date;
+        const withFollowers = dailyInsights.map((row) =>
+          row.insight_date === latestDate && typeof profile.followers_count === "number"
+            ? { ...row, follower_count: profile.followers_count }
+            : row,
+        );
+        await cache.saveDailyInsightsBatch(
+          supabaseService,
+          connectedAccount.id,
+          withFollowers,
+        );
+      }
 
       // Update cache metadata
       const postDates = mediaWithInsights
@@ -1138,6 +1300,13 @@ serve(async (req) => {
     } catch (cacheError) {
       console.error('[ig-dashboard] ⚠️  Failed to save to cache (non-critical):', cacheError);
       // Don't fail the request if caching fails
+    }
+
+    let profileSnapshots: any[] = [];
+    try {
+      profileSnapshots = await cache.getProfileSnapshots(supabaseService, connectedAccount.id, sinceDate, untilDate);
+    } catch (snapshotErr) {
+      console.log('[ig-dashboard] Failed to load profile snapshots:', snapshotErr instanceof Error ? snapshotErr.message : String(snapshotErr));
     }
 
     return new Response(
@@ -1161,6 +1330,9 @@ serve(async (req) => {
         consolidated_reach: accountInsights.reach || totalReach,
         consolidated_impressions: accountInsights.impressions || totalViews,
         consolidated_profile_views: accountInsights.profile_views || 0,
+        daily_insights: dailyInsights,
+        previous_daily_insights: previousDailyInsights,
+        profile_snapshots: profileSnapshots,
         // Period comparison metrics (current vs previous period)
         previous_period_insights: previousPeriodInsights,
         comparison_metrics: comparisonMetrics,

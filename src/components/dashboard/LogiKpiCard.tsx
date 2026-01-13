@@ -29,7 +29,7 @@ export function LogiKpiCard({
   return (
     <article
       className={cn(
-        "group relative rounded-xl border border-border/40 bg-card p-5 transition-all duration-200",
+        "group relative rounded-2xl border border-border/50 bg-card/85 p-5 transition-all duration-200 backdrop-blur-sm",
         "animate-fade-in-up hover-lift",
         staggerClass,
         className
@@ -37,7 +37,7 @@ export function LogiKpiCard({
     >
       {/* Icon Container - Circular */}
       <div className="flex items-start justify-between mb-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-foreground transition-transform duration-200 group-hover:scale-110">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/80 text-foreground transition-transform duration-200 group-hover:scale-110">
           {icon}
         </div>
         

@@ -35,11 +35,12 @@ const GENDER_COLORS = [
 ];
 
 export default function Followers() {
-  const { data, loading, error } = useDashboardData();
+  const { data, loading } = useDashboardData();
   const demographics = (data?.demographics as Record<string, Record<string, number>> | undefined) ?? {};
   const profile = data?.profile;
   const followersCount = profile?.followers_count ?? 0;
   const followsCount = profile?.follows_count ?? 0;
+  const profileSnapshots = data?.profile_snapshots ?? [];
 
   // Sort order states
   const [ageSortOrder, setAgeSortOrder] = useState<SortOrder>("desc");
@@ -48,27 +49,31 @@ export default function Followers() {
   const [genderSortOrder, setGenderSortOrder] = useState<SortOrder>("desc");
   const [changeVariant, setChangeVariant] = useState<'stacked' | 'net'>('stacked');
 
-  // Mock follower change data (would come from instagram_daily_insights in production)
   const followerChangeData = useMemo(() => {
-    const days = 7;
-    const result = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const gained = Math.floor(Math.random() * 100) + 20;
-      const lost = Math.floor(Math.random() * 50) + 5;
-      result.push({
-        date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
-        gained,
-        lost: -lost, // negative for stacked chart
-        net: gained - lost,
-      });
-    }
-    return result;
-  }, []);
+    if (profileSnapshots.length < 2) return [];
+
+    return profileSnapshots
+      .map((snap, index) => {
+        const prev = profileSnapshots[index - 1];
+        if (!prev) return null;
+        const currentCount = snap.followers_count ?? 0;
+        const previousCount = prev.followers_count ?? 0;
+        const net = currentCount - previousCount;
+        return {
+          date: new Date(snap.snapshot_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+          gained: net > 0 ? net : 0,
+          lost: net < 0 ? net : 0,
+          net,
+        };
+      })
+      .filter(Boolean) as Array<{ date: string; gained: number; lost: number; net: number }>;
+  }, [profileSnapshots]);
 
   // Follower change stats
   const changeStats = useMemo(() => {
+    if (!followerChangeData.length) {
+      return { totalGained: 0, totalLost: 0, totalNet: 0, maxChange: 0, avgChange: 0 };
+    }
     const totalGained = followerChangeData.reduce((sum, d) => sum + d.gained, 0);
     const totalLost = followerChangeData.reduce((sum, d) => sum + Math.abs(d.lost), 0);
     const totalNet = totalGained - totalLost;
@@ -294,7 +299,7 @@ export default function Followers() {
     );
   }
 
-  const maxAgeValue = Math.max(...ageGroups.map(d => d.value), 1);
+  const hasFollowerChange = followerChangeData.length > 0;
 
   return (
     <>
@@ -315,24 +320,24 @@ export default function Followers() {
           />
           <MetricCard
             label="Ganhos"
-            value={`+${changeStats.totalGained}`}
+            value={hasFollowerChange ? `+${changeStats.totalGained}` : "--"}
             icon={<TrendingUp className="w-4 h-4" />}
-            delta={{ value: changeStats.totalGained, positive: true }}
+            delta={hasFollowerChange ? { value: changeStats.totalGained.toLocaleString("pt-BR"), positive: true } : undefined}
           />
           <MetricCard
             label="Perdidos"
-            value={`-${changeStats.totalLost}`}
+            value={hasFollowerChange ? `-${changeStats.totalLost}` : "--"}
             icon={<TrendingDown className="w-4 h-4" />}
-            delta={{ value: changeStats.totalLost, positive: false }}
+            delta={hasFollowerChange ? { value: changeStats.totalLost.toLocaleString("pt-BR"), positive: false } : undefined}
           />
           <MetricCard
             label="Variação Máx"
-            value={changeStats.maxChange > 0 ? `+${changeStats.maxChange}` : changeStats.maxChange.toString()}
+            value={hasFollowerChange ? (changeStats.maxChange > 0 ? `+${changeStats.maxChange}` : changeStats.maxChange.toString()) : "--"}
             icon={<TrendingUp className="w-4 h-4" />}
           />
           <MetricCard
             label="Variação Média"
-            value={changeStats.avgChange > 0 ? `+${changeStats.avgChange}` : changeStats.avgChange.toString()}
+            value={hasFollowerChange ? (changeStats.avgChange > 0 ? `+${changeStats.avgChange}` : changeStats.avgChange.toString()) : "--"}
             icon={<Calendar className="w-4 h-4" />}
           />
         </div>
@@ -340,10 +345,26 @@ export default function Followers() {
         {/* Follower Change Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ChartCard title="Variação de Seguidores" subtitle="Ganhos vs Perdidos por dia">
-            <FollowerChangeChart data={followerChangeData} variant="stacked" height={220} />
+            {hasFollowerChange ? (
+              <FollowerChangeChart data={followerChangeData} variant="stacked" height={220} />
+            ) : (
+              <div className="flex h-[220px] flex-col items-center justify-center text-muted-foreground">
+                <UserMinus className="w-8 h-8 mb-2 opacity-60" />
+                <p className="text-sm font-medium">Sem histórico suficiente</p>
+                <p className="text-xs">Conecte e acompanhe por alguns dias.</p>
+              </div>
+            )}
           </ChartCard>
           <ChartCard title="Variação Líquida" subtitle="Saldo diário de seguidores">
-            <FollowerChangeChart data={followerChangeData} variant="net" height={220} />
+            {hasFollowerChange ? (
+              <FollowerChangeChart data={followerChangeData} variant="net" height={220} />
+            ) : (
+              <div className="flex h-[220px] flex-col items-center justify-center text-muted-foreground">
+                <UserMinus className="w-8 h-8 mb-2 opacity-60" />
+                <p className="text-sm font-medium">Sem histórico suficiente</p>
+                <p className="text-xs">Conecte e acompanhe por alguns dias.</p>
+              </div>
+            )}
           </ChartCard>
         </div>
 

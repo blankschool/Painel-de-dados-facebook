@@ -1,6 +1,9 @@
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useFilteredMedia } from '@/hooks/useFilteredMedia';
+import { useAuth } from '@/contexts/AuthContext';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
+import { FiltersBar } from '@/components/layout/FiltersBar';
 import { formatNumberOrDash, getViews, isReel } from '@/utils/ig';
 import { 
   Play, 
@@ -23,7 +26,10 @@ import {
 
 const Reels = () => {
   const { data, loading, error } = useDashboardData();
-  const media = data?.media ?? [];
+  const { selectedAccount } = useAuth();
+  const allMedia = data?.media ?? [];
+  const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
+  const media = useFilteredMedia(allMedia, timezone);
 
   if (loading) {
     return (
@@ -57,15 +63,7 @@ const Reels = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reels & Vídeos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Métricas e análises dos seus conteúdos em vídeo.
-          </p>
-        </div>
-      </section>
+      <FiltersBar showMediaType />
 
       {/* KPIs - Real data only */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -183,14 +183,11 @@ const Optimization = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-3 py-2">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Optimization</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Sugestões de otimização baseadas nos dados do seu perfil.
-          </p>
-        </div>
+      {/* Summary + Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Sugestões de otimização baseadas nos dados do seu perfil.
+        </p>
         <div className="flex items-center gap-3">
           {data?.from_cache && data?.cache_age_hours !== undefined && (
             <div className="chip">
@@ -214,7 +211,7 @@ const Optimization = () => {
             Atualizar
           </Button>
         </div>
-      </section>
+      </div>
 
       <FiltersBar />
 

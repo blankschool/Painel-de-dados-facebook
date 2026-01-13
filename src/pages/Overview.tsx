@@ -3,9 +3,8 @@ import { formatDateForGraph, getDateKey } from "@/utils/dateFormat";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
-import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { formatRelativeTime } from "@/lib/dashboardHelpers";
-import { Users, Eye, Heart, MessageCircle, Bookmark, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, Grid2X2, Search } from "lucide-react";
+import { formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
+import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
@@ -36,33 +35,6 @@ function formatCompact(value: number | null): string {
   return value.toLocaleString("pt-BR");
 }
 
-// Comparison badge component
-function ComparisonBadge({ metric }: { metric?: { current: number; previous: number; change: number; changePercent: number } }) {
-  if (!metric || metric.previous === 0) return null;
-
-  const isPositive = metric.change > 0;
-  const isNeutral = metric.change === 0;
-
-  if (isNeutral) {
-    return (
-      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-        <Minus className="w-3 h-3" />
-        <span>Sem mudanças</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex items-center gap-1 text-xs mt-1 ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-      {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-      <span className="font-medium">
-        {isPositive ? '+' : ''}{metric.changePercent.toFixed(1)}%
-      </span>
-      <span className="text-muted-foreground text-[10px]">vs período anterior</span>
-    </div>
-  );
-}
-
 const tooltipStyle = {
   backgroundColor: "hsl(var(--card))",
   border: "1px solid hsl(var(--border))",
@@ -80,9 +52,7 @@ export default function Overview() {
   // Apply filters to media using account's timezone
   const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
   const media = useFilteredMedia(allMedia, accountTimezone);
-  
-  // Raw post count (before 1-per-day filter)
-  const rawPostCount = allMedia.length;
+  const bestPerDayMedia = useFilteredMedia(allMedia, accountTimezone, { bestPerDay: true });
   
   // Cache info for display
   const fromCache = (data as any)?.from_cache === true;
@@ -96,7 +66,9 @@ export default function Overview() {
   const [engagementSort, setEngagementSort] = useState<SortOrder>("desc");
 
   // Extract comparison metrics from API response
-  const comparisonMetrics = (data as any)?.comparison_metrics as Record<string, { current: number; previous: number; change: number; changePercent: number }> | undefined;
+  const comparisonMetrics = data?.comparison_metrics;
+  const dailyInsights = data?.daily_insights ?? [];
+  const previousDailyInsights = data?.previous_daily_insights ?? [];
 
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
@@ -104,6 +76,8 @@ export default function Overview() {
 
   const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
   const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
+  const consolidatedReach = typeof data?.consolidated_reach === "number" ? data.consolidated_reach : totalReach;
+  const consolidatedImpressions = typeof data?.consolidated_impressions === "number" ? data.consolidated_impressions : totalViews;
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
   const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
@@ -127,36 +101,51 @@ export default function Overview() {
     };
   }, [media, data?.stories?.length]);
 
-  // Performance over time data (group by date)
+  // Performance over time data (prefer daily insights, fallback to grouped posts)
   const performanceData = useMemo(() => {
-    const grouped: Record<string, { reach: number; reachPrev: number }> = {};
-    
+    if (dailyInsights.length > 0) {
+      const current = dailyInsights.slice(-30);
+      const previous = previousDailyInsights.slice(-current.length);
+      const totalDays = current.length;
+
+      return current.map((row, index) => ({
+        date: row.insight_date,
+        dateLabel: formatDateForGraph(row.insight_date, totalDays),
+        reach: row.reach ?? 0,
+        reachPrev: previous[index]?.reach ?? null,
+      }));
+    }
+
+    const grouped: Record<string, { reach: number }> = {};
+
     for (const item of media) {
       if (!item.timestamp) continue;
       const date = new Date(item.timestamp);
       // Use local timezone format to avoid UTC shift issues
       const dateKey = getDateKey(date);
       const reach = getReach(item) ?? 0;
-      
+
       if (!grouped[dateKey]) {
-        grouped[dateKey] = { reach: 0, reachPrev: 0 };
+        grouped[dateKey] = { reach: 0 };
       }
       grouped[dateKey].reach += reach;
     }
 
-    // Get total days for formatting
     const entries = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).slice(-30);
     const totalDays = entries.length;
 
-    // Sort by date and take last 30 days
     return entries.map(([date, values]) => ({
-        date,
-        // Use universal date format: "12 Jan"
-        dateLabel: formatDateForGraph(date, totalDays),
-        reach: values.reach,
-        reachPrev: Math.round(values.reach * (0.6 + Math.random() * 0.3)), // Simulated previous period
-      }));
-  }, [media]);
+      date,
+      dateLabel: formatDateForGraph(date, totalDays),
+      reach: values.reach,
+      reachPrev: null,
+    }));
+  }, [dailyInsights, previousDailyInsights, media]);
+
+  const hasReachPrev = useMemo(
+    () => performanceData.some((item) => typeof item.reachPrev === "number" && item.reachPrev > 0),
+    [performanceData],
+  );
 
   // Performance by day of week (with sorting)
   const dayData = useMemo(() => {
@@ -183,9 +172,10 @@ export default function Overview() {
     return sorted;
   }, [media, daySort]);
 
-  // Top content with sorting - show ALL filtered posts (1 per day)
+  // Top content with sorting - best post per day
   const topContent = useMemo(() => {
-    return [...media]
+    const source = bestPerDayMedia.length ? bestPerDayMedia : media;
+    return [...source]
       .map((item) => ({
         item,
         er: getComputedNumber(item, "er") ?? 0,
@@ -197,8 +187,8 @@ export default function Overview() {
         const bVal = b[topContentSortBy];
         return topContentSort === "desc" ? bVal - aVal : aVal - bVal;
       });
-    // No .slice() - show all posts (1 per day = 7 for 7-day period)
-  }, [media, topContentSort, topContentSortBy]);
+    // No .slice() - show all best-per-day posts
+  }, [bestPerDayMedia, media, topContentSort, topContentSortBy]);
 
   // Calculate max value for bar chart scaling
   const maxTopContentValue = useMemo(() => {
@@ -257,38 +247,40 @@ export default function Overview() {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <FiltersBar />
-        <div className="flex items-center gap-2">
-          {/* Last update indicator */}
-          {data && (
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="w-3.5 h-3.5" />
-              <span>
-                {(data as any).from_cache 
-                  ? `Cache (${((data as any).cache_age_hours ?? 0).toFixed(1)}h)`
-                  : 'Atualizado agora'
-                }
-              </span>
-            </div>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => forceRefresh()}
-            disabled={loading}
-            className="flex items-center gap-1.5"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Atualizar</span>
-          </Button>
-          {data?.token_type && (
-            <Badge variant="outline" className="flex items-center gap-1.5 shrink-0">
-              <Instagram className="w-3.5 h-3.5" />
-              {data.token_type === 'IGAA' ? 'Instagram Business Login' : 'Facebook Login'}
-            </Badge>
-          )}
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {/* Last update indicator */}
+            {data && (
+              <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="w-3.5 h-3.5" />
+                <span>
+                  {(data as any).from_cache 
+                    ? `Cache (${((data as any).cache_age_hours ?? 0).toFixed(1)}h)`
+                    : 'Atualizado agora'
+                  }
+                </span>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => forceRefresh()}
+              disabled={loading}
+              className="flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Atualizar</span>
+            </Button>
+            {data?.token_type && (
+              <Badge variant="outline" className="flex items-center gap-1.5 shrink-0">
+                <Instagram className="w-3.5 h-3.5" />
+                {data.token_type === 'IGAA' ? 'Instagram Business Login' : 'Facebook Login'}
+              </Badge>
+            )}
+          </div>
         </div>
+        <FiltersBar />
       </div>
 
       <div className="content-area space-y-6">
@@ -303,7 +295,7 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Alcance Total"
-            value={formatCompact(totalReach)}
+            value={formatCompact(consolidatedReach)}
             icon={<Eye className="w-5 h-5" />}
             trend={comparisonMetrics?.reach ? { 
               value: comparisonMetrics.reach.changePercent, 
@@ -344,7 +336,7 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Visualizações"
-            value={formatCompact(totalViews)}
+            value={formatCompact(consolidatedImpressions)}
             icon={<Play className="w-5 h-5" />}
             trend={comparisonMetrics?.impressions ? { 
               value: comparisonMetrics.impressions.changePercent, 
@@ -376,9 +368,11 @@ export default function Overview() {
                 <div className="legend-item">
                   <span className="legend-dot solid" /> Alcance
                 </div>
-                <div className="legend-item">
-                  <span className="legend-dot dashed" /> Alcance (mês anterior)
-                </div>
+                {hasReachPrev && (
+                  <div className="legend-item">
+                    <span className="legend-dot dashed" /> Alcance (mês anterior)
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -417,14 +411,16 @@ export default function Overview() {
                     dot={{ r: 3, fill: "hsl(var(--foreground))" }}
                     activeDot={{ r: 6, fill: "hsl(var(--foreground))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="reachPrev"
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeWidth={2}
-                    strokeDasharray="8 4"
-                    dot={false}
-                  />
+                  {hasReachPrev && (
+                    <Line
+                      type="monotone"
+                      dataKey="reachPrev"
+                      stroke="hsl(var(--muted-foreground))"
+                      strokeWidth={2}
+                      strokeDasharray="8 4"
+                      dot={false}
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -561,7 +557,7 @@ export default function Overview() {
               <div>
                 <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {media.length} {media.length === 1 ? 'publicação' : 'publicações'} • 1 por dia
+                  {bestPerDayMedia.length} {bestPerDayMedia.length === 1 ? 'publicação' : 'publicações'} • 1 por dia
                 </p>
               </div>
               <SortDropdown

@@ -70,6 +70,8 @@ export function getViews(item: IgMediaItem): number | null {
   if (hasInsights) return null;
   return (
     getInsightsNumber(item, "views") ??
+    getInsightsNumber(item, "plays") ??
+    getInsightsNumber(item, "video_views") ??
     getInsightsNumber(item, "impressions") ??
     null
   );

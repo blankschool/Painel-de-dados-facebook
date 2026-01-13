@@ -103,7 +103,7 @@ export default function IGAADashboard() {
 
   // Performance over time data (group by date)
   const performanceData = useMemo(() => {
-    const grouped: Record<string, { reach: number; reachPrev: number }> = {};
+    const grouped: Record<string, { reach: number }> = {};
     
     for (const item of media) {
       if (!item.timestamp) continue;
@@ -112,7 +112,7 @@ export default function IGAADashboard() {
       const reach = getReach(item) ?? 0;
       
       if (!grouped[dateKey]) {
-        grouped[dateKey] = { reach: 0, reachPrev: 0 };
+        grouped[dateKey] = { reach: 0 };
       }
       grouped[dateKey].reach += reach;
     }
@@ -125,7 +125,7 @@ export default function IGAADashboard() {
         date,
         dateLabel: new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
         reach: values.reach,
-        reachPrev: Math.round(values.reach * (0.6 + Math.random() * 0.3)), // Simulated previous period
+        reachPrev: null,
       }));
   }, [media]);
 
@@ -316,9 +316,6 @@ export default function IGAADashboard() {
                 <div className="legend-item">
                   <span className="legend-dot solid" /> Alcance
                 </div>
-                <div className="legend-item">
-                  <span className="legend-dot dashed" /> Alcance (mês anterior)
-                </div>
               </div>
             </div>
           </div>
@@ -356,14 +353,6 @@ export default function IGAADashboard() {
                     strokeWidth={2}
                     dot={{ r: 3, fill: "hsl(var(--foreground))" }}
                     activeDot={{ r: 6, fill: "hsl(var(--foreground))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="reachPrev"
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeWidth={2}
-                    strokeDasharray="8 4"
-                    dot={false}
                   />
                 </LineChart>
               </ResponsiveContainer>

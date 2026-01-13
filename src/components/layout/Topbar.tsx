@@ -19,12 +19,63 @@ import {
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
 
-const pageNames: Record<string, string> = {
-  "/": "Dashboard",
-  "/overview": "Dashboard",
-  "/followers": "Seguidores",
-  "/content": "Conteúdo",
-  "/time": "Tempo",
+const pageMeta: Record<string, { title: string; subtitle: string }> = {
+  "/": {
+    title: "Visão Geral",
+    subtitle: "Panorama do desempenho e principais métricas do período.",
+  },
+  "/overview": {
+    title: "Visão Geral",
+    subtitle: "Panorama do desempenho e principais métricas do período.",
+  },
+  "/followers": {
+    title: "Seguidores",
+    subtitle: "Distribuição, crescimento e padrões da audiência.",
+  },
+  "/content": {
+    title: "Conteúdo",
+    subtitle: "Performance por formato e análise editorial.",
+  },
+  "/time": {
+    title: "Tempo",
+    subtitle: "Leitura temporal para alcance e engajamento.",
+  },
+  "/posts": {
+    title: "Posts",
+    subtitle: "Ranking e métricas detalhadas por publicação.",
+  },
+  "/performance": {
+    title: "Performance",
+    subtitle: "Comparativos de engajamento por tipo de mídia.",
+  },
+  "/stories": {
+    title: "Stories",
+    subtitle: "Insights de consumo, resposta e retenção.",
+  },
+  "/reels": {
+    title: "Reels",
+    subtitle: "Acompanhamento de plays, alcance e engajamento.",
+  },
+  "/profile": {
+    title: "Perfil",
+    subtitle: "Visitas ao perfil e alcance do público.",
+  },
+  "/optimization": {
+    title: "Otimização",
+    subtitle: "Ajustes recomendados a partir dos dados.",
+  },
+  "/demographics": {
+    title: "Demografia",
+    subtitle: "Distribuição geográfica e perfil da audiência.",
+  },
+  "/online": {
+    title: "Online",
+    subtitle: "Quando sua audiência está ativa.",
+  },
+  "/advanced": {
+    title: "Análise Avançada",
+    subtitle: "Leituras profundas de performance e eficiência.",
+  },
 };
 
 export function Topbar() {
@@ -33,7 +84,15 @@ export function Topbar() {
   const { data, refresh } = useDashboardData();
   const { theme, setTheme } = useTheme();
   
-  const pageName = pageNames[location.pathname] || "Dashboard";
+  const meta =
+    pageMeta[location.pathname] ||
+    (location.pathname.startsWith("/media/") ? {
+      title: "Detalhe do Post",
+      subtitle: "Dados completos do conteúdo selecionado.",
+    } : {
+      title: "Dashboard",
+      subtitle: "Resumo geral do desempenho da conta.",
+    });
   const accountName = data?.profile?.username || "Instagram Business";
   const profilePicture = data?.profile?.profile_picture_url;
   
@@ -83,25 +142,26 @@ export function Topbar() {
   return (
     <header className="header">
       <div className="header-left">
-        <h1 className="page-title">{pageName}</h1>
-        <div className="header-actions">
-          {/* Theme Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="h-8 w-8"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        <span className="page-hero-kicker">Relatório do Instagram</span>
+        <h1 className="page-title">{meta.title}</h1>
+        <p className="page-hero-subtitle">{meta.subtitle}</p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {/* Theme Toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          className="h-9 w-9"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </Button>
+
         {/* Account Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

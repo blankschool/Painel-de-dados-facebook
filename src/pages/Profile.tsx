@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { useAuth } from '@/contexts/AuthContext';
 import { FiltersBar } from '@/components/layout/FiltersBar';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   RefreshCw,
   Clock,
@@ -19,29 +17,14 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
   Area,
   AreaChart,
 } from 'recharts';
-
-const COLORS = {
-  followers: 'hsl(217, 91%, 60%)',
-  nonFollowers: 'hsl(262, 83%, 58%)',
-  primary: 'hsl(var(--primary))',
-  muted: 'hsl(var(--muted-foreground))',
-};
 
 const tooltipStyle = {
   backgroundColor: 'hsl(var(--card))',
@@ -60,7 +43,6 @@ function formatNumber(value: number | undefined | null): string {
 
 const Profile = () => {
   const { data, loading, forceRefresh } = useDashboardData();
-  const { selectedAccount } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = data?.profile;
@@ -71,63 +53,41 @@ const Profile = () => {
     setRefreshing(false);
   };
 
-  // Mock data for profile metrics (these would come from API)
-  // In reality, you'd get these from instagram_daily_insights table
+  const dailyInsights = data?.daily_insights ?? [];
+  const consolidatedProfileViews = typeof data?.consolidated_profile_views === "number" ? data.consolidated_profile_views : null;
+
   const profileVisitsData = useMemo(() => {
-    // Generate sample data - in production this comes from daily insights
-    const days = 7;
-    const result = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      result.push({
-        date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
-        visits: Math.floor(Math.random() * 500) + 100,
-        followers: Math.floor(Math.random() * 300) + 50,
-        nonFollowers: Math.floor(Math.random() * 200) + 50,
-      });
-    }
-    return result;
-  }, []);
+    if (!dailyInsights.length) return [];
+    return dailyInsights.map((row) => ({
+      date: new Date(row.insight_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+      visits: row.profile_views ?? 0,
+    }));
+  }, [dailyInsights]);
 
   // Calculate totals from the data
   const totals = useMemo(() => {
+    if (!profileVisitsData.length) {
+      return {
+        totalVisits: consolidatedProfileViews,
+        maxVisits: null,
+        avgVisits: null,
+      };
+    }
     const visits = profileVisitsData.reduce((sum, d) => sum + d.visits, 0);
     const maxVisits = Math.max(...profileVisitsData.map(d => d.visits));
     const avgVisits = Math.round(visits / profileVisitsData.length);
-    const followersViews = profileVisitsData.reduce((sum, d) => sum + d.followers, 0);
-    const nonFollowersViews = profileVisitsData.reduce((sum, d) => sum + d.nonFollowers, 0);
-    const totalViews = followersViews + nonFollowersViews;
 
     return {
       totalVisits: visits,
       maxVisits,
       avgVisits,
-      followersViews,
-      nonFollowersViews,
-      totalViews,
-      followersPercent: totalViews > 0 ? Math.round((followersViews / totalViews) * 100) : 0,
-      nonFollowersPercent: totalViews > 0 ? Math.round((nonFollowersViews / totalViews) * 100) : 0,
     };
-  }, [profileVisitsData]);
+  }, [profileVisitsData, consolidatedProfileViews]);
 
-  // Reach distribution data
-  const reachDistribution = useMemo(() => [
-    { name: 'Seguidores', value: totals.followersPercent, fill: COLORS.followers },
-    { name: 'Não Seguidores', value: totals.nonFollowersPercent, fill: COLORS.nonFollowers },
-  ], [totals]);
-
-  // Accounts engaged data
-  const accountsEngagedData = useMemo(() => {
-    return profileVisitsData.map(d => ({
-      ...d,
-      engaged: Math.floor(d.visits * 0.3 + Math.random() * 50),
-    }));
-  }, [profileVisitsData]);
-
-  const totalEngaged = accountsEngagedData.reduce((sum, d) => sum + d.engaged, 0);
-  const avgEngaged = Math.round(totalEngaged / accountsEngagedData.length);
-  const maxEngaged = Math.max(...accountsEngagedData.map(d => d.engaged));
+  const visitRate =
+    profile?.followers_count && typeof totals.totalVisits === "number"
+      ? (totals.totalVisits / profile.followers_count) * 100
+      : null;
 
   if (loading && !data) {
     return (
@@ -139,14 +99,11 @@ const Profile = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-3 py-2">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Perfil</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Métricas de visualizações e alcance do seu perfil.
-          </p>
-        </div>
+      {/* Summary + Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Métricas de visualizações e alcance do seu perfil.
+        </p>
         <div className="flex items-center gap-3">
           {data?.from_cache && data?.cache_age_hours !== undefined && (
             <div className="chip">
@@ -170,7 +127,7 @@ const Profile = () => {
             Atualizar
           </Button>
         </div>
-      </section>
+      </div>
 
       <FiltersBar />
 
@@ -250,10 +207,10 @@ const Profile = () => {
           tooltip="Média de visitas diárias ao perfil"
         />
         <MetricCard
-          label="Contas Engajadas"
-          value={formatNumber(totalEngaged)}
+          label="Taxa de Visita"
+          value={visitRate !== null ? `${visitRate.toFixed(1)}%` : "--"}
           icon={<Users className="w-4 h-4" />}
-          tooltip="Total de contas que interagiram com seu conteúdo"
+          tooltip="Visitas ao perfil ÷ seguidores × 100"
         />
       </div>
 
@@ -263,51 +220,15 @@ const Profile = () => {
         subtitle="Visualizações diárias do seu perfil"
       >
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={profileVisitsData}>
-              <defs>
-                <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11 }}
-                stroke="hsl(var(--muted-foreground))"
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10 }}
-                stroke="hsl(var(--muted-foreground))"
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Area
-                type="monotone"
-                dataKey="visits"
-                name="Visitas"
-                stroke="hsl(var(--primary))"
-                fill="url(#visitsGradient)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
-
-      {/* Views breakdown + Reach Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Views by Follower Status */}
-        <ChartCard
-          title="Views por Tipo de Seguidor"
-          subtitle="Seguidores vs Não Seguidores"
-        >
-          <div className="h-64">
+          {profileVisitsData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={profileVisitsData}>
+              <AreaChart data={profileVisitsData}>
+                <defs>
+                  <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -322,23 +243,39 @@ const Profile = () => {
                   axisLine={false}
                 />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                <Bar
-                  dataKey="followers"
-                  name="Seguidores"
-                  fill={COLORS.followers}
-                  stackId="stack"
-                  radius={[0, 0, 0, 0]}
+                <Area
+                  type="monotone"
+                  dataKey="visits"
+                  name="Visitas"
+                  stroke="hsl(var(--primary))"
+                  fill="url(#visitsGradient)"
+                  strokeWidth={2}
                 />
-                <Bar
-                  dataKey="nonFollowers"
-                  name="Não Seguidores"
-                  fill={COLORS.nonFollowers}
-                  stackId="stack"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
+              </AreaChart>
             </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+              <Eye className="w-10 h-10 mb-2 opacity-60" />
+              <p className="text-sm font-medium">Sem dados de visitas</p>
+              <p className="text-xs">Aguardando histórico diário do Instagram.</p>
+            </div>
+          )}
+        </div>
+      </ChartCard>
+
+      {/* Views breakdown + Reach Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Views by Follower Status */}
+        <ChartCard
+          title="Views por Tipo de Seguidor"
+          subtitle="Seguidores vs Não Seguidores"
+        >
+          <div className="flex h-64 flex-col items-center justify-center text-muted-foreground text-center">
+            <UserCheck className="w-10 h-10 mb-2 opacity-60" />
+            <p className="text-sm font-medium">Breakdown indisponível</p>
+            <p className="text-xs max-w-xs">
+              O Instagram não fornece esta divisão para todas as contas.
+            </p>
           </div>
         </ChartCard>
 
@@ -347,52 +284,12 @@ const Profile = () => {
           title="Distribuição de Alcance"
           subtitle="Proporção de visualizações por tipo"
         >
-          <div className="flex items-center gap-8 h-64">
-            <div className="w-48 h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={reachDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {reachDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value: number) => [`${value}%`, '']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex-1 space-y-4">
-              {reachDistribution.map((item) => (
-                <div key={item.name} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.fill }}
-                      />
-                      <span className="text-sm font-medium">{item.name}</span>
-                    </div>
-                    <span className="text-lg font-bold">{item.value}%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${item.value}%`, backgroundColor: item.fill }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="flex h-64 flex-col items-center justify-center text-muted-foreground text-center">
+            <UserX className="w-10 h-10 mb-2 opacity-60" />
+            <p className="text-sm font-medium">Sem dados suficientes</p>
+            <p className="text-xs max-w-xs">
+              Ative métricas avançadas para visualizar esta divisão.
+            </p>
           </div>
         </ChartCard>
       </div>
@@ -402,62 +299,19 @@ const Profile = () => {
         title="Contas Engajadas"
         subtitle="Contas únicas que interagiram com seu conteúdo"
       >
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          <div className="p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold">{formatNumber(totalEngaged)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground">Máximo/Dia</p>
-            <p className="text-2xl font-bold">{formatNumber(maxEngaged)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground">Média/Dia</p>
-            <p className="text-2xl font-bold">{formatNumber(avgEngaged)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-muted/30">
-            <p className="text-sm text-muted-foreground">Taxa de Engajamento</p>
-            <p className="text-2xl font-bold">
-              {profile?.followers_count
-                ? `${((totalEngaged / profile.followers_count) * 100).toFixed(1)}%`
-                : '--'}
-            </p>
-          </div>
-        </div>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={accountsEngagedData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11 }}
-                stroke="hsl(var(--muted-foreground))"
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10 }}
-                stroke="hsl(var(--muted-foreground))"
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar
-                dataKey="engaged"
-                name="Contas Engajadas"
-                fill="hsl(var(--primary))"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="flex h-48 flex-col items-center justify-center text-muted-foreground text-center">
+          <Users className="w-10 h-10 mb-2 opacity-60" />
+          <p className="text-sm font-medium">Métrica indisponível</p>
+          <p className="text-xs max-w-xs">
+            O Instagram não fornece contas engajadas para este período.
+          </p>
         </div>
       </ChartCard>
 
       {/* Note about data */}
       <div className="p-4 rounded-lg bg-muted/30 text-sm text-muted-foreground">
-        <strong>Nota:</strong> Algumas métricas como Profile Visits, Views por tipo de seguidor e 
-        Accounts Engaged requerem dados históricos do Instagram Insights API. Os gráficos acima 
-        mostram dados de demonstração. Conecte os dados reais através da tabela 
-        `instagram_daily_insights` para visualizar suas métricas reais.
+        <strong>Nota:</strong> Algumas métricas dependem do Instagram Insights e podem levar alguns
+        dias para aparecer. Quando houver histórico suficiente, os gráficos serão preenchidos.
       </div>
     </div>
   );

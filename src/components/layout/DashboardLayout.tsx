@@ -6,7 +6,9 @@ export function DashboardLayout() {
       <Sidebar />
       <main className="main-content">
         <Topbar />
-        <Outlet />
+        <div className="page-content">
+          <Outlet />
+        </div>
       </main>
       
     </div>;

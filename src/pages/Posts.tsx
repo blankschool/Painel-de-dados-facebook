@@ -7,6 +7,7 @@ import { FiltersBar } from '@/components/layout/FiltersBar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getScore, getShares, getViews, type IgMediaItem } from '@/utils/ig';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Grid3X3,
   Heart,
@@ -41,8 +42,10 @@ const POSTS_PER_PAGE = 25;
 
 const Posts = () => {
   const { data, loading, error, refresh } = useDashboardData();
+  const { selectedAccount } = useAuth();
   const allPosts = data?.posts ?? [];
-  const posts = useFilteredMedia(allPosts);
+  const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
+  const posts = useFilteredMedia(allPosts, timezone);
   
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'score' | 'engagement' | 'likes' | 'comments' | 'saves' | 'shares' | 'reach' | 'views' | 'er'>('score');
@@ -186,14 +189,11 @@ const Posts = () => {
       {/* Filters Bar */}
       <FiltersBar showMediaType={true} />
 
-      {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Posts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Análise de {posts.length.toLocaleString()} posts{allPosts.length !== posts.length ? ` (filtrado de ${allPosts.length.toLocaleString()})` : ''}. Rankings usam Score (ponderado) e métricas normalizadas quando disponíveis.
-          </p>
-        </div>
+      {/* Summary + Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          Análise de {posts.length.toLocaleString()} posts{allPosts.length !== posts.length ? ` (filtrado de ${allPosts.length.toLocaleString()})` : ''}. Rankings usam Score (ponderado) e métricas normalizadas quando disponíveis.
+        </p>
         <div className="flex items-center gap-3">
           {lastUpdated && (
             <div className="chip">
@@ -212,7 +212,7 @@ const Posts = () => {
             </Button>
           )}
         </div>
-      </section>
+      </div>
 
       {loading && !data && (
         <div className="flex items-center justify-center min-h-[300px]">

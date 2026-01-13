@@ -3,7 +3,6 @@ import { Filter, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
-import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilters, type DayFilter, type MediaType, type DateRangePreset } from "@/contexts/FiltersContext";
 import {
   DropdownMenu,
@@ -45,7 +44,6 @@ const dateRangeOptions: { value: DateRangePreset; label: string }[] = [
 const quickFilters: DateRangePreset[] = ["7d", "30d", "90d"];
 
 export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean }) {
-  const { data } = useDashboardData();
   const { 
     filters, 
     setDayFilter, 
@@ -62,9 +60,6 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
     filters.customDateRange || undefined
   );
   
-  const accountName = data?.profile?.username ? data.profile.username : "Instagram Business";
-  const profilePicture = data?.profile?.profile_picture_url;
-
   const selectedDay = dayOptions.find((d) => d.value === filters.dayFilter)?.label || "Dias";
   const selectedMediaType = mediaTypeOptions.find((m) => m.value === filters.mediaType)?.label || "Tipo";
   
@@ -108,7 +103,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-xl border border-border/40 shadow-card mb-6">
+    <div className="filters-bar flex flex-wrap items-center gap-3 mb-6">
       {/* Filter Button with count */}
       <Button
         variant={activeFiltersCount > 0 ? "default" : "outline"}
@@ -125,18 +120,6 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
           </span>
         )}
       </Button>
-
-      {/* Account Display */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-lg">
-        {profilePicture ? (
-          <img src={profilePicture} alt={accountName} className="w-5 h-5 rounded-full object-cover" />
-        ) : (
-          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-            <span className="text-[10px] font-medium text-muted-foreground">IG</span>
-          </div>
-        )}
-        <span className="text-sm font-medium">{accountName}</span>
-      </div>
 
       {/* Date Range Selector with actual date display */}
       <div className="flex items-center gap-2">

@@ -11,9 +11,13 @@ export function Sidebar() {
     href: "/overview",
     icon: "chart"
   }, {
-    label: "Seguidores",
-    href: "/followers",
-    icon: "users"
+    label: "Performance",
+    href: "/performance",
+    icon: "performance"
+  }, {
+    label: "Posts",
+    href: "/posts",
+    icon: "posts"
   }, {
     label: "Conteúdo",
     href: "/content",
@@ -22,6 +26,18 @@ export function Sidebar() {
     label: "Stories",
     href: "/stories",
     icon: "stories"
+  }, {
+    label: "Reels",
+    href: "/reels",
+    icon: "reels"
+  }, {
+    label: "Seguidores",
+    href: "/followers",
+    icon: "users"
+  }, {
+    label: "Demografia",
+    href: "/demographics",
+    icon: "demographics"
   }, {
     label: "Otimização",
     href: "/optimization",
@@ -62,11 +78,32 @@ export function Sidebar() {
                 <path d="M21 15l-5-5L5 21" />
               </svg>
             )}
+            {item.icon === "performance" && (
+              <svg viewBox="0 0 24 24">
+                <path d="M3 12h6l2-6 4 12 2-6h4" />
+              </svg>
+            )}
+            {item.icon === "posts" && (
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            )}
             {item.icon === "stories" && (
               <svg viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" />
                 <circle cx="12" cy="12" r="6" />
                 <circle cx="12" cy="12" r="2" />
+              </svg>
+            )}
+            {item.icon === "reels" && (
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18" />
+                <path d="M8 3l4 6" />
+                <path d="M12 3l4 6" />
               </svg>
             )}
             {item.icon === "optimization" && (
@@ -78,6 +115,12 @@ export function Sidebar() {
               <svg viewBox="0 0 24 24">
                 <circle cx="12" cy="8" r="5" />
                 <path d="M20 21a8 8 0 10-16 0" />
+              </svg>
+            )}
+            {item.icon === "demographics" && (
+              <svg viewBox="0 0 24 24">
+                <path d="M12 21c4.97-5.33 7-8.06 7-11a7 7 0 10-14 0c0 2.94 2.03 5.67 7 11z" />
+                <circle cx="12" cy="10" r="2.5" />
               </svg>
             )}
             {item.icon === "time" && (

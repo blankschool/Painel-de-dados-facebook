@@ -229,12 +229,16 @@ function normalizeMediaInsights(raw: Record<string, number>): Record<string, num
   const saved = raw.saved ?? raw.saves;
   const shares = raw.shares;
   const reach = raw.reach;
-  const views = raw.views;
+  const plays = raw.plays;
+  const videoViews = raw.video_views;
+  const views = raw.views ?? plays ?? videoViews;
   const total_interactions = raw.total_interactions ?? raw.engagement;
 
   return {
     ...raw,
     ...(typeof views === "number" ? { views } : {}),
+    ...(typeof plays === "number" ? { plays } : {}),
+    ...(typeof videoViews === "number" ? { video_views: videoViews } : {}),
     ...(typeof reach === "number" ? { reach } : {}),
     ...(typeof saved === "number" ? { saved, saves: raw.saves ?? saved } : {}),
     ...(typeof shares === "number" ? { shares } : {}),
@@ -267,10 +271,17 @@ async function fetchMediaInsights(
     );
   } else if (isReel) {
     candidates.push(
+      "plays,reach,saved,shares,total_interactions",
+      "video_views,reach,saved,shares,total_interactions",
       "views,reach,saved,shares,total_interactions",
+      "plays,reach,saved,shares",
+      "video_views,reach,saved,shares",
       "views,reach,saved,shares",
-      "views,reach,saved,total_interactions",
+      "plays,reach,saved",
+      "video_views,reach,saved",
       "views,reach,saved",
+      "plays,reach",
+      "video_views,reach",
       "views,reach",
       "reach,saved,shares",
       "reach,saved",
@@ -278,10 +289,15 @@ async function fetchMediaInsights(
     );
   } else if (isVideo) {
     candidates.push(
+      "video_views,reach,saved,shares,total_interactions",
       "views,reach,saved,shares,total_interactions",
+      "video_views,reach,saved,total_interactions",
       "views,reach,saved,total_interactions",
+      "video_views,reach,saved,shares",
       "views,reach,saved,shares",
+      "video_views,reach,saved",
       "views,reach,saved",
+      "video_views,reach",
       "views,reach",
       "reach,saved,shares",
       "reach,saved",
@@ -366,7 +382,7 @@ function computeMediaMetrics(
 
   const savesPick = pickMetric(insightsRaw, ["saved", "saves"]);
   const reachPick = pickMetric(insightsRaw, ["reach"]);
-  const viewsPick = pickMetric(insightsRaw, ["views"]);
+  const viewsPick = pickMetric(insightsRaw, ["views", "plays", "video_views", "impressions"]);
   const sharesPick = pickMetric(insightsRaw, ["shares"]);
   const totalInteractionsPick = pickMetric(insightsRaw, ["total_interactions", "engagement"]);
 

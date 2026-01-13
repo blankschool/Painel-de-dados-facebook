@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useFilteredMedia } from '@/hooks/useFilteredMedia';
+import { useAuth } from '@/contexts/AuthContext';
+import { FiltersBar } from '@/components/layout/FiltersBar';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { Heart, MessageCircle, Activity, Loader2 } from 'lucide-react';
@@ -32,8 +35,11 @@ const MEDIA_TYPE_LABELS: Record<string, string> = {
 
 const Performance = () => {
   const { data, loading } = useDashboardData();
+  const { selectedAccount } = useAuth();
   const profile = data?.profile ?? null;
-  const media = data?.media ?? [];
+  const allMedia = data?.media ?? [];
+  const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
+  const media = useFilteredMedia(allMedia, timezone);
 
   // Sort states
   const [typeSort, setTypeSort] = useState<SortOrder>("desc");
@@ -56,8 +62,12 @@ const Performance = () => {
     ? (((totalLikes + totalComments) / media.length / profile.followers_count) * 100).toFixed(2)
     : '0';
 
-  // Media type distribution from API or calculated
-  const mediaTypeDistribution = (data as any)?.media_type_distribution || {};
+  // Media type distribution from filtered media
+  const mediaTypeDistribution = media.reduce<Record<string, number>>((acc, item) => {
+    const type = item.media_type || 'UNKNOWN';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
   const mediaTypeData = Object.entries(mediaTypeDistribution)
     .map(([type, count]) => ({
       name: MEDIA_TYPE_LABELS[type] || type,
@@ -114,16 +124,7 @@ const Performance = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Performance</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Métricas de desempenho calculadas a partir de {media.length.toLocaleString()} posts.
-          </p>
-        </div>
-      </section>
-
+      <FiltersBar showMediaType />
       {/* Performance KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard

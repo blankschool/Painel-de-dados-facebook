@@ -57,8 +57,6 @@ const tooltipStyle = {
 const COLORS = {
   photo: 'hsl(142, 76%, 36%)',
   video: 'hsl(262, 83%, 58%)',
-  followers: 'hsl(217, 91%, 60%)',
-  nonFollowers: 'hsl(330, 81%, 60%)',
 };
 
 function formatNumber(value: number | undefined | null): string {
@@ -135,11 +133,6 @@ const Stories = () => {
     const videoViews = videoStories.reduce((sum: number, s: any) => sum + (s.insights?.views || s.insights?.impressions || 0), 0);
     
     const totalShares = stories.reduce((sum: number, s: any) => sum + (s.insights?.shares || 0), 0);
-    const totalProfileVisits = stories.reduce((sum: number, s: any) => sum + (s.insights?.profile_visits || 0), 0);
-    
-    // Follower vs non-follower reach (mock calculation - would need real API data)
-    const followerReach = Math.round(agg.total_reach * 0.7);
-    const nonFollowerReach = agg.total_reach - followerReach;
     
     // Reach rate (reach / followers)
     const followersCount = data?.profile?.followers_count || 1;
@@ -160,9 +153,6 @@ const Stories = () => {
       photoViews,
       videoViews,
       totalShares,
-      totalProfileVisits,
-      followerReach,
-      nonFollowerReach,
       reachRate: isFinite(reachRate) ? reachRate.toFixed(1) : '0',
       maxReachRate: isFinite(maxReachRate) ? maxReachRate.toFixed(1) : '0',
       avgFullViewRate: avgFullViewRate.toFixed(1),
@@ -193,10 +183,7 @@ const Stories = () => {
   }, [stories]);
 
   // Reach breakdown data
-  const reachBreakdown = [
-    { name: 'Seguidores', value: metrics.followerReach, fill: COLORS.followers },
-    { name: 'Não Seguidores', value: metrics.nonFollowerReach, fill: COLORS.nonFollowers },
-  ];
+  const reachBreakdown: Array<{ name: string; value: number; fill: string }> = [];
 
   // Actions chart data
   const actionsData = [
@@ -418,39 +405,49 @@ const Stories = () => {
           {/* Reach breakdown + Actions */}
           <div className="grid gap-4 lg:grid-cols-2">
             <ChartCard title="Alcance por Tipo de Seguidor" subtitle="Seguidores vs Não Seguidores">
-              <div className="flex items-center gap-6 h-56">
-                <div className="w-40 h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={reachBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={65}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {reachBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatNumber(v)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex-1 space-y-3">
-                  {reachBreakdown.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                        <span className="text-sm">{item.name}</span>
+              {reachBreakdown.length > 0 ? (
+                <div className="flex items-center gap-6 h-56">
+                  <div className="w-40 h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={reachBreakdown}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={65}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {reachBreakdown.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatNumber(v)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    {reachBreakdown.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
+                          <span className="text-sm">{item.name}</span>
+                        </div>
+                        <span className="font-semibold">{formatNumber(item.value)}</span>
                       </div>
-                      <span className="font-semibold">{formatNumber(item.value)}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex h-56 flex-col items-center justify-center text-muted-foreground text-center">
+                  <UserCheck className="w-10 h-10 mb-2 opacity-60" />
+                  <p className="text-sm font-medium">Breakdown indisponível</p>
+                  <p className="text-xs max-w-xs">
+                    O Instagram não fornece esta divisão para stories.
+                  </p>
+                </div>
+              )}
             </ChartCard>
 
             <ChartCard title="Interações nos Stories" subtitle="Taps, respostas, shares e saídas">

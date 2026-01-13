@@ -183,6 +183,28 @@ export async function getCachedProfile(
   return snapshot;
 }
 
+export async function getProfileSnapshots(
+  supabase: SupabaseClient,
+  accountId: string,
+  sinceDate: string,
+  untilDate: string,
+): Promise<ProfileSnapshot[]> {
+  const { data: snapshots, error } = await supabase
+    .from('instagram_profile_snapshots')
+    .select('*')
+    .eq('account_id', accountId)
+    .gte('snapshot_date', sinceDate)
+    .lte('snapshot_date', untilDate)
+    .order('snapshot_date', { ascending: true });
+
+  if (error) {
+    console.error('[cache] Error getting profile snapshots:', error);
+    return [];
+  }
+
+  return snapshots || [];
+}
+
 /**
  * Save profile snapshot
  */
@@ -248,6 +270,40 @@ export async function saveDailyInsights(
 
   if (error) {
     console.error('[cache] Error saving daily insight:', error);
+  }
+}
+
+export async function saveDailyInsightsBatch(
+  supabase: SupabaseClient,
+  accountId: string,
+  insights: Array<{ insight_date: string; [key: string]: number }>,
+): Promise<void> {
+  if (!insights.length) return;
+
+  const rows = insights.map((row) => ({
+    account_id: accountId,
+    insight_date: row.insight_date,
+    reach: row.reach,
+    impressions: row.impressions,
+    profile_views: row.profile_views,
+    website_clicks: row.website_clicks,
+    follower_count: row.follower_count,
+    email_contacts: row.email_contacts,
+    phone_call_clicks: row.phone_call_clicks,
+    text_message_clicks: row.text_message_clicks,
+    get_directions_clicks: row.get_directions_clicks,
+  }));
+
+  const { error } = await supabase
+    .from('instagram_daily_insights')
+    .upsert(rows, {
+      onConflict: 'account_id,insight_date',
+    });
+
+  if (error) {
+    console.error('[cache] Error saving daily insights batch:', error);
+  } else {
+    console.log(`[cache] Saved ${rows.length} daily insight rows`);
   }
 }
 

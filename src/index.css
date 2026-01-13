@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @import "./styles/databloo.css";
 
 @tailwind base;
@@ -7,115 +7,118 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-display: 'Fraunces', 'Instrument Sans', ui-serif, serif;
     
-    /* Neutral Light Mode Palette */
-    --background: 210 20% 98%;           /* #F9FAFB - gray-50 */
-    --background-secondary: 220 14% 96%; /* #F3F4F6 - gray-100 */
-    --foreground: 221 39% 11%;           /* #111827 - gray-900 */
+    /* Warm report palette */
+    --background: 36 33% 96%;            /* #F8F5F1 */
+    --background-secondary: 34 28% 92%;  /* #F0EBE4 */
+    --foreground: 220 18% 12%;           /* #1B1F2A */
 
-    --card: 0 0% 100%;                   /* #FFFFFF - white */
-    --card-foreground: 221 39% 11%;      /* #111827 - gray-900 */
+    --card: 0 0% 100%;                   /* white */
+    --card-foreground: 220 18% 12%;
 
-    --popover: 0 0% 100%;                /* white */
-    --popover-foreground: 221 39% 11%;   /* gray-900 */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 18% 12%;
 
-    --primary: 221 39% 11%;              /* #111827 - gray-900 (dark accent) */
+    --primary: 220 18% 12%;              /* ink */
     --primary-foreground: 0 0% 100%;     /* white */
 
-    --secondary: 220 14% 96%;            /* #F3F4F6 - gray-100 */
-    --secondary-foreground: 221 39% 11%; /* gray-900 */
+    --secondary: 34 28% 93%;
+    --secondary-foreground: 220 18% 12%;
 
-    --muted: 220 14% 96%;                /* gray-100 */
-    --muted-foreground: 220 9% 46%;      /* #6B7280 - gray-500 */
+    --muted: 34 28% 93%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 220 14% 96%;               /* gray-100 */
-    --accent-foreground: 221 39% 11%;    /* gray-900 */
+    --accent: 174 45% 92%;               /* light teal */
+    --accent-foreground: 220 18% 12%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 150 52% 36%;
     --success-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;               /* #E5E7EB - gray-200 */
-    --input: 220 13% 91%;                /* gray-200 */
-    --ring: 221 39% 11%;                 /* gray-900 */
+    --border: 30 14% 86%;
+    --input: 30 14% 86%;
+    --ring: 174 45% 36%;
 
-    --radius: 0.75rem;
-    --radius-sm: 0.5rem;
+    --radius: 1rem;
+    --radius-sm: 0.65rem;
     
-    --shadow-card: 0 1px 3px rgba(0,0,0,0.06);
-    --shadow-hover: 0 4px 12px rgba(0,0,0,0.1);
+    --shadow-card: 0 12px 30px rgba(28, 32, 38, 0.06);
+    --shadow-hover: 0 18px 40px rgba(28, 32, 38, 0.12);
     
-    --sidebar-width: 72px;
+    --sidebar-width: 92px;
     --sidebar-width-expanded: 240px;
     --content-max-width: 1400px;
 
-    --sidebar-background: 0 0% 100%;     /* white */
-    --sidebar-foreground: 220 9% 46%;    /* gray-500 */
-    --sidebar-primary: 221 39% 11%;      /* gray-900 */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 9% 46%;
+    --sidebar-primary: 220 18% 12%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;       /* gray-100 */
-    --sidebar-accent-foreground: 221 39% 11%;
-    --sidebar-border: 220 13% 91%;       /* gray-200 */
-    --sidebar-ring: 221 39% 11%;
+    --sidebar-accent: 34 28% 93%;
+    --sidebar-accent-foreground: 220 18% 12%;
+    --sidebar-border: 30 14% 86%;
+    --sidebar-ring: 174 45% 36%;
 
-    /* Chart colors - grayscale */
-    --chart-line: 221 39% 11%;           /* gray-900 */
-    --chart-line-secondary: 220 9% 64%;  /* gray-400 */
-    --chart-grid: 220 13% 91%;           /* gray-200 */
-    --chart-text: 220 9% 46%;            /* gray-500 */
+    /* Chart colors */
+    --chart-line: 220 18% 12%;
+    --chart-line-secondary: 210 7% 55%;
+    --chart-grid: 30 14% 86%;
+    --chart-text: 220 9% 46%;
+    --chart-warm: 24 74% 52%;
+    --chart-cool: 174 45% 42%;
   }
 
   .dark {
-    /* Neutral Dark Mode Palette */
-    --background: 0 0% 4%;               /* #0A0A0A - near black */
-    --background-secondary: 0 0% 9%;     /* #171717 - neutral-900 */
-    --foreground: 0 0% 98%;              /* #FAFAFA - gray-50 */
+    --background: 220 18% 8%;
+    --background-secondary: 220 16% 12%;
+    --foreground: 36 33% 95%;
 
-    --card: 0 0% 12%;                    /* #1F1F1F - dark gray */
-    --card-foreground: 0 0% 98%;         /* white */
+    --card: 220 16% 12%;
+    --card-foreground: 36 33% 95%;
 
-    --popover: 0 0% 12%;                 /* dark gray */
-    --popover-foreground: 0 0% 98%;      /* white */
+    --popover: 220 16% 12%;
+    --popover-foreground: 36 33% 95%;
 
-    --primary: 0 0% 98%;                 /* #FAFAFA - white (light accent) */
-    --primary-foreground: 0 0% 4%;       /* near black */
+    --primary: 36 33% 95%;
+    --primary-foreground: 220 18% 8%;
 
-    --secondary: 0 0% 15%;               /* neutral-800 */
-    --secondary-foreground: 0 0% 98%;    /* white */
+    --secondary: 220 14% 16%;
+    --secondary-foreground: 36 33% 95%;
 
-    --muted: 0 0% 15%;                   /* neutral-800 */
-    --muted-foreground: 240 4% 65%;      /* #A1A1AA - gray-400 */
+    --muted: 220 14% 16%;
+    --muted-foreground: 220 9% 65%;
 
-    --accent: 0 0% 18%;                  /* slightly lighter */
-    --accent-foreground: 0 0% 98%;       /* white */
+    --accent: 174 30% 18%;
+    --accent-foreground: 36 33% 95%;
 
     --destructive: 0 63% 45%;
     --destructive-foreground: 0 0% 98%;
 
-    --success: 142 76% 42%;
+    --success: 150 52% 45%;
     --success-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%;                  /* #2E2E2E - dark border */
-    --input: 0 0% 18%;
-    --ring: 0 0% 70%;
+    --border: 220 10% 22%;
+    --input: 220 10% 22%;
+    --ring: 174 45% 55%;
 
-    --sidebar-background: 0 0% 4%;       /* near black */
-    --sidebar-foreground: 240 4% 65%;    /* gray-400 */
-    --sidebar-primary: 0 0% 98%;         /* white */
-    --sidebar-primary-foreground: 0 0% 4%;
-    --sidebar-accent: 0 0% 15%;          /* neutral-800 */
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 15%;          /* neutral-800 */
-    --sidebar-ring: 0 0% 70%;
+    --sidebar-background: 220 18% 8%;
+    --sidebar-foreground: 220 9% 65%;
+    --sidebar-primary: 36 33% 95%;
+    --sidebar-primary-foreground: 220 18% 8%;
+    --sidebar-accent: 220 14% 16%;
+    --sidebar-accent-foreground: 36 33% 95%;
+    --sidebar-border: 220 10% 22%;
+    --sidebar-ring: 174 45% 55%;
 
-    /* Chart colors - grayscale dark */
-    --chart-line: 0 0% 100%;             /* white */
-    --chart-line-secondary: 240 4% 32%;  /* gray-600 */
-    --chart-grid: 0 0% 18%;              /* dark gray */
-    --chart-text: 240 4% 65%;            /* gray-400 */
+    --chart-line: 36 33% 95%;
+    --chart-line-secondary: 220 9% 40%;
+    --chart-grid: 220 10% 22%;
+    --chart-text: 220 9% 65%;
+    --chart-warm: 24 74% 52%;
+    --chart-cool: 174 45% 50%;
   }
 }
 
@@ -129,14 +132,19 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
+    background:
+      radial-gradient(1200px 520px at 8% -10%, hsl(var(--chart-warm) / 0.15), transparent 60%),
+      radial-gradient(1000px 520px at 92% 0%, hsl(var(--chart-cool) / 0.18), transparent 55%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background-secondary)) 65%, hsl(var(--background)) 100%);
+    background-attachment: fixed;
   }
 }
 
 @layer components {
   /* Big KPI Card - Looker Style */
   .kpi-card {
-    @apply rounded-xl border border-border/40 bg-card p-6 transition-all duration-200;
+    @apply rounded-2xl border border-border/50 bg-card/85 p-6 transition-all duration-200 backdrop-blur-sm;
     box-shadow: var(--shadow-card);
   }
 
@@ -145,15 +153,15 @@
   }
 
   .kpi-label {
-    @apply text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2;
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2;
   }
 
   .kpi-value {
-    @apply text-3xl font-bold tracking-tight text-foreground;
+    @apply text-3xl font-semibold tracking-tight text-foreground;
   }
 
   .kpi-value-xl {
-    @apply text-4xl font-bold tracking-tight text-foreground;
+    @apply text-4xl font-semibold tracking-tight text-foreground;
   }
 
   .kpi-delta {
@@ -170,7 +178,7 @@
 
   /* Metric Card - Compact */
   .metric-card {
-    @apply rounded-xl border border-border/40 bg-card p-4 transition-all duration-200;
+    @apply rounded-2xl border border-border/50 bg-card/85 p-4 transition-all duration-200 backdrop-blur-sm;
     box-shadow: var(--shadow-card);
   }
 
@@ -179,7 +187,7 @@
   }
 
   .metric-label {
-    @apply flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground;
+    @apply flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground;
   }
 
   .metric-value {
@@ -192,7 +200,7 @@
 
   /* Tag */
   .tag {
-    @apply inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground;
+    @apply inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground;
   }
 
   .tag-success {
@@ -222,7 +230,7 @@
 
   /* Chart Card */
   .chart-card {
-    @apply rounded-xl border border-border/40 bg-card overflow-hidden;
+    @apply rounded-2xl border border-border/50 bg-card/85 overflow-hidden backdrop-blur-sm;
     box-shadow: var(--shadow-card);
   }
 
@@ -232,6 +240,7 @@
 
   .chart-title {
     @apply text-base font-semibold tracking-tight;
+    font-family: var(--font-display);
   }
 
   .chart-subtitle {
@@ -253,7 +262,7 @@
   }
 
   .data-table th {
-    @apply bg-secondary/50 font-semibold text-xs uppercase tracking-wider text-muted-foreground;
+    @apply bg-secondary/70 font-semibold text-[11px] uppercase tracking-[0.2em] text-muted-foreground;
   }
 
   .data-table td {
@@ -266,7 +275,7 @@
 
   /* Chip */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-sm;
   }
 
   /* App Layout - Looker Style */
@@ -295,6 +304,35 @@
     @apply px-6 py-6;
   }
 
+  .page-content {
+    @apply px-6 py-6;
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+  }
+
+  .page-hero {
+    @apply flex flex-col gap-3 rounded-3xl border border-border/50 bg-card/85 px-6 py-6 backdrop-blur-sm;
+    box-shadow: var(--shadow-card);
+  }
+
+  .page-hero-kicker {
+    @apply text-[11px] uppercase tracking-[0.3em] text-muted-foreground;
+  }
+
+  .page-hero-title {
+    @apply text-2xl font-semibold text-foreground;
+    font-family: var(--font-display);
+  }
+
+  .page-hero-subtitle {
+    @apply text-sm text-muted-foreground;
+    max-width: 60ch;
+  }
+
+  .page-hero-meta {
+    @apply flex flex-wrap items-center gap-2 text-sm text-muted-foreground;
+  }
+
   /* Sparkline */
   .sparkline {
     @apply mt-3 h-8;
@@ -306,7 +344,8 @@
   }
 
   .progress-bar-fill {
-    @apply h-full rounded-full bg-primary transition-all duration-300;
+    @apply h-full rounded-full transition-all duration-300;
+    background-image: linear-gradient(90deg, hsl(var(--chart-cool)), hsl(var(--chart-warm)));
   }
 
   /* Heatmap */
