@@ -31,6 +31,7 @@ import Followers from "./pages/Followers";
 import Content from "./pages/Content";
 import Time from "./pages/Time";
 import MediaDetail from "./pages/MediaDetail";
+import Optimization from "./pages/Optimization";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,7 @@ const App = () => (
                     <Route path="/online" element={<OnlineFollowers />} />
                     <Route path="/reels" element={<Reels />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/optimization" element={<Optimization />} />
                   </Route>
                 </Route>
 
