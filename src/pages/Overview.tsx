@@ -5,13 +5,15 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
 import { formatRelativeTime } from "@/lib/dashboardHelpers";
-import { Grid2X2, Search, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram } from "lucide-react";
+import { Users, Eye, Heart, MessageCircle, Bookmark, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, Grid2X2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
 import { useAuth } from "@/contexts/AuthContext";
+import { LogiKpiCard, LogiKpiGrid } from "@/components/dashboard/LogiKpiCard";
+import { CircularProgress } from "@/components/dashboard/CircularProgress";
 import {
   LineChart,
   Line,
@@ -290,68 +292,80 @@ export default function Overview() {
       </div>
 
       <div className="content-area space-y-6">
-        {/* Business Overview Metrics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Primary Metrics Card */}
-          <div className="metrics-card primary">
-            <div className="metric-icon blue">
-              <Grid2X2 className="w-6 h-6" />
-            </div>
-            <div className="metric-group">
-              <div className="metric-item">
-                <span className="metric-label">Publicações</span>
-                <span className="metric-value">{media.length}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Seguidores</span>
-                <span className="metric-value">{profile?.followers_count?.toLocaleString("pt-BR") ?? "--"}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Seguindo</span>
-                <span className="metric-value">{profile?.follows_count?.toLocaleString("pt-BR") ?? "--"}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Visualizações</span>
-                <span className="metric-value">{formatNumberOrDash(totalViews)}</span>
-                <ComparisonBadge metric={comparisonMetrics?.impressions} />
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Alcance</span>
-                <span className="metric-value">{formatNumberOrDash(totalReach)}</span>
-                <ComparisonBadge metric={comparisonMetrics?.reach} />
-              </div>
-            </div>
-          </div>
+        {/* LogiChain-style KPI Cards */}
+        <LogiKpiGrid columns={5}>
+          <LogiKpiCard
+            label="Seguidores"
+            value={profile?.followers_count?.toLocaleString("pt-BR") ?? "--"}
+            icon={<Users className="w-5 h-5" />}
+            index={0}
+            tooltip="Total de seguidores da conta"
+          />
+          <LogiKpiCard
+            label="Alcance Total"
+            value={formatCompact(totalReach)}
+            icon={<Eye className="w-5 h-5" />}
+            trend={comparisonMetrics?.reach ? { 
+              value: comparisonMetrics.reach.changePercent, 
+              isPositive: comparisonMetrics.reach.change > 0 
+            } : null}
+            index={1}
+            tooltip="Contas únicas alcançadas no período"
+          />
+          <LogiKpiCard
+            label="Taxa de Engajamento"
+            value={formatPercent(avgEr)}
+            icon={<Target className="w-5 h-5" />}
+            index={2}
+            tooltip="Média de engajamento por post"
+          />
+          <LogiKpiCard
+            label="Curtidas"
+            value={formatCompact(totalLikes)}
+            icon={<Heart className="w-5 h-5" />}
+            index={3}
+          />
+          <LogiKpiCard
+            label="Comentários"
+            value={formatCompact(totalComments)}
+            icon={<MessageCircle className="w-5 h-5" />}
+            index={4}
+          />
+        </LogiKpiGrid>
 
-          {/* Secondary Metrics Card */}
-          <div className="metrics-card">
-            <div className="metric-icon search">
-              <Search className="w-6 h-6" />
-            </div>
-            <div className="metric-group">
-              <div className="metric-item">
-                <span className="metric-label">Alcance médio</span>
-                <span className="metric-value">{formatCompact(avgReach)}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Taxa de engajamento</span>
-                <span className="metric-value">{formatPercent(avgEr)}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Curtidas</span>
-                <span className="metric-value">{formatNumberOrDash(totalLikes)}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Comentários</span>
-                <span className="metric-value">{formatNumberOrDash(totalComments)}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Salvamentos</span>
-                <span className="metric-value">{formatNumberOrDash(totalSaves)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Secondary KPI Row */}
+        <LogiKpiGrid columns={4}>
+          <LogiKpiCard
+            label="Publicações"
+            value={media.length.toString()}
+            icon={<ImageIcon className="w-5 h-5" />}
+            index={5}
+            tooltip="Publicações no período selecionado"
+          />
+          <LogiKpiCard
+            label="Visualizações"
+            value={formatCompact(totalViews)}
+            icon={<Play className="w-5 h-5" />}
+            trend={comparisonMetrics?.impressions ? { 
+              value: comparisonMetrics.impressions.changePercent, 
+              isPositive: comparisonMetrics.impressions.change > 0 
+            } : null}
+            index={6}
+          />
+          <LogiKpiCard
+            label="Salvamentos"
+            value={formatCompact(totalSaves)}
+            icon={<Bookmark className="w-5 h-5" />}
+            index={7}
+          />
+          <LogiKpiCard
+            label="Alcance Médio"
+            value={formatCompact(avgReach)}
+            icon={<BarChart3 className="w-5 h-5" />}
+            index={8}
+            tooltip="Média de alcance por publicação"
+          />
+        </LogiKpiGrid>
 
         {/* Performance Over Time Chart */}
         <div className="chart-section">

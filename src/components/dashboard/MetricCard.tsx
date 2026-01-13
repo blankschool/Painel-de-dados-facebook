@@ -34,11 +34,15 @@ export function MetricCard({
 
   return (
     <article className={cn(
-      "metric-card animate-fade-in",
+      "metric-card animate-fade-in-up hover-lift",
       isLarge && "p-6"
     )}>
       <div className="metric-label">
-        {icon && <span className="text-muted-foreground">{icon}</span>}
+        {icon && (
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-foreground">
+            {icon}
+          </span>
+        )}
         <span>{label}</span>
         {tooltip && (
           <Tooltip>
