@@ -299,12 +299,25 @@ export default function Connect() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-8 pb-8">
             <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center mb-4">
-                <Instagram className="h-8 w-8 text-white animate-pulse" />
-              </div>
-              <h2 className="text-xl font-semibold text-foreground mb-2">
-                Redirecionando para Instagram
-              </h2>
+              {usingFacebookOAuth ? (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-[#1877F2] flex items-center justify-center mb-4">
+                    <Facebook className="h-8 w-8 text-white animate-pulse" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">
+                    Redirecionando para Facebook
+                  </h2>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center mb-4">
+                    <Instagram className="h-8 w-8 text-white animate-pulse" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">
+                    Redirecionando para Instagram
+                  </h2>
+                </>
+              )}
               <p className="text-muted-foreground mb-4">
                 Aguarde enquanto você é redirecionado...
               </p>
