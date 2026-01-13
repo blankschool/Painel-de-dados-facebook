@@ -77,6 +77,15 @@ export type ExportPayload = {
   consolidated_metrics: ConsolidatedMetrics;
   api_metadata: ApiMetadata;
   posts_daily_metrics: PostDailyMetricsRow[];
+  // Data coverage info
+  data_coverage: {
+    requested_days: number;
+    covered_days: number;
+    completeness_percent: number;
+    oldest_insight_date: string | null;
+    newest_insight_date: string | null;
+    note: string;
+  };
 };
 
 function formatDateOnly(date: Date | undefined | null): string | null {
@@ -266,6 +275,31 @@ export function buildExportPayload(params: {
       request_id: data.request_id,
     },
     posts_daily_metrics: postsDailyMetrics,
+    // Data coverage info
+    data_coverage: (() => {
+      const dataCoverage = (data as any).data_coverage;
+      const dailyInsightsArr = data.daily_insights ?? [];
+      const requestedDays = dataCoverage?.requested_days ?? 
+        (dateRange?.from && dateRange?.to 
+          ? Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (24 * 60 * 60 * 1000))
+          : dailyInsightsArr.length);
+      const coveredDays = dataCoverage?.covered_days ?? dailyInsightsArr.length;
+      const completeness = dataCoverage?.completeness_percent ?? 
+        (requestedDays > 0 ? Math.round((coveredDays / requestedDays) * 100) : 100);
+      
+      return {
+        requested_days: requestedDays,
+        covered_days: coveredDays,
+        completeness_percent: completeness,
+        oldest_insight_date: dataCoverage?.oldest_insight_date ?? 
+          (dailyInsightsArr.length > 0 ? dailyInsightsArr[0].insight_date : null),
+        newest_insight_date: dataCoverage?.newest_insight_date ?? 
+          (dailyInsightsArr.length > 0 ? dailyInsightsArr[dailyInsightsArr.length - 1].insight_date : null),
+        note: completeness < 100 
+          ? 'Instagram only provides daily account metrics for the last 30 days. Historical data beyond 30 days uses aggregated post metrics.'
+          : 'Full daily account-level data coverage for the selected period.',
+      };
+    })(),
   };
 }
 
