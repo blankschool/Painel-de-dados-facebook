@@ -4,7 +4,7 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target } from "lucide-react";
+import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
@@ -71,10 +71,22 @@ export default function Overview() {
   const comparisonMetrics = data?.comparison_metrics;
   const dailyInsights = data?.daily_insights ?? [];
   const previousDailyInsights = data?.previous_daily_insights ?? [];
+  
+  // Data coverage info for incomplete data warnings
+  const dataCoverage = (data as any)?.data_coverage as {
+    requested_days?: number;
+    covered_days?: number;
+    completeness_percent?: number;
+    oldest_insight_date?: string | null;
+    newest_insight_date?: string | null;
+  } | undefined;
+  
+  const hasIncompleteData = dataCoverage && dataCoverage.completeness_percent !== undefined && dataCoverage.completeness_percent < 100;
 
   // Debug logging
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
   console.log(`[Overview] Comparison metrics:`, comparisonMetrics);
+  console.log(`[Overview] Data coverage:`, dataCoverage);
 
   const totalViewsFromPosts = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
   const totalReachFromPosts = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
@@ -246,6 +258,23 @@ export default function Overview() {
 
   return (
     <>
+      {/* Incomplete data warning banner */}
+      {hasIncompleteData && (
+        <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-foreground">Dados diários parciais</p>
+            <p className="text-muted-foreground">
+              O Instagram só disponibiliza métricas diárias de conta (alcance, engajamento) dos últimos 30 dias.
+              {dataCoverage?.oldest_insight_date && (
+                <> Dados disponíveis a partir de {new Date(dataCoverage.oldest_insight_date).toLocaleDateString('pt-BR')}.</>
+              )}
+              {' '}Para períodos mais longos, usamos dados acumulados dos posts.
+            </p>
+          </div>
+        </div>
+      )}
+      
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
