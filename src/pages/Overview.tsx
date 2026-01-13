@@ -220,28 +220,6 @@ export default function Overview() {
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {/* Last update indicator */}
-            {data && (
-              <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                <span>
-                  {(data as any).from_cache 
-                    ? `Cache (${((data as any).cache_age_hours ?? 0).toFixed(1)}h)`
-                    : 'Atualizado agora'
-                  }
-                </span>
-              </div>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => forceRefresh()}
-              disabled={loading}
-              className="flex items-center gap-1.5"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
             {data?.token_type && (
               <Badge variant="outline" className="flex items-center gap-1.5 shrink-0">
                 <Instagram className="w-3.5 h-3.5" />
