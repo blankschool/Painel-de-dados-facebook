@@ -4,7 +4,7 @@ import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, AlertTriangle } from "lucide-react";
+import { Users, Eye, Heart, MessageCircle, Bookmark, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram, BarChart3, Target, AlertTriangle, ChevronDown, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
@@ -13,7 +13,13 @@ import { usePostClick } from "@/hooks/usePostClick";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilters } from "@/contexts/FiltersContext";
 import { LogiKpiCard, LogiKpiGrid } from "@/components/dashboard/LogiKpiCard";
+import { DataAuditTable } from "@/components/dashboard/DataAuditTable";
 import { buildPostDailyMetrics } from "@/lib/dashboardHelpers";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   LineChart,
   Line,
@@ -61,11 +67,12 @@ export default function Overview() {
   const cacheAgeHours = (data as any)?.cache_age_hours as number | undefined;
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
 
-  // Sort states
+  // Sort states and UI states
   const [daySort, setDaySort] = useState<SortOrder>("desc");
   const [topContentSort, setTopContentSort] = useState<SortOrder>("desc");
   const [topContentSortBy, setTopContentSortBy] = useState<"er" | "reach" | "likes">("er");
   const [engagementSort, setEngagementSort] = useState<SortOrder>("desc");
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
 
   // Extract comparison metrics from API response
   const comparisonMetrics = data?.comparison_metrics;
@@ -326,14 +333,18 @@ export default function Overview() {
             value={profile?.followers_count?.toLocaleString("pt-BR") ?? "--"}
             icon={<Users className="w-5 h-5" />}
             index={0}
-            tooltip="Total de seguidores da conta"
+            tooltip="Total de seguidores da conta (snapshot atual)"
           />
           <LogiKpiCard
-            label="Alcance Total"
+            label="Alcance"
             value={formatCompact(accountReach)}
             icon={<Eye className="w-5 h-5" />}
             index={1}
-            tooltip="Contas únicas alcançadas por posts, stories e anúncios no período"
+            tooltip={dailyInsights.length > 0 
+              ? "Soma do alcance diário no período. Nota: pode incluir contas repetidas entre dias."
+              : "Soma do alcance dos posts no período (não inclui stories/ads)."
+            }
+            badge={dailyInsights.length > 0 ? "soma diária" : "posts"}
           />
           <LogiKpiCard
             label="Taxa de Engajamento"
@@ -347,12 +358,14 @@ export default function Overview() {
             value={formatCompact(totalLikes)}
             icon={<Heart className="w-5 h-5" />}
             index={3}
+            tooltip="Total de curtidas nos posts do período"
           />
           <LogiKpiCard
             label="Comentários"
             value={formatCompact(totalComments)}
             icon={<MessageCircle className="w-5 h-5" />}
             index={4}
+            tooltip="Total de comentários nos posts do período"
           />
         </LogiKpiGrid>
 
@@ -370,22 +383,53 @@ export default function Overview() {
             value={formatCompact(accountImpressions)}
             icon={<Play className="w-5 h-5" />}
             index={6}
-            tooltip="Visualizações de posts, stories e anúncios no período"
+            tooltip={dailyInsights.length > 0 && dailyInsights.some(d => d.impressions != null)
+              ? "Soma das impressões diárias (visualizações totais) no período."
+              : "Soma das visualizações dos posts (plays + impressões). Não inclui stories/ads."
+            }
+            badge={dailyInsights.length > 0 && dailyInsights.some(d => d.impressions != null) ? "soma diária" : "posts"}
           />
           <LogiKpiCard
             label="Salvamentos"
             value={formatCompact(totalSaves)}
             icon={<Bookmark className="w-5 h-5" />}
             index={7}
+            tooltip="Total de salvamentos nos posts do período"
           />
           <LogiKpiCard
             label="Alcance Médio"
             value={formatCompact(avgReach)}
             icon={<BarChart3 className="w-5 h-5" />}
             index={8}
-            tooltip="Média de alcance por publicação"
+            tooltip="Média de alcance por publicação (baseado nos posts)"
           />
         </LogiKpiGrid>
+
+        {/* Data Audit Section - Collapsible */}
+        <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between py-3 h-auto hover:bg-accent/50">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                <span className="font-medium">Diagnóstico de Dados</span>
+                {dailyInsights.length > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {dailyInsights.length} dias
+                  </Badge>
+                )}
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${isAuditOpen ? 'rotate-180' : ''}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <div className="card">
+              <DataAuditTable 
+                dailyInsights={dailyInsights} 
+                dateRange={dateRange}
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Performance Over Time Chart */}
         <div className="chart-section">

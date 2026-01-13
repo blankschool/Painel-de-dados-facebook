@@ -225,30 +225,63 @@ async function syncAccountDailyInsights(
       }
     };
 
-    const fetchMetrics = async (metrics: string[], label: string) => {
-      try {
-        const json = await graphGet(`/${businessId}/insights`, accessToken, {
-          metric: metrics.join(','),
-          period: 'day',
-          since: sinceDate,
-          until: untilDate,
-        }, graphBase);
-        collectMetrics(json);
-        console.log(`[ig-daily-sync] ✓ ${label} fetched`);
-      } catch (err) {
-        console.log(`[ig-daily-sync] ⚠ ${label} not available:`, err instanceof Error ? err.message : String(err));
+    // Try to fetch metrics with retry on alternate endpoint
+    const fetchMetricsWithRetry = async (metrics: string[], label: string) => {
+      const endpoints = [
+        { base: graphBase, name: tokenType === 'IGAA' ? 'graph.instagram.com' : 'graph.facebook.com' },
+        { base: tokenType === 'IGAA' ? FB_GRAPH_BASE : IG_GRAPH_BASE, name: tokenType === 'IGAA' ? 'graph.facebook.com' : 'graph.instagram.com' },
+      ];
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`[ig-daily-sync] Fetching ${label} from ${endpoint.name}...`);
+          const json = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: metrics.join(','),
+            period: 'day',
+            since: sinceDate,
+            until: untilDate,
+          }, endpoint.base);
+          
+          // Log raw response for debugging
+          const responseData = (json as { data?: unknown[] }).data;
+          console.log(`[ig-daily-sync] ${label} raw response: ${Array.isArray(responseData) ? responseData.length : 0} metrics`);
+          
+          if (Array.isArray(responseData)) {
+            for (const metric of responseData) {
+              const m = metric as { name?: string; values?: unknown[] };
+              console.log(`[ig-daily-sync]   ${m.name}: ${m.values?.length ?? 0} values`);
+            }
+          }
+          
+          collectMetrics(json);
+          console.log(`[ig-daily-sync] ✓ ${label} fetched successfully from ${endpoint.name}`);
+          return true;
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.log(`[ig-daily-sync] ⚠ ${label} failed on ${endpoint.name}: ${errMsg}`);
+          // Continue to next endpoint
+        }
       }
+      console.log(`[ig-daily-sync] ✗ ${label} failed on all endpoints`);
+      return false;
     };
 
-    // Fetch all metric types
-    await fetchMetrics(['reach', 'profile_views'], 'reach/profile_views');
-    await fetchMetrics(['impressions'], 'impressions');
-    await fetchMetrics(['accounts_engaged'], 'accounts_engaged');
-    await fetchMetrics(['follower_count'], 'follower_count');
-    await fetchMetrics(
+    // Fetch all metric types with retry logic
+    console.log(`[ig-daily-sync] Token type: ${tokenType}, Primary endpoint: ${graphBase}`);
+    await fetchMetricsWithRetry(['reach', 'profile_views'], 'reach/profile_views');
+    await fetchMetricsWithRetry(['impressions'], 'impressions');
+    await fetchMetricsWithRetry(['accounts_engaged'], 'accounts_engaged');
+    await fetchMetricsWithRetry(['follower_count'], 'follower_count');
+    await fetchMetricsWithRetry(
       ['website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks'],
       'contact_clicks'
     );
+    
+    // Log summary of collected data
+    console.log(`[ig-daily-sync] Collected metrics for ${Object.keys(dailyMap).length} days:`);
+    for (const [date, metrics] of Object.entries(dailyMap)) {
+      console.log(`[ig-daily-sync]   ${date}: ${Object.keys(metrics).join(', ')}`);
+    }
 
     const dailyInsights = mapDailyInsights(dailyMap) as DailyInsightRecord[];
 
