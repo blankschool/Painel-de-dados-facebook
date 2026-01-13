@@ -137,126 +137,141 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
   };
 
   return (
-    <div className="filters-bar flex flex-wrap items-center gap-2 md:gap-3 mb-4 md:mb-6">
-      {/* Refresh Button with Tooltip */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refresh()}
-              disabled={loading}
-              className="gap-1.5 md:gap-2 h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5 md:h-4 md:w-4", loading && "animate-spin")} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{getLastUpdatedText()}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+    <div className="filters-bar flex flex-wrap items-center gap-3 mb-4 md:mb-6">
+      {/* Left Section: Actions */}
+      <div className="flex items-center gap-2">
+        {/* Refresh Button with Tooltip */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refresh()}
+                disabled={loading}
+                className="h-8 w-8 p-0"
+              >
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{getLastUpdatedText()}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
-      {/* Filter Button with count */}
-      <Button
-        variant={activeFiltersCount > 0 ? "default" : "outline"}
-        size="sm"
-        className="gap-1.5 md:gap-2 h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
-        onClick={resetFilters}
-        disabled={activeFiltersCount === 0}
-      >
-        <Filter className="h-3.5 w-3.5 md:h-4 md:w-4" />
-        <span className="hidden xs:inline">Filtros</span>
+        {/* Filter Button with count */}
         {activeFiltersCount > 0 && (
-          <span className="ml-0.5 md:ml-1 px-1.5 md:px-2 py-0.5 bg-primary-foreground/20 rounded-full text-[10px] md:text-xs">
-            {activeFiltersCount}
-          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-1.5 h-8 text-xs px-2"
+            onClick={resetFilters}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>{activeFiltersCount}</span>
+            <X className="h-3 w-3" />
+          </Button>
         )}
-      </Button>
+      </div>
 
-      {/* Date Range Picker - Calendar Button */}
-      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-        <PopoverTrigger asChild>
-          <button type="button" className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm">
-            <CalendarIcon className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
-            <span className="max-w-[100px] md:max-w-none truncate">{dateLabel}</span>
-            <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={dateRange?.from}
-            selected={tempRange}
-            onSelect={handleDateSelect}
-            numberOfMonths={1}
-            locale={ptBR}
-            disabled={(date) => date > new Date()}
-            className={cn("p-3 pointer-events-auto")}
-          />
-          <div className="p-3 border-t border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <p className="text-xs text-muted-foreground">
-              {tempRange?.from ? (
-                tempRange.to ? (
-                  <>
-                    {format(tempRange.from, "dd MMM", { locale: ptBR })} - {format(tempRange.to, "dd MMM", { locale: ptBR })}
-                  </>
-                ) : (
-                  "Selecione a data final"
-                )
-              ) : (
-                "Selecione a data inicial"
-              )}
-            </p>
-            <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleCancel}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={handleApplyRange}
-                disabled={!tempRange?.from || !tempRange?.to}
-              >
-                Aplicar
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+      {/* Separator */}
+      <div className="hidden sm:block w-px h-6 bg-border" />
 
-      {/* Preset Selector */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm" type="button">
-            <span className="max-w-[80px] md:max-w-none truncate">{getDateRangeDisplay()}</span>
-            <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-48">
-          {dateRangeOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.value}
-              onClick={() => handlePresetSelect(option.value)}
+      {/* Center Section: Date Controls */}
+      <div className="flex items-center gap-2">
+        {/* Quick Filters */}
+        <div className="hidden md:flex items-center gap-1 bg-secondary/50 rounded-lg p-0.5">
+          {quickFilters.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => setDateRangePreset(preset)}
               className={cn(
-                "cursor-pointer",
-                filters.dateRangePreset === option.value && "bg-accent font-medium"
+                "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                filters.dateRangePreset === preset
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
             >
-              {option.label}
-              {filters.dateRangePreset === option.value && <span className="ml-auto">✓</span>}
-            </DropdownMenuItem>
+              {preset.toUpperCase().replace("D", "d").replace("M", "m").replace("Y", "a")}
+            </button>
           ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </div>
 
-      {/* Custom Date Range Picker Popover */}
+        {/* Preset Selector */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs font-medium" type="button">
+              <span>{getDateRangeDisplay()}</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            {dateRangeOptions.map((option) => (
+              <DropdownMenuItem
+                key={option.value}
+                onClick={() => handlePresetSelect(option.value)}
+                className={cn(
+                  "cursor-pointer",
+                  filters.dateRangePreset === option.value && "bg-accent font-medium"
+                )}
+              >
+                {option.label}
+                {filters.dateRangePreset === option.value && <span className="ml-auto">✓</span>}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Date Range Picker - Calendar Button */}
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs">
+              <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium">{dateLabel}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={dateRange?.from}
+              selected={tempRange}
+              onSelect={handleDateSelect}
+              numberOfMonths={1}
+              locale={ptBR}
+              disabled={(date) => date > new Date()}
+              className={cn("p-3 pointer-events-auto")}
+            />
+            <div className="p-3 border-t border-border flex justify-between items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                {tempRange?.from ? (
+                  tempRange.to ? (
+                    <>
+                      {format(tempRange.from, "dd MMM", { locale: ptBR })} - {format(tempRange.to, "dd MMM", { locale: ptBR })}
+                    </>
+                  ) : (
+                    "Selecione a data final"
+                  )
+                ) : (
+                  "Selecione a data inicial"
+                )}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleApplyRange} disabled={!tempRange?.from || !tempRange?.to}>
+                  Aplicar
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Custom Date Range Picker Popover (hidden trigger) */}
       <Popover open={customPickerOpen} onOpenChange={setCustomPickerOpen}>
         <PopoverTrigger asChild>
           <span className="hidden" />
@@ -315,88 +330,65 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
         </PopoverContent>
       </Popover>
 
-      {/* Day Filter - hidden on very small screens */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="hidden sm:flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm" type="button">
-            <span>{filters.dayFilter !== "all" ? selectedDay : "Dias"}</span>
-            <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {dayOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.value}
-              onClick={() => setDayFilter(option.value)}
-              className={cn(
-                "cursor-pointer",
-                filters.dayFilter === option.value && "bg-accent font-medium"
-              )}
-            >
-              {option.label}
-              {filters.dayFilter === option.value && <span className="ml-auto">✓</span>}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Right Section: Additional Filters */}
+      {(showMediaType || filters.dayFilter !== "all") && (
+        <>
+          <div className="hidden sm:block w-px h-6 bg-border" />
+          
+          <div className="hidden sm:flex items-center gap-2">
+            {/* Day Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs" type="button">
+                  <span>{filters.dayFilter !== "all" ? selectedDay : "Dias"}</span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {dayOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => setDayFilter(option.value)}
+                    className={cn(
+                      "cursor-pointer",
+                      filters.dayFilter === option.value && "bg-accent font-medium"
+                    )}
+                  >
+                    {option.label}
+                    {filters.dayFilter === option.value && <span className="ml-auto">✓</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-      {/* Media Type Filter (conditional) - hidden on very small screens */}
-      {showMediaType && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="hidden sm:flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs md:text-sm" type="button">
-              <span>{filters.mediaType !== "all" ? selectedMediaType : "Tipo"}</span>
-              <ChevronDown className="h-3 w-3 md:h-3.5 md:w-3.5 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {mediaTypeOptions.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onClick={() => setMediaType(option.value)}
-                className={cn(
-                  "cursor-pointer",
-                  filters.mediaType === option.value && "bg-accent font-medium"
-                )}
-              >
-                {option.label}
-                {filters.mediaType === option.value && <span className="ml-auto">✓</span>}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-
-      {/* Quick Filters - pushed to right, hidden on small screens */}
-      <div className="hidden md:flex items-center gap-1 ml-auto">
-        {quickFilters.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => setDateRangePreset(preset)}
-            className={cn(
-              "px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors",
-              filters.dateRangePreset === preset
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+            {/* Media Type Filter (conditional) */}
+            {showMediaType && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary hover:bg-accent rounded-lg transition-colors text-xs" type="button">
+                    <span>{filters.mediaType !== "all" ? selectedMediaType : "Tipo"}</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {mediaTypeOptions.map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => setMediaType(option.value)}
+                      className={cn(
+                        "cursor-pointer",
+                        filters.mediaType === option.value && "bg-accent font-medium"
+                      )}
+                    >
+                      {option.label}
+                      {filters.mediaType === option.value && <span className="ml-auto">✓</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          >
-            {preset.toUpperCase().replace("D", "D").replace("M", "M").replace("Y", "A")}
-          </button>
-        ))}
-      </div>
-
-      {/* Clear Filters Button */}
-      {activeFiltersCount > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={resetFilters}
-          className="gap-1 text-muted-foreground hover:text-foreground h-8 px-2 text-xs md:text-sm"
-        >
-          <X className="h-3 w-3 md:h-3.5 md:w-3.5" />
-          <span className="hidden sm:inline">Limpar</span>
-        </Button>
+          </div>
+        </>
       )}
     </div>
   );
