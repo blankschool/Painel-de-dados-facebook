@@ -3,30 +3,25 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  StackedNormalizedAreaChart,
-  LinearXAxis,
-  LinearXAxisTickSeries,
-  LinearXAxisTickLabel,
-  LinearYAxis,
-  LinearYAxisTickSeries,
-  StackedNormalizedAreaSeries,
-  Line,
-  Area,
-  Gradient,
-  GradientStop,
-  GridlineSeries,
-  Gridline,
   BarChart,
   Bar,
   BarSeries,
+  LinearXAxis,
+  LinearXAxisTickSeries,
+  LinearXAxisTickLabel,
+  GridlineSeries,
+  Gridline,
+  Gradient,
+  GradientStop,
 } from 'reaviz';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { FiltersBar } from '@/components/layout/FiltersBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Minus, Calendar, BarChart3, Layers } from 'lucide-react';
-import { getSaves, getEngagement } from '@/utils/ig';
+import { TrendingUp, TrendingDown, Minus, Calendar, BarChart3, Layers, Eye, Heart, MessageCircle, Bookmark, Users, Activity } from 'lucide-react';
+import { getSaves, getEngagement, getReach } from '@/utils/ig';
+import DetailedNormalizedIncidentReport from '@/components/ui/detailed-normalized-incident-report';
 
 type ComparisonPeriod = 'week' | 'month' | 'quarter';
 
@@ -221,6 +216,30 @@ export default function Comparisons() {
     ];
   }, [comparisonData]);
 
+  // Metrics for the detailed report component
+  const reportMetrics = useMemo(() => {
+    if (!comparisonData?.metrics) return [];
+    
+    const iconMap: Record<string, React.ReactNode> = {
+      'Alcance': <Eye className="h-5 w-5" />,
+      'Impressões': <Activity className="h-5 w-5" />,
+      'Visitas ao Perfil': <Users className="h-5 w-5" />,
+      'Curtidas': <Heart className="h-5 w-5" />,
+      'Comentários': <MessageCircle className="h-5 w-5" />,
+      'Salvos': <Bookmark className="h-5 w-5" />,
+    };
+
+    return comparisonData.metrics.slice(0, 3).map((metric, index) => ({
+      id: metric.label.toLowerCase().replace(/\s/g, '-'),
+      icon: iconMap[metric.label] || <Activity className="h-5 w-5" />,
+      label: metric.label,
+      value: formatNumber(metric.current),
+      trend: metric.changePercent >= 0 ? 'up' as const : 'down' as const,
+      trendColor: metric.changePercent >= 0 ? '#22C55E' : '#EF4444',
+      delay: index * 0.05,
+    }));
+  }, [comparisonData]);
+
   const legendItems = [
     { name: 'Alcance', color: '#3B82F6' },
     { name: 'Impressões', color: '#8B5CF6' },
@@ -307,84 +326,15 @@ export default function Comparisons() {
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Normalized Area Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-semibold">Distribuição de Métricas</CardTitle>
-                    <div className="flex items-center gap-3">
-                      {legendItems.map((item) => (
-                        <div key={item.name} className="flex items-center gap-1.5">
-                          <div
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-xs text-muted-foreground">{item.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[250px] w-full">
-                    {chartData.length > 0 ? (
-                      <StackedNormalizedAreaChart
-                        data={chartData as any}
-                        xAxis={
-                          <LinearXAxis
-                            type="time"
-                            tickSeries={
-                              <LinearXAxisTickSeries
-                                label={
-                                  <LinearXAxisTickLabel
-                                    format={(v) => format(new Date(v), 'dd/MM', { locale: ptBR })}
-                                    fill="hsl(var(--muted-foreground))"
-                                  />
-                                }
-                                tickSize={10}
-                              />
-                            }
-                          />
-                        }
-                        yAxis={
-                          <LinearYAxis
-                            tickSeries={<LinearYAxisTickSeries tickSize={0} />}
-                          />
-                        }
-                        series={
-                          <StackedNormalizedAreaSeries
-                            line={<Line strokeWidth={2} />}
-                            area={
-                              <Area
-                                gradient={
-                                  <Gradient
-                                    stops={[
-                                      <GradientStop key="start" offset="0%" stopOpacity={0.4} />,
-                                      <GradientStop key="end" offset="100%" stopOpacity={0.1} />,
-                                    ]}
-                                  />
-                                }
-                              />
-                            }
-                            colorScheme={['#3B82F6', '#8B5CF6', '#EC4899']}
-                          />
-                        }
-                        gridlines={<GridlineSeries line={<Gridline strokeDasharray="3 3" />} />}
-                      />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-muted-foreground">
-                        Sem dados disponíveis
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            {/* Detailed Normalized Report */}
+            <DetailedNormalizedIncidentReport
+              title="Distribuição de Métricas"
+              legendItems={legendItems}
+              chartData={chartData.length > 0 ? chartData : undefined}
+              colorScheme={['#3B82F6', '#8B5CF6', '#EC4899']}
+              metrics={reportMetrics}
+              height={220}
+            />
 
             {/* Bar Comparison Chart */}
             <motion.div
