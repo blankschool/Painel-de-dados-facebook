@@ -11,11 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
 import { PostDetailModal } from "@/components/PostDetailModal";
 import { usePostClick } from "@/hooks/usePostClick";
-import { ProfileSection } from "@/components/sections/ProfileSection";
-import { PostsSection } from "@/components/sections/PostsSection";
-import { StoriesSection } from "@/components/sections/StoriesSection";
-import { AudienceSection } from "@/components/sections/AudienceSection";
-import { OptimizationSection } from "@/components/sections/OptimizationSection";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LineChart,
@@ -596,29 +591,6 @@ export default function Overview() {
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        {/* New Dashboard Sections with Tooltips */}
-        <div className="mt-12 space-y-12">
-          <div className="border-t pt-12">
-            <ProfileSection data={data} />
-          </div>
-
-          <div className="border-t pt-12">
-            <PostsSection data={data} />
-          </div>
-
-          <div className="border-t pt-12">
-            <StoriesSection data={data} />
-          </div>
-
-          <div className="border-t pt-12">
-            <AudienceSection data={data} />
-          </div>
-
-          <div className="border-t pt-12">
-            <OptimizationSection data={data} />
           </div>
         </div>
 
