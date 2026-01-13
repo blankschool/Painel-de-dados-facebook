@@ -18,13 +18,14 @@ import { cn } from "@/lib/utils";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
+  Area,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 
 const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -106,13 +107,12 @@ export default function Overview() {
     [media, dateRange, accountTimezone],
   );
 
-  // Performance over time data with month comparison
-  const performanceData = useMemo(() => {
-    if (postDailyMetrics.length === 0) return [];
-    
+  // Performance over time data - show FULL timeline of both months side by side
+  const { performanceData, daysInPrevMonth } = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    const currentDay = now.getDate();
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     
@@ -120,7 +120,7 @@ export default function Overview() {
     const allMediaItems = data?.media ?? [];
     const allMetrics = buildPostDailyMetrics(allMediaItems, undefined, accountTimezone);
     
-    // Group by day of month for current month
+    // Group by day of month for each month
     const currentMonthData: Record<number, number> = {};
     const prevMonthData: Record<number, number> = {};
     
@@ -135,30 +135,44 @@ export default function Overview() {
       }
     });
     
-    // Create aligned data for comparison
-    const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const result: Array<{ day: number; date: string; dateLabel: string; reach: number; reachPrev: number | null }> = [];
+    const daysInPrevMonthCount = new Date(prevYear, prevMonth + 1, 0).getDate();
+    const result: Array<{ 
+      index: number; 
+      dateLabel: string; 
+      reach: number | null; 
+      reachPrev: number | null;
+      isCurrentMonth: boolean;
+    }> = [];
     
-    for (let day = 1; day <= daysInCurrentMonth; day++) {
-      const currentReach = currentMonthData[day] || 0;
-      const prevReach = prevMonthData[day] || null;
-      
-      // Only include days that have data in either month
-      if (currentReach > 0 || (prevReach !== null && prevReach > 0)) {
-        result.push({
-          day,
-          date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-          dateLabel: `${day}`,
-          reach: currentReach,
-          reachPrev: prevReach,
-        });
-      }
+    // Add ALL days from previous month
+    for (let day = 1; day <= daysInPrevMonthCount; day++) {
+      const prevReach = prevMonthData[day] || 0;
+      result.push({
+        index: day,
+        dateLabel: `${day}/${prevMonth + 1}`,
+        reach: null,
+        reachPrev: prevReach > 0 ? prevReach : null,
+        isCurrentMonth: false,
+      });
     }
     
-    return result;
-  }, [postDailyMetrics, data?.media, accountTimezone]);
+    // Add days from current month (up to today)
+    for (let day = 1; day <= currentDay; day++) {
+      const currentReach = currentMonthData[day] || 0;
+      result.push({
+        index: daysInPrevMonthCount + day,
+        dateLabel: `${day}/${currentMonth + 1}`,
+        reach: currentReach > 0 ? currentReach : null,
+        reachPrev: null,
+        isCurrentMonth: true,
+      });
+    }
+    
+    return { performanceData: result, daysInPrevMonth: daysInPrevMonthCount };
+  }, [data?.media, accountTimezone]);
 
   const hasReachPrev = performanceData.some(d => d.reachPrev !== null && d.reachPrev > 0);
+  const hasReachCurrent = performanceData.some(d => d.reach !== null && d.reach > 0);
 
   // Get month names for legend
   const monthNames = useMemo(() => {
@@ -377,16 +391,27 @@ export default function Overview() {
               </div>
             </div>
           </div>
-          <div className="h-64">
+          <div className="h-72">
             {performanceData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={performanceData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <ComposedChart data={performanceData} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
+                  <defs>
+                    <linearGradient id="reachGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="reachPrevGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     dataKey="dateLabel"
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 10 }}
                     stroke="hsl(var(--muted-foreground))"
                     tickLine={false}
+                    interval="preserveStartEnd"
                   />
                   <YAxis
                     tick={{ fontSize: 11 }}
@@ -396,33 +421,73 @@ export default function Overview() {
                     axisLine={false}
                   />
                   <Tooltip
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ fontWeight: 600, marginBottom: "4px", color: "hsl(var(--foreground))" }}
-                    formatter={(value: number, name: string) => [
-                      value.toLocaleString("pt-BR"),
-                      name === "reach" ? "Alcance" : "Alcance (mês anterior)",
-                    ]}
-                    labelFormatter={(label) => `Data: ${label}`}
+                    contentStyle={{
+                      ...tooltipStyle,
+                      minWidth: '180px',
+                    }}
+                    labelStyle={{ fontWeight: 600, marginBottom: "8px", color: "hsl(var(--foreground))" }}
+                    formatter={(value: number | null, name: string) => {
+                      if (value === null) return [null, null];
+                      return [
+                        value.toLocaleString("pt-BR"),
+                        name === "reach" ? `Alcance (${monthNames.current})` : `Alcance (${monthNames.prev})`,
+                      ];
+                    }}
+                    labelFormatter={(label) => `Dia ${label}`}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="reach"
-                    stroke="hsl(var(--foreground))"
+                  {/* Reference line to separate months */}
+                  <ReferenceLine 
+                    x={daysInPrevMonth} 
+                    stroke="hsl(var(--border))" 
+                    strokeDasharray="5 5"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: "hsl(var(--foreground))" }}
-                    activeDot={{ r: 6, fill: "hsl(var(--foreground))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
                   />
+                  {/* Previous month - area with dashed line */}
                   {hasReachPrev && (
-                    <Line
-                      type="monotone"
-                      dataKey="reachPrev"
-                      stroke="hsl(var(--muted-foreground))"
-                      strokeWidth={2}
-                      strokeDasharray="8 4"
-                      dot={false}
-                    />
+                    <>
+                      <Area
+                        type="monotone"
+                        dataKey="reachPrev"
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        fill="url(#reachPrevGradient)"
+                        connectNulls={false}
+                        animationBegin={0}
+                        animationDuration={1200}
+                        animationEasing="ease-out"
+                      />
+                    </>
                   )}
-                </LineChart>
+                  {/* Current month - solid line with dots */}
+                  {hasReachCurrent && (
+                    <>
+                      <Area
+                        type="monotone"
+                        dataKey="reach"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={3}
+                        fill="url(#reachGradient)"
+                        connectNulls={false}
+                        animationBegin={200}
+                        animationDuration={1500}
+                        animationEasing="ease-out"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="reach"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+                        activeDot={{ r: 8, fill: "hsl(var(--primary))", stroke: "hsl(var(--card))", strokeWidth: 3 }}
+                        connectNulls={false}
+                        animationBegin={200}
+                        animationDuration={1500}
+                        animationEasing="ease-out"
+                      />
+                    </>
+                  )}
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -433,9 +498,9 @@ export default function Overview() {
         </div>
 
         {/* Bottom Row: Day of Week + Engagement Breakdown + Top Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 items-stretch">
           {/* Performance By Day Of Week */}
-          <div className="card">
+          <div className="card min-h-[380px] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="card-title">Desempenho por Dia da Semana</h3>
@@ -446,7 +511,7 @@ export default function Overview() {
                 onToggle={() => setDaySort(o => o === "desc" ? "asc" : "desc")} 
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1">
               {dayData.some((d) => d.value > 0) ? (
                 <>
                   {dayData.map((item, index) => {
@@ -504,7 +569,7 @@ export default function Overview() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card min-h-[380px] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="card-title">Detalhamento de Engajamento</h3>
@@ -575,7 +640,7 @@ export default function Overview() {
           </div>
 
           {/* Top Performing Content - Shows all posts (1 per day) */}
-          <div className="card" ref={topContentRef}>
+          <div className="card min-h-[380px] flex flex-col" ref={topContentRef}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>
