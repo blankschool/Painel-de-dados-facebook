@@ -50,6 +50,7 @@ export default function Overview() {
   const { data, loading, error, forceRefresh } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
+  const accountInsights: Record<string, number> = data?.account_insights ?? {};
 
   // Apply filters to media using account's timezone
   const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
@@ -75,19 +76,30 @@ export default function Overview() {
   console.log(`[Overview] All media: ${allMedia.length}, Filtered: ${media.length}`);
   console.log(`[Overview] Comparison metrics:`, comparisonMetrics);
 
-  const totalViews = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
-  const totalReach = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
+  const totalViewsFromPosts = media.reduce((sum, item) => sum + (getViews(item) ?? 0), 0);
+  const totalReachFromPosts = media.reduce((sum, item) => sum + (getReach(item) ?? 0), 0);
   const totalLikes = media.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = media.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);
   const totalSaves = media.reduce((sum, item) => sum + (getSaves(item) ?? 0), 0);
+  const accountsEngaged = typeof accountInsights['accounts_engaged'] === "number" ? accountInsights['accounts_engaged'] : null;
+  const accountReach = data?.consolidated_reach ?? totalReachFromPosts;
+  const accountImpressions = data?.consolidated_impressions ?? totalViewsFromPosts;
   
-  const avgEr = useMemo(() => {
-    const values = media.map((m) => getComputedNumber(m, "er")).filter((v): v is number => typeof v === "number");
-    if (values.length === 0) return null;
-    return values.reduce((s, v) => s + v, 0) / values.length;
-  }, [media]);
+  const latestFollowerCount = useMemo(() => {
+    const lastDaily = dailyInsights.length ? dailyInsights[dailyInsights.length - 1] : null;
+    if (lastDaily && typeof lastDaily.follower_count === "number") return lastDaily.follower_count;
+    if (typeof accountInsights['follower_count'] === "number") return accountInsights['follower_count'];
+    return profile?.followers_count ?? null;
+  }, [dailyInsights, accountInsights, profile?.followers_count]);
+
+  const accountEngagementRate = useMemo(() => {
+    if (typeof accountsEngaged === "number" && typeof latestFollowerCount === "number" && latestFollowerCount > 0) {
+      return (accountsEngaged / latestFollowerCount) * 100;
+    }
+    return null;
+  }, [accountsEngaged, latestFollowerCount]);
   
-  const avgReach = media.length ? Math.round(totalReach / media.length) : null;
+  const avgReach = media.length ? Math.round(totalReachFromPosts / media.length) : null;
 
   // Content counts
   const counts = useMemo(() => {
@@ -282,17 +294,17 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Alcance Total"
-            value={formatCompact(totalReach)}
+            value={formatCompact(accountReach)}
             icon={<Eye className="w-5 h-5" />}
             index={1}
-            tooltip="Contas únicas alcançadas pelos posts no período"
+            tooltip="Contas únicas alcançadas por posts, stories e anúncios no período"
           />
           <LogiKpiCard
             label="Taxa de Engajamento"
-            value={formatPercent(avgEr)}
+            value={formatPercent(accountEngagementRate)}
             icon={<Target className="w-5 h-5" />}
             index={2}
-            tooltip="Média de engajamento por post"
+            tooltip="Percentual de seguidores que interagiram com posts, stories ou anúncios no período"
           />
           <LogiKpiCard
             label="Curtidas"
@@ -319,10 +331,10 @@ export default function Overview() {
           />
           <LogiKpiCard
             label="Visualizações"
-            value={formatCompact(totalViews)}
+            value={formatCompact(accountImpressions)}
             icon={<Play className="w-5 h-5" />}
             index={6}
-            tooltip="Visualizações de posts no período"
+            tooltip="Visualizações de posts, stories e anúncios no período"
           />
           <LogiKpiCard
             label="Salvamentos"

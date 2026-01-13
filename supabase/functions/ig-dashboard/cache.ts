@@ -34,9 +34,14 @@ export type DailyInsight = {
   insight_date: string; // YYYY-MM-DD
   reach?: number;
   impressions?: number;
+  accounts_engaged?: number;
   profile_views?: number;
   website_clicks?: number;
   follower_count?: number;
+  email_contacts?: number;
+  phone_call_clicks?: number;
+  text_message_clicks?: number;
+  get_directions_clicks?: number;
 };
 
 export type PostCache = {
@@ -257,9 +262,14 @@ export async function saveDailyInsights(
     insight_date: insightDate,
     reach: insightsData.reach,
     impressions: insightsData.impressions,
+    accounts_engaged: insightsData.accounts_engaged,
     profile_views: insightsData.profile_views,
     website_clicks: insightsData.website_clicks,
     follower_count: insightsData.follower_count,
+    email_contacts: insightsData.email_contacts,
+    phone_call_clicks: insightsData.phone_call_clicks,
+    text_message_clicks: insightsData.text_message_clicks,
+    get_directions_clicks: insightsData.get_directions_clicks,
   };
 
   const { error } = await supabase
@@ -277,6 +287,7 @@ export type DailyInsightRecord = {
   insight_date: string;
   reach?: number;
   impressions?: number;
+  accounts_engaged?: number;
   profile_views?: number;
   website_clicks?: number;
   follower_count?: number;
@@ -298,6 +309,7 @@ export async function saveDailyInsightsBatch(
     insight_date: row.insight_date,
     reach: row.reach,
     impressions: row.impressions,
+    accounts_engaged: row.accounts_engaged,
     profile_views: row.profile_views,
     website_clicks: row.website_clicks,
     follower_count: row.follower_count,

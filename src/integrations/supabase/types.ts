@@ -118,6 +118,7 @@ export type Database = {
       instagram_daily_insights: {
         Row: {
           account_id: string
+          accounts_engaged: number | null
           created_at: string
           email_contacts: number | null
           follower_count: number | null
@@ -134,6 +135,7 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          accounts_engaged?: number | null
           created_at?: string
           email_contacts?: number | null
           follower_count?: number | null
@@ -150,6 +152,7 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          accounts_engaged?: number | null
           created_at?: string
           email_contacts?: number | null
           follower_count?: number | null

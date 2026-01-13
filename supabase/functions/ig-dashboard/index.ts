@@ -704,12 +704,33 @@ serve(async (req) => {
 
         // Calculate consolidated metrics from cached daily insights
         const consolidatedMetrics = cachedInsights.reduce(
-          (acc: any, insight: any) => ({
-            reach: acc.reach + (insight.reach || 0),
-            impressions: acc.impressions + (insight.impressions || 0),
-            profile_views: acc.profile_views + (insight.profile_views || 0),
-          }),
-          { reach: 0, impressions: 0, profile_views: 0 }
+          (acc: any, insight: any) => {
+            acc.reach += insight.reach || 0;
+            acc.impressions += insight.impressions || 0;
+            acc.profile_views += insight.profile_views || 0;
+            acc.accounts_engaged += insight.accounts_engaged || 0;
+            acc.website_clicks += insight.website_clicks || 0;
+            acc.text_message_clicks += insight.text_message_clicks || 0;
+            acc.email_contacts += insight.email_contacts || 0;
+            acc.phone_call_clicks += insight.phone_call_clicks || 0;
+            acc.get_directions_clicks += insight.get_directions_clicks || 0;
+            if (acc.follower_count === null && typeof insight.follower_count === "number") {
+              acc.follower_count = insight.follower_count;
+            }
+            return acc;
+          },
+          {
+            reach: 0,
+            impressions: 0,
+            profile_views: 0,
+            accounts_engaged: 0,
+            website_clicks: 0,
+            text_message_clicks: 0,
+            email_contacts: 0,
+            phone_call_clicks: 0,
+            get_directions_clicks: 0,
+            follower_count: null,
+          },
         );
 
         const dailyInsights = cachedInsights
@@ -717,9 +738,14 @@ serve(async (req) => {
             insight_date: insight.insight_date,
             reach: insight.reach ?? 0,
             impressions: insight.impressions ?? 0,
+            accounts_engaged: insight.accounts_engaged ?? 0,
             profile_views: insight.profile_views ?? 0,
             follower_count: insight.follower_count ?? null,
             website_clicks: insight.website_clicks ?? 0,
+            email_contacts: insight.email_contacts ?? 0,
+            phone_call_clicks: insight.phone_call_clicks ?? 0,
+            text_message_clicks: insight.text_message_clicks ?? 0,
+            get_directions_clicks: insight.get_directions_clicks ?? 0,
           }))
           .sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
 
@@ -737,23 +763,61 @@ serve(async (req) => {
             insight_date: insight.insight_date,
             reach: insight.reach ?? 0,
             impressions: insight.impressions ?? 0,
+            accounts_engaged: insight.accounts_engaged ?? 0,
             profile_views: insight.profile_views ?? 0,
             follower_count: insight.follower_count ?? null,
             website_clicks: insight.website_clicks ?? 0,
+            email_contacts: insight.email_contacts ?? 0,
+            phone_call_clicks: insight.phone_call_clicks ?? 0,
+            text_message_clicks: insight.text_message_clicks ?? 0,
+            get_directions_clicks: insight.get_directions_clicks ?? 0,
           }))
           .sort((a: any, b: any) => String(a.insight_date).localeCompare(String(b.insight_date)));
 
         const previousTotals = previousCachedInsights.reduce(
-          (acc: any, insight: any) => ({
-            reach: acc.reach + (insight.reach || 0),
-            impressions: acc.impressions + (insight.impressions || 0),
-            profile_views: acc.profile_views + (insight.profile_views || 0),
-          }),
-          { reach: 0, impressions: 0, profile_views: 0 },
+          (acc: any, insight: any) => {
+            acc.reach += insight.reach || 0;
+            acc.impressions += insight.impressions || 0;
+            acc.profile_views += insight.profile_views || 0;
+            acc.accounts_engaged += insight.accounts_engaged || 0;
+            acc.website_clicks += insight.website_clicks || 0;
+            acc.text_message_clicks += insight.text_message_clicks || 0;
+            acc.email_contacts += insight.email_contacts || 0;
+            acc.phone_call_clicks += insight.phone_call_clicks || 0;
+            acc.get_directions_clicks += insight.get_directions_clicks || 0;
+            if (acc.follower_count === null && typeof insight.follower_count === "number") {
+              acc.follower_count = insight.follower_count;
+            }
+            return acc;
+          },
+          {
+            reach: 0,
+            impressions: 0,
+            profile_views: 0,
+            accounts_engaged: 0,
+            website_clicks: 0,
+            text_message_clicks: 0,
+            email_contacts: 0,
+            phone_call_clicks: 0,
+            get_directions_clicks: 0,
+            follower_count: null,
+          },
         );
 
         const comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
-        for (const metric of ['reach', 'impressions', 'profile_views'] as const) {
+        const comparisonKeys = [
+          'reach',
+          'impressions',
+          'profile_views',
+          'accounts_engaged',
+          'website_clicks',
+          'text_message_clicks',
+          'email_contacts',
+          'phone_call_clicks',
+          'get_directions_clicks',
+          'follower_count',
+        ];
+        for (const metric of comparisonKeys) {
           const current = (consolidatedMetrics as Record<string, number>)[metric] || 0;
           const previous = (previousTotals as Record<string, number>)[metric] || 0;
           if (current === 0 && previous === 0) continue;
@@ -1119,102 +1183,91 @@ serve(async (req) => {
       const currentDailyMap: DailyInsightsMap = {};
       const previousDailyMap: DailyInsightsMap = {};
 
-      // Fetch current period reach/profile_views (safe metrics)
-      const insightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-        metric: 'reach,profile_views',
-        period: 'day',
-        since: sinceDate,
-        until: untilDate,
-      });
-
-      const insightsData = (insightsJson as { data?: unknown[] }).data;
-      if (Array.isArray(insightsData)) {
-        for (const metric of insightsData) {
+      const collectMetrics = (
+        payload: unknown,
+        targetTotals: Record<string, number>,
+        targetDaily: DailyInsightsMap,
+      ) => {
+        const values = (payload as { data?: unknown[] }).data;
+        if (!Array.isArray(values)) return;
+        for (const metric of values) {
           const metricData = metric as { name?: string; values?: InsightValue[] };
           if (metricData.name && metricData.values) {
             const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
-            accountInsights[metricData.name] = total;
-            addDailyInsightValues(currentDailyMap, metricData.name, metricData.values);
-          }
-        }
-      }
-
-      // Attempt impressions (may be unavailable depending on permissions)
-      try {
-        const impressionsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-          metric: 'impressions',
-          period: 'day',
-          since: sinceDate,
-          until: untilDate,
-        });
-        const impressionsData = (impressionsJson as { data?: unknown[] }).data;
-        if (Array.isArray(impressionsData)) {
-          for (const metric of impressionsData) {
-            const metricData = metric as { name?: string; values?: InsightValue[] };
-            if (metricData.name && metricData.values) {
-              const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
-              accountInsights[metricData.name] = total;
-              addDailyInsightValues(currentDailyMap, metricData.name, metricData.values);
+            const lastValue = [...metricData.values].reverse().find((v) => typeof v.value === "number")?.value;
+            if (metricData.name === 'follower_count') {
+              if (typeof lastValue === 'number') {
+                targetTotals[metricData.name] = lastValue;
+              }
+            } else {
+              targetTotals[metricData.name] = total;
             }
+            addDailyInsightValues(targetDaily, metricData.name, metricData.values);
           }
         }
-      } catch (impErr) {
-        console.log('[ig-dashboard] Impressions not available for current period:', impErr instanceof Error ? impErr.message : String(impErr));
-      }
+      };
+
+      const fetchMetrics = async (
+        metrics: string[],
+        since: string,
+        until: string,
+        targetTotals: Record<string, number>,
+        targetDaily: DailyInsightsMap,
+        label: string,
+      ) => {
+        try {
+          const json = await graphGet(`/${businessId}/insights`, accessToken, {
+            metric: metrics.join(','),
+            period: 'day',
+            since,
+            until,
+          });
+          collectMetrics(json, targetTotals, targetDaily);
+        } catch (err) {
+          console.log(`[ig-dashboard] ${label} not available:`, err instanceof Error ? err.message : String(err));
+        }
+      };
+
+      await fetchMetrics(['reach', 'profile_views'], sinceDate, untilDate, accountInsights, currentDailyMap, 'reach/profile_views');
+      await fetchMetrics(['impressions'], sinceDate, untilDate, accountInsights, currentDailyMap, 'impressions');
+      await fetchMetrics(['accounts_engaged'], sinceDate, untilDate, accountInsights, currentDailyMap, 'accounts_engaged');
+      await fetchMetrics(['follower_count'], sinceDate, untilDate, accountInsights, currentDailyMap, 'follower_count');
+      await fetchMetrics(
+        ['website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks'],
+        sinceDate,
+        untilDate,
+        accountInsights,
+        currentDailyMap,
+        'contact_clicks',
+      );
 
       dailyInsights = mapDailyInsights(currentDailyMap) as cache.DailyInsightRecord[];
+      if (typeof accountInsights.follower_count !== "number" && typeof profile.followers_count === "number") {
+        accountInsights.follower_count = profile.followers_count;
+      }
 
       console.log('[ig-dashboard] Account insights (current):', accountInsights);
 
       // Fetch previous period insights for comparison
       try {
-        const prevInsightsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-          metric: 'reach,profile_views',
-          period: 'day',
-          since: prevSince,
-          until: prevUntil,
-        });
-
-        const prevInsightsData = (prevInsightsJson as { data?: unknown[] }).data;
-        if (Array.isArray(prevInsightsData)) {
-          for (const metric of prevInsightsData) {
-            const metricData = metric as { name?: string; values?: InsightValue[] };
-            if (metricData.name && metricData.values) {
-              const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
-              previousPeriodInsights[metricData.name] = total;
-              addDailyInsightValues(previousDailyMap, metricData.name, metricData.values);
-            }
-          }
-        }
-
-        // Attempt impressions for previous period
-        try {
-          const prevImpressionsJson = await graphGet(`/${businessId}/insights`, accessToken, {
-            metric: 'impressions',
-            period: 'day',
-            since: prevSince,
-            until: prevUntil,
-          });
-          const prevImpressionsData = (prevImpressionsJson as { data?: unknown[] }).data;
-          if (Array.isArray(prevImpressionsData)) {
-            for (const metric of prevImpressionsData) {
-              const metricData = metric as { name?: string; values?: InsightValue[] };
-              if (metricData.name && metricData.values) {
-                const total = metricData.values.reduce((sum, v) => sum + (typeof v.value === "number" ? v.value : 0), 0);
-                previousPeriodInsights[metricData.name] = total;
-                addDailyInsightValues(previousDailyMap, metricData.name, metricData.values);
-              }
-            }
-          }
-        } catch (prevImpErr) {
-          console.log('[ig-dashboard] Impressions not available for previous period:', prevImpErr instanceof Error ? prevImpErr.message : String(prevImpErr));
-        }
+        await fetchMetrics(['reach', 'profile_views'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'reach/profile_views (prev)');
+        await fetchMetrics(['impressions'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'impressions (prev)');
+        await fetchMetrics(['accounts_engaged'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'accounts_engaged (prev)');
+        await fetchMetrics(['follower_count'], prevSince, prevUntil, previousPeriodInsights, previousDailyMap, 'follower_count (prev)');
+        await fetchMetrics(
+          ['website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks'],
+          prevSince,
+          prevUntil,
+          previousPeriodInsights,
+          previousDailyMap,
+          'contact_clicks (prev)',
+        );
 
         previousDailyInsights = mapDailyInsights(previousDailyMap) as cache.DailyInsightRecord[];
 
         console.log('[ig-dashboard] Account insights (previous):', previousPeriodInsights);
 
-        const comparisonKeys = ['reach', 'impressions', 'profile_views'].filter(
+        const comparisonKeys = ['reach', 'impressions', 'profile_views', 'accounts_engaged', 'website_clicks', 'text_message_clicks', 'email_contacts', 'phone_call_clicks', 'get_directions_clicks', 'follower_count'].filter(
           (metric) => metric in accountInsights || metric in previousPeriodInsights,
         );
 
