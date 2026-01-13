@@ -3,9 +3,10 @@ import { useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useTheme } from "next-themes";
-import { Sun, Moon, User, Settings, LogOut, ChevronDown } from "lucide-react";
+import { Sun, Moon, User, Settings, LogOut, ChevronDown, Download } from "lucide-react";
 import { useFilters } from "@/contexts/FiltersContext";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useAuth } from "@/contexts/AuthContext";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
+import {
+  buildExportFileBaseName,
+  buildExportPayload,
+  exportCsvBundle,
+  exportJson,
+  exportPdf,
+} from "@/utils/exportData";
 
 const pageMeta: Record<string, { title: string; subtitle: string }> = {
   "/": {
@@ -80,8 +88,9 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
 
 export function Topbar() {
   const location = useLocation();
-  const { getDateRangeFromPreset, setDateRangePreset, setCustomDateRange, filters } = useFilters();
-  const { data, refresh } = useDashboardData();
+  const { getDateRangeFromPreset, setCustomDateRange, filters } = useFilters();
+  const { data, refresh, loading } = useDashboardData();
+  const { selectedAccount } = useAuth();
   const { theme, setTheme } = useTheme();
   
   const meta =
@@ -118,6 +127,28 @@ export function Topbar() {
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  const handleExport = (format: "csv" | "json" | "pdf") => {
+    if (!data) return;
+    const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
+    const payload = buildExportPayload({
+      data,
+      filters,
+      dateRange,
+      timezone,
+    });
+    const baseName = buildExportFileBaseName(payload);
+
+    if (format === "csv") {
+      exportCsvBundle(payload, baseName);
+      return;
+    }
+    if (format === "json") {
+      exportJson(payload, baseName);
+      return;
+    }
+    exportPdf(payload, baseName);
   };
 
   // Handle calendar date selection
@@ -206,6 +237,28 @@ export function Topbar() {
             <DropdownMenuItem className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               Desconectar conta
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Export */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2" disabled={loading || !data}>
+              <Download className="h-4 w-4" />
+              Exportar
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem onClick={() => handleExport("csv")} disabled={!data}>
+              Exportar CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("json")} disabled={!data}>
+              Exportar JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("pdf")} disabled={!data}>
+              Exportar PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

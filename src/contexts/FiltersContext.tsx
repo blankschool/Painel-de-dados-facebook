@@ -6,7 +6,7 @@ export type DayFilter = 'all' | 'weekdays' | 'weekends' | 'best';
 export type MediaType = 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS';
 export type DateRangePreset = '7d' | '14d' | '30d' | '60d' | '90d' | '6m' | '1y' | 'custom';
 
-interface FiltersState {
+export interface FiltersState {
   dayFilter: DayFilter;
   mediaType: MediaType;
   dateRangePreset: DateRangePreset;
