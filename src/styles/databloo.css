@@ -605,6 +605,9 @@ body {
   box-shadow: var(--shadow-card);
   border: 1px solid hsl(var(--border));
   backdrop-filter: blur(12px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 768px) {

@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useFilteredMedia } from '@/hooks/useFilteredMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { FiltersBar } from '@/components/layout/FiltersBar';
-import { formatNumberOrDash, getViews, isReel } from '@/utils/ig';
+import { ReelDetailModal } from '@/components/ReelDetailModal';
+import { formatNumberOrDash, getViews, isReel, type IgMediaItem } from '@/utils/ig';
 import { 
   Play, 
   Eye,
@@ -24,12 +26,64 @@ import {
   Legend
 } from 'recharts';
 
+// Custom tooltip component for bar chart
+const CustomReelTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; fullCaption: string; thumbnail: string | undefined; date: string | undefined; views: number; likes: number; comments: number }; name: string; value: number; color: string }> }) => {
+  if (active && payload?.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-card p-4 rounded-xl border shadow-lg min-w-[200px]">
+        <div className="flex items-center gap-3 mb-3">
+          {data.thumbnail && (
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+              <img src={data.thumbnail} alt="Reel" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{data.name}</p>
+            {data.date && (
+              <p className="text-xs text-muted-foreground">
+                {new Date(data.date).toLocaleDateString('pt-BR')}
+              </p>
+            )}
+          </div>
+        </div>
+        {data.fullCaption && (
+          <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{data.fullCaption}</p>
+        )}
+        <div className="space-y-1.5">
+          {payload.map((p) => (
+            <div key={p.name} className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{p.name}:</span>
+              <span className="font-semibold">{p.value.toLocaleString('pt-BR')}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const Reels = () => {
   const { data, loading, error } = useDashboardData();
   const { selectedAccount } = useAuth();
   const allMedia = data?.media ?? [];
   const timezone = selectedAccount?.timezone || "America/Sao_Paulo";
   const media = useFilteredMedia(allMedia, timezone);
+
+  // Modal state
+  const [selectedReel, setSelectedReel] = useState<IgMediaItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleReelClick = (reel: IgMediaItem) => {
+    setSelectedReel(reel);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedReel(null);
+  };
 
   if (loading) {
     return (
@@ -52,12 +106,16 @@ const Reels = () => {
   const rankedByViews = data?.top_reels_by_views?.length ? data.top_reels_by_views : reels;
   const topReels = rankedByViews.slice(0, 10);
 
-  // Real performance data from API
+  // Real performance data from API with enhanced tooltip info
   const reelsPerformance = topReels.map((reel, index) => ({
-    name: `Reel ${index + 1}`,
+    name: reel.caption?.slice(0, 15) || `Reel ${index + 1}`,
+    fullCaption: reel.caption?.slice(0, 80) || '',
+    thumbnail: reel.thumbnail_url || reel.media_url,
+    date: reel.timestamp,
     views: getViews(reel) ?? 0,
     likes: reel.like_count || 0,
     comments: reel.comments_count || 0,
+    reel: reel, // reference for click
   }));
   const hasViews = reelsPerformance.some((r) => r.views > 0);
 
@@ -110,24 +168,47 @@ const Reels = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={reelsPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      padding: '12px',
-                    }}
-                    labelStyle={{ fontWeight: 600, marginBottom: '4px', color: 'hsl(var(--foreground))' }}
-                    formatter={(value: number) => [value.toLocaleString('pt-BR'), '']}
-                    cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }}
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 10 }} 
+                    stroke="hsl(var(--muted-foreground))"
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                    height={50}
                   />
+                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip content={<CustomReelTooltip />} cursor={{ fill: 'hsl(var(--accent))', opacity: 0.3 }} />
                   <Legend />
-                  {hasViews && <Bar dataKey="views" fill="hsl(var(--foreground) / 0.35)" radius={[4, 4, 0, 0]} name="Views" />}
-                  <Bar dataKey="likes" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Curtidas" />
-                  <Bar dataKey="comments" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} name="Comentários" />
+                  {hasViews && (
+                    <Bar 
+                      dataKey="views" 
+                      fill="hsl(var(--foreground) / 0.35)" 
+                      radius={[4, 4, 0, 0]} 
+                      name="Views"
+                      animationBegin={0}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    />
+                  )}
+                  <Bar 
+                    dataKey="likes" 
+                    fill="hsl(var(--primary))" 
+                    radius={[4, 4, 0, 0]} 
+                    name="Curtidas"
+                    animationBegin={100}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
+                  <Bar 
+                    dataKey="comments" 
+                    fill="hsl(var(--muted-foreground))" 
+                    radius={[4, 4, 0, 0]} 
+                    name="Comentários"
+                    animationBegin={200}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -137,17 +218,15 @@ const Reels = () => {
           <ChartCard title="Top Reels" subtitle={hasViews ? "Ordenado por views" : "Ordenado por relevância"}>
             <div className="space-y-3">
               {topReels.slice(0, 5).map((reel, index) => (
-                <a
+                <div
                   key={reel.id}
-                  href={reel.permalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors"
+                  onClick={() => handleReelClick(reel)}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
                     {index + 1}
                   </div>
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-secondary">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-secondary relative">
                     {reel.thumbnail_url || reel.media_url ? (
                       <img 
                         src={reel.thumbnail_url || reel.media_url}
@@ -159,6 +238,9 @@ const Reels = () => {
                         <Play className="w-6 h-6 text-muted-foreground" />
                       </div>
                     )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <Play className="w-6 h-6 text-white" />
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
@@ -181,13 +263,13 @@ const Reels = () => {
                       </span>
                     </div>
                   </div>
-                </a>
+                </div>
               ))}
             </div>
           </ChartCard>
 
           {/* Comparison Table */}
-          <ChartCard title="Comparativo de Métricas" subtitle="Clique para abrir no Instagram">
+          <ChartCard title="Comparativo de Métricas" subtitle="Clique para ver detalhes">
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
@@ -205,10 +287,10 @@ const Reels = () => {
                     <tr 
                       key={reel.id}
                       className="cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={() => reel.permalink && window.open(reel.permalink, '_blank')}
+                      onClick={() => handleReelClick(reel)}
                     >
                       <td>
-                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-secondary flex-shrink-0 relative">
                           {reel.thumbnail_url || reel.media_url ? (
                             <img 
                               src={reel.thumbnail_url || reel.media_url}
@@ -220,6 +302,9 @@ const Reels = () => {
                               <Play className="w-4 h-4 text-muted-foreground" />
                             </div>
                           )}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Play className="w-4 h-4 text-white" />
+                          </div>
                         </div>
                       </td>
                       <td className="font-medium max-w-[200px]">
@@ -242,6 +327,9 @@ const Reels = () => {
           </ChartCard>
         </>
       )}
+
+      {/* Reel Detail Modal */}
+      <ReelDetailModal reel={selectedReel} isOpen={isModalOpen} onClose={closeModal} />
     </div>
   );
 };
