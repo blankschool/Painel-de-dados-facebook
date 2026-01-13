@@ -30,7 +30,7 @@ interface FiltersContextType {
 const defaultFilters: FiltersState = {
   dayFilter: 'all',
   mediaType: 'all',
-  dateRangePreset: '1y',
+  dateRangePreset: '30d',
   customDateRange: null,
   searchQuery: '',
 };
@@ -138,7 +138,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     let count = 0;
     if (filters.dayFilter !== 'all') count++;
     if (filters.mediaType !== 'all') count++;
-    if (filters.dateRangePreset !== '1y') count++;
+    if (filters.dateRangePreset !== '30d') count++;
     if (filters.searchQuery) count++;
     return count;
   }, [filters]);
