@@ -752,9 +752,9 @@ serve(async (req) => {
         );
 
         const comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
-        for (const metric of ['reach', 'impressions', 'profile_views']) {
-          const current = consolidatedMetrics[metric] || 0;
-          const previous = previousTotals[metric] || 0;
+        for (const metric of ['reach', 'impressions', 'profile_views'] as const) {
+          const current = (consolidatedMetrics as Record<string, number>)[metric] || 0;
+          const previous = (previousTotals as Record<string, number>)[metric] || 0;
           if (current === 0 && previous === 0) continue;
           const change = current - previous;
           const changePercent = previous > 0 ? ((change / previous) * 100) : 0;
@@ -1102,8 +1102,8 @@ serve(async (req) => {
     let accountInsights: Record<string, number> = {};
     let previousPeriodInsights: Record<string, number> = {};
     let comparisonMetrics: Record<string, { current: number; previous: number; change: number; changePercent: number }> = {};
-    let dailyInsights: Array<{ insight_date: string; [key: string]: number }> = [];
-    let previousDailyInsights: Array<{ insight_date: string; [key: string]: number }> = [];
+    let dailyInsights: cache.DailyInsightRecord[] = [];
+    let previousDailyInsights: cache.DailyInsightRecord[] = [];
 
     try {
       console.log(`[ig-dashboard] Fetching account insights from ${sinceDate} to ${untilDate}`);
@@ -1161,7 +1161,7 @@ serve(async (req) => {
         console.log('[ig-dashboard] Impressions not available for current period:', impErr instanceof Error ? impErr.message : String(impErr));
       }
 
-      dailyInsights = mapDailyInsights(currentDailyMap);
+      dailyInsights = mapDailyInsights(currentDailyMap) as cache.DailyInsightRecord[];
 
       console.log('[ig-dashboard] Account insights (current):', accountInsights);
 
@@ -1209,7 +1209,7 @@ serve(async (req) => {
           console.log('[ig-dashboard] Impressions not available for previous period:', prevImpErr instanceof Error ? prevImpErr.message : String(prevImpErr));
         }
 
-        previousDailyInsights = mapDailyInsights(previousDailyMap);
+        previousDailyInsights = mapDailyInsights(previousDailyMap) as cache.DailyInsightRecord[];
 
         console.log('[ig-dashboard] Account insights (previous):', previousPeriodInsights);
 
@@ -1269,7 +1269,7 @@ serve(async (req) => {
       // Save daily insights (one row per day)
       if (dailyInsights.length > 0) {
         const latestDate = dailyInsights[dailyInsights.length - 1]?.insight_date;
-        const withFollowers = dailyInsights.map((row) =>
+        const withFollowers: cache.DailyInsightRecord[] = dailyInsights.map((row) =>
           row.insight_date === latestDate && typeof profile.followers_count === "number"
             ? { ...row, follower_count: profile.followers_count }
             : row,
