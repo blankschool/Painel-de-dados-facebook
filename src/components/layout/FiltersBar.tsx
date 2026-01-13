@@ -137,8 +137,8 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
   };
 
   return (
-    <div className="filters-bar flex flex-wrap items-center gap-3 mb-4 md:mb-6">
-      {/* Left Section: Date Controls + Actions */}
+    <div className="filters-bar flex flex-wrap items-center justify-between gap-3 mb-4 md:mb-6">
+      {/* Left Section: Actions + Quick Filters */}
       <div className="flex items-center gap-2">
         {/* Refresh Button with Tooltip */}
         <TooltipProvider>
@@ -195,7 +195,10 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
             </button>
           ))}
         </div>
+      </div>
 
+      {/* Right Section: Date Preset + Calendar */}
+      <div className="flex items-center gap-2">
         {/* Preset Selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -204,7 +207,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="end" className="w-48">
             {dateRangeOptions.map((option) => (
               <DropdownMenuItem
                 key={option.value}
@@ -229,7 +232,7 @@ export function FiltersBar({ showMediaType = false }: { showMediaType?: boolean 
               <span className="font-medium">{dateLabel}</span>
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="w-auto p-0" align="end">
             <Calendar
               initialFocus
               mode="range"
