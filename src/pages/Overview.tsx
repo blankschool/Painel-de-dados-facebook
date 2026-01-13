@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { formatDateForGraph, formatDateForTooltip, getDateKey } from "@/utils/dateFormat";
-import { Link } from "react-router-dom";
+import { formatDateForGraph, getDateKey } from "@/utils/dateFormat";
 import { FiltersBar } from "@/components/layout/FiltersBar";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredMedia } from "@/hooks/useFilteredMedia";
 import { formatNumberOrDash, formatPercent, getComputedNumber, getReach, getSaves, getViews, type IgMediaItem } from "@/utils/ig";
-import { Grid2X2, Search, Play, Clock, Image, ExternalLink, Instagram, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
+import { formatRelativeTime } from "@/lib/dashboardHelpers";
+import { Grid2X2, Search, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Image as ImageIcon, Play, ExternalLink, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortToggle, SortDropdown, type SortOrder } from "@/components/ui/SortToggle";
@@ -71,15 +71,20 @@ const tooltipStyle = {
 
 export default function Overview() {
   const { selectedAccount } = useAuth();
-  const { data, loading, error, refresh } = useDashboardData();
+  const { data, loading, error, forceRefresh } = useDashboardData();
   const profile = data?.profile ?? null;
   const allMedia = data?.media ?? [];
 
   // Apply filters to media using account's timezone
   const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
   const media = useFilteredMedia(allMedia, accountTimezone);
-
-  // Post click handling
+  
+  // Raw post count (before 1-per-day filter)
+  const rawPostCount = allMedia.length;
+  
+  // Cache info for display
+  const fromCache = (data as any)?.from_cache === true;
+  const cacheAgeHours = (data as any)?.cache_age_hours as number | undefined;
   const { selectedPost, isModalOpen, handlePostClick, closeModal } = usePostClick("modal");
 
   // Sort states
@@ -253,10 +258,22 @@ export default function Overview() {
       <div className="flex items-center justify-between gap-4 mb-4">
         <FiltersBar />
         <div className="flex items-center gap-2">
+          {/* Last update indicator */}
+          {data && (
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              <span>
+                {(data as any).from_cache 
+                  ? `Cache (${((data as any).cache_age_hours ?? 0).toFixed(1)}h)`
+                  : 'Atualizado agora'
+                }
+              </span>
+            </div>
+          )}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refresh()}
+            onClick={() => forceRefresh()}
             disabled={loading}
             className="flex items-center gap-1.5"
           >
@@ -501,7 +518,7 @@ export default function Overview() {
               <div className="engagement-stats">
                 <div className="stat-box">
                   <div className="stat-icon">
-                    <Image className="w-5 h-5" />
+                    <ImageIcon className="w-5 h-5" />
                   </div>
                   <span className="stat-label">Posts</span>
                   <span className="stat-value">{counts.posts}</span>
