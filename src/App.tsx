@@ -27,7 +27,7 @@ import Profile from "./pages/Profile";
 import AdvancedAnalysis from "./pages/AdvancedAnalysis";
 import Followers from "./pages/Followers";
 import Content from "./pages/Content";
-import Time from "./pages/Time";
+
 import MediaDetail from "./pages/MediaDetail";
 import Optimization from "./pages/Optimization";
 
@@ -62,7 +62,7 @@ const App = () => (
                     <Route path="/overview" element={<Overview />} />
                     <Route path="/followers" element={<Followers />} />
                     <Route path="/content" element={<Content />} />
-                    <Route path="/time" element={<Time />} />
+                    
                     <Route path="/media/:mediaId" element={<MediaDetail />} />
                     <Route path="/performance" element={<Performance />} />
                     <Route path="/posts" element={<Posts />} />
