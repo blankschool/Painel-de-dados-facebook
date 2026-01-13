@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
-import { subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
+import { subDays, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
 export type DayFilter = 'all' | 'weekdays' | 'weekends' | 'best';
@@ -60,10 +60,10 @@ function computeDateRangeFromPreset(preset: DateRangePreset): DateRange {
       startDate = subDays(today, 89);
       break;
     case '6m':
-      startDate = subMonths(today, 6);
+      startDate = subDays(today, 181);
       break;
     case '1y':
-      startDate = subYears(today, 1);
+      startDate = subDays(today, 364);
       break;
     case 'custom':
     default:
@@ -125,7 +125,11 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const getDateRangeFromPreset = useCallback(() => {
     // If custom preset and customDateRange is set, use it
     if (filters.dateRangePreset === 'custom' && filters.customDateRange?.from) {
-      return filters.customDateRange;
+      const from = startOfDay(filters.customDateRange.from);
+      const to = filters.customDateRange.to
+        ? endOfDay(filters.customDateRange.to)
+        : endOfDay(filters.customDateRange.from);
+      return { from, to };
     }
     return computeDateRangeFromPreset(filters.dateRangePreset);
   }, [filters.dateRangePreset, filters.customDateRange]);

@@ -51,7 +51,7 @@ export function useFilteredMedia(
 
     console.log(`[useFilteredMedia] After date filter: ${filtered.length} items`);
 
-    const useBestPerDay = options.bestPerDay || filters.dayFilter === 'best';
+    const useBestPerDay = options.bestPerDay ?? true;
 
     // Filter by day of week (skip when using best-per-day mode)
     if (filters.dayFilter !== 'all' && filters.dayFilter !== 'best') {

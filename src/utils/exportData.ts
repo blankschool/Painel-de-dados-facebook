@@ -134,8 +134,9 @@ export function buildExportPayload(params: {
 }): ExportPayload {
   const { data, filters, dateRange, timezone } = params;
   const media = data.media ?? [];
-  const mediaFiltered = filterMediaForExport(media, filters, dateRange);
-  const mediaBestPerDay = getBestPostPerDay(mediaFiltered, "engagement", timezone);
+  const mediaFilteredRaw = filterMediaForExport(media, filters, dateRange);
+  const mediaBestPerDay = getBestPostPerDay(mediaFilteredRaw, "engagement", timezone);
+  const mediaFiltered = mediaBestPerDay;
 
   const totalLikes = mediaFiltered.reduce((sum, item) => sum + (item.like_count ?? 0), 0);
   const totalComments = mediaFiltered.reduce((sum, item) => sum + (item.comments_count ?? 0), 0);

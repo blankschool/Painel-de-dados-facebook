@@ -52,7 +52,6 @@ export default function Overview() {
   // Apply filters to media using account's timezone
   const accountTimezone = selectedAccount?.timezone || 'America/Sao_Paulo';
   const media = useFilteredMedia(allMedia, accountTimezone);
-  const bestPerDayMedia = useFilteredMedia(allMedia, accountTimezone, { bestPerDay: true });
   
   // Cache info for display
   const fromCache = (data as any)?.from_cache === true;
@@ -172,10 +171,9 @@ export default function Overview() {
     return sorted;
   }, [media, daySort]);
 
-  // Top content with sorting - best post per day
+  // Top content with sorting - respects current filters
   const topContent = useMemo(() => {
-    const source = bestPerDayMedia.length ? bestPerDayMedia : media;
-    return [...source]
+    return [...media]
       .map((item) => ({
         item,
         er: getComputedNumber(item, "er") ?? 0,
@@ -187,8 +185,8 @@ export default function Overview() {
         const bVal = b[topContentSortBy];
         return topContentSort === "desc" ? bVal - aVal : aVal - bVal;
       });
-    // No .slice() - show all best-per-day posts
-  }, [bestPerDayMedia, media, topContentSort, topContentSortBy]);
+    // No .slice() - show all filtered posts
+  }, [media, topContentSort, topContentSortBy]);
 
   // Calculate max value for bar chart scaling
   const maxTopContentValue = useMemo(() => {
@@ -557,7 +555,7 @@ export default function Overview() {
               <div>
                 <h3 className="card-title">Conteúdos de Melhor Desempenho</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {bestPerDayMedia.length} {bestPerDayMedia.length === 1 ? 'publicação' : 'publicações'} • 1 por dia
+                  {media.length} {media.length === 1 ? 'publicação' : 'publicações'}
                 </p>
               </div>
               <SortDropdown
